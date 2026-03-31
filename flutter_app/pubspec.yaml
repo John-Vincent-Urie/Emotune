@@ -1,0 +1,47 @@
+name: emotune
+description: EmoTune - Sentiment-Driven AI Music Recommender
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  provider: ^6.1.2
+  shared_preferences: ^2.2.3
+
+  # HTTP & API
+  http: ^1.2.1
+  dio: ^5.4.3+1
+
+  # UI
+  google_fonts: ^6.2.1
+  flutter_svg: ^2.0.10+1
+  cached_network_image: ^3.3.1
+  shimmer: ^3.0.0
+  fl_chart: ^0.67.0
+  lottie: ^3.1.0
+
+  # Audio
+  just_audio: ^0.9.39
+  audio_session: ^0.1.21
+
+  # Utils
+  intl: ^0.19.0
+  url_launcher: ^6.2.5
+  image_picker: ^1.1.2
+  percent_indicator: ^4.2.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

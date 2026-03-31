@@ -1,0 +1,325 @@
+"""Outcome modes, session planning, and taste controls for recommendations."""
+
+from __future__ import annotations
+
+from typing import Mapping
+
+
+OUTCOME_MODE_CONFIG = {
+    "match_mood": {
+        "label": "Match My Mood",
+        "description": "Stay close to the emotion the classifier detected.",
+        "target_weights": {},
+        "target_weight": 0.0,
+        "default_session_minutes": 20,
+        "default_check_in_tracks": 5,
+        "check_in_prompt": "Is this session matching how you want to feel right now?",
+        "completion_message": "Session locked in. I will stop interrupting and let the music carry you.",
+    },
+    "calm_me_down": {
+        "label": "Calm Me Down",
+        "description": "Gently de-escalate intense feelings into a steadier state.",
+        "target_weights": {
+            "calm": 0.55,
+            "stressed": 0.15,
+            "fear": 0.1,
+            "sad": 0.1,
+            "mixed": 0.1,
+        },
+        "target_weight": 0.58,
+        "default_session_minutes": 20,
+        "default_check_in_tracks": 3,
+        "check_in_prompt": "Has this session helped you settle down a little?",
+        "completion_message": "Nice. I will keep the session calm and steady from here.",
+    },
+    "help_me_focus": {
+        "label": "Help Me Focus",
+        "description": "Balance calm and momentum so the playlist supports concentration.",
+        "target_weights": {
+            "calm": 0.4,
+            "motivational": 0.35,
+            "happy": 0.15,
+            "mixed": 0.1,
+        },
+        "target_weight": 0.55,
+        "default_session_minutes": 45,
+        "default_check_in_tracks": 4,
+        "check_in_prompt": "Is this session helping you focus better?",
+        "completion_message": "Great. I will keep the focus lane stable and out of the way.",
+    },
+    "lift_me_up": {
+        "label": "Lift Me Up",
+        "description": "Nudge the energy upward without losing emotional fit.",
+        "target_weights": {
+            "happy": 0.42,
+            "motivational": 0.33,
+            "calm": 0.15,
+            "mixed": 0.1,
+        },
+        "target_weight": 0.52,
+        "default_session_minutes": 20,
+        "default_check_in_tracks": 4,
+        "check_in_prompt": "Is this session starting to lift your mood?",
+        "completion_message": "Good. I will keep the energy brighter without overdoing it.",
+    },
+    "sleep": {
+        "label": "Help Me Sleep",
+        "description": "Bias toward softer, slower, less jarring recommendations.",
+        "target_weights": {
+            "calm": 0.62,
+            "nostalgic": 0.14,
+            "sad": 0.04,
+            "mixed": 0.2,
+        },
+        "target_weight": 0.68,
+        "default_session_minutes": 45,
+        "default_check_in_tracks": 3,
+        "check_in_prompt": "Is this session helping you wind down for sleep?",
+        "completion_message": "I will keep things gentle and low-stimulation from here.",
+    },
+}
+
+TASTE_FAMILIARITY_OPTIONS = {"balanced", "familiar", "discovery"}
+
+
+def _safe_float(value, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_int(value, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def normalize_outcome_mode(value) -> str:
+    normalized = str(value or "match_mood").strip().lower() or "match_mood"
+    return normalized if normalized in OUTCOME_MODE_CONFIG else "match_mood"
+
+
+def outcome_mode_config(mode: str | None) -> dict:
+    return OUTCOME_MODE_CONFIG[normalize_outcome_mode(mode)]
+
+
+def normalize_taste_profile(raw_taste_profile: Mapping | None) -> dict:
+    working = raw_taste_profile if isinstance(raw_taste_profile, Mapping) else {}
+    familiarity = str(working.get("familiarity") or "balanced").strip().lower()
+    if familiarity not in TASTE_FAMILIARITY_OPTIONS:
+        familiarity = "balanced"
+
+    return {
+        "familiarity": familiarity,
+        "prefer_instrumental": bool(working.get("prefer_instrumental", False)),
+        "train_session": bool(working.get("train_session", True)),
+    }
+
+
+def should_persist_recommendation_context(
+    *,
+    outcome_mode: str,
+    session_length_minutes: int,
+    taste_profile: Mapping | None,
+) -> bool:
+    normalized_mode = normalize_outcome_mode(outcome_mode)
+    normalized_taste = normalize_taste_profile(taste_profile)
+    return (
+        normalized_mode != "match_mood"
+        or max(_safe_int(session_length_minutes), 0) > 0
+        or normalized_taste["familiarity"] != "balanced"
+        or normalized_taste["prefer_instrumental"]
+        or not normalized_taste["train_session"]
+    )
+
+
+def _normalize_emotune_scores(scores: Mapping[str, float] | None) -> dict[str, float]:
+    scores = scores if isinstance(scores, Mapping) else {}
+    sanitized = {
+        emotion: max(0.0, _safe_float(scores.get(emotion), 0.0))
+        for emotion in {
+            "happy",
+            "sad",
+            "angry",
+            "motivational",
+            "fear",
+            "depressing",
+            "surprising",
+            "stressed",
+            "calm",
+            "lonely",
+            "romantic",
+            "nostalgic",
+            "mixed",
+        }
+    }
+    max_value = max(sanitized.values(), default=0.0)
+    if max_value > 1.0:
+        sanitized = {
+            emotion: min(value / 100.0, 1.0)
+            for emotion, value in sanitized.items()
+        }
+    total = sum(sanitized.values())
+    if total <= 0:
+        sanitized["mixed"] = 1.0
+        total = 1.0
+    return {
+        emotion: value / total
+        for emotion, value in sanitized.items()
+    }
+
+
+def _normalize_weight_map(weight_map: Mapping[str, float] | None) -> dict[str, float]:
+    weight_map = weight_map if isinstance(weight_map, Mapping) else {}
+    sanitized = {
+        str(emotion or "").strip().lower(): max(0.0, _safe_float(weight, 0.0))
+        for emotion, weight in weight_map.items()
+        if str(emotion or "").strip()
+    }
+    total = sum(sanitized.values())
+    if total <= 0:
+        return {}
+    return {
+        emotion: value / total
+        for emotion, value in sanitized.items()
+    }
+
+
+def _rank_score_map(score_map: Mapping[str, float] | None) -> list[dict]:
+    score_map = score_map if isinstance(score_map, Mapping) else {}
+    ranking = [
+        {"emotion": emotion, "confidence": max(0.0, _safe_float(confidence, 0.0))}
+        for emotion, confidence in score_map.items()
+    ]
+    ranking.sort(key=lambda item: (-item["confidence"], item["emotion"]))
+    return ranking
+
+
+def _confidence_margin(ranking: list[dict]) -> float:
+    if not ranking:
+        return 0.0
+    if len(ranking) == 1:
+        return max(0.0, _safe_float(ranking[0].get("confidence"), 0.0))
+    return max(
+        0.0,
+        _safe_float(ranking[0].get("confidence"), 0.0)
+        - _safe_float(ranking[1].get("confidence"), 0.0),
+    )
+
+
+def apply_outcome_mode(result: Mapping | None, outcome_mode: str) -> dict:
+    working_result = dict(result) if isinstance(result, Mapping) else {}
+    normalized_mode = normalize_outcome_mode(outcome_mode)
+    config = outcome_mode_config(normalized_mode)
+    base_scores = _normalize_emotune_scores(working_result.get("all_scores"))
+
+    if normalized_mode == "match_mood":
+        ranking = _rank_score_map(base_scores)
+        return {
+            "emotion": ranking[0]["emotion"] if ranking else "mixed",
+            "confidence": ranking[0]["confidence"] if ranking else 0.0,
+            "all_scores": base_scores,
+            "top_emotions": ranking[:2],
+            "secondary_emotion": ranking[1]["emotion"] if len(ranking) > 1 else None,
+            "confidence_margin": _confidence_margin(ranking),
+            "outcome_mode": normalized_mode,
+            "outcome_label": config["label"],
+            "outcome_description": config["description"],
+        }
+
+    target_scores = _normalize_weight_map(config.get("target_weights"))
+    target_weight = min(max(_safe_float(config.get("target_weight"), 0.5), 0.0), 1.0)
+    base_weight = max(0.0, 1.0 - target_weight)
+
+    combined_scores = {}
+    for emotion in base_scores:
+        combined_scores[emotion] = (
+            base_scores.get(emotion, 0.0) * base_weight
+            + target_scores.get(emotion, 0.0) * target_weight
+        )
+
+    total = sum(combined_scores.values())
+    if total > 0:
+        combined_scores = {
+            emotion: value / total
+            for emotion, value in combined_scores.items()
+        }
+
+    ranking = _rank_score_map(combined_scores)
+    return {
+        "emotion": ranking[0]["emotion"] if ranking else "mixed",
+        "confidence": ranking[0]["confidence"] if ranking else 0.0,
+        "all_scores": combined_scores,
+        "top_emotions": ranking[:2],
+        "secondary_emotion": ranking[1]["emotion"] if len(ranking) > 1 else None,
+        "confidence_margin": _confidence_margin(ranking),
+        "outcome_mode": normalized_mode,
+        "outcome_label": config["label"],
+        "outcome_description": config["description"],
+    }
+
+
+def build_session_plan(
+    *,
+    outcome_mode: str,
+    session_length_minutes: int | None,
+    check_in_frequency_tracks: int | None = None,
+) -> dict | None:
+    normalized_mode = normalize_outcome_mode(outcome_mode)
+    config = outcome_mode_config(normalized_mode)
+    if session_length_minutes is None:
+        target_minutes = max(_safe_int(config.get("default_session_minutes"), 0), 0)
+    else:
+        target_minutes = max(_safe_int(session_length_minutes), 0)
+    if target_minutes <= 0:
+        return None
+
+    checkpoint_tracks = max(
+        _safe_int(check_in_frequency_tracks, _safe_int(config.get("default_check_in_tracks"), 4)),
+        1,
+    )
+    phase_cutoff = max(target_minutes // 3, 1)
+
+    return {
+        "enabled": True,
+        "mode": normalized_mode,
+        "label": config["label"],
+        "description": config["description"],
+        "target_minutes": target_minutes,
+        "target_seconds": target_minutes * 60,
+        "check_in_after_tracks": checkpoint_tracks,
+        "next_check_in_tracks": checkpoint_tracks,
+        "phase": "settle",
+        "phase_cutoff_minutes": phase_cutoff,
+        "check_in_prompt": config["check_in_prompt"],
+        "completion_message": config["completion_message"],
+        "progress_seconds": 0,
+        "completed": False,
+        "last_response": None,
+    }
+
+
+def update_session_plan_progress(
+    session_plan: Mapping | None,
+    *,
+    duration_seconds: int,
+    tracks_played: int,
+) -> dict | None:
+    if not isinstance(session_plan, Mapping) or not session_plan.get("enabled"):
+        return None
+
+    updated = dict(session_plan)
+    updated["progress_seconds"] = max(_safe_int(duration_seconds), 0)
+    updated["tracks_played"] = max(_safe_int(tracks_played), 0)
+
+    target_seconds = max(_safe_int(updated.get("target_seconds")), 0)
+    if target_seconds and updated["progress_seconds"] >= target_seconds:
+        updated["phase"] = "close"
+    elif updated["progress_seconds"] >= max(_safe_int(updated.get("phase_cutoff_minutes")) * 60, 60):
+        updated["phase"] = "support"
+    else:
+        updated["phase"] = "settle"
+
+    return updated

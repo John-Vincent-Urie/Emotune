@@ -1,0 +1,42 @@
+{
+  "rows_original": 1200,
+  "rows_after_cleaning": 1200,
+  "rows_removed": 0,
+  "empty_text_rows_removed": 0,
+  "empty_label_rows_removed": 0,
+  "invalid_label_rows_removed": 0,
+  "duplicate_rows_removed": 0,
+  "label_distribution": {
+    "angry": 100,
+    "calm": 100,
+    "depressing": 100,
+    "fear": 100,
+    "happy": 100,
+    "lonely": 100,
+    "motivational": 100,
+    "nostalgic": 100,
+    "romantic": 100,
+    "sad": 100,
+    "stressed": 100,
+    "surprising": 100
+  },
+  "recommended_reduced_distribution": {
+    "angry": 100,
+    "calm": 100,
+    "fear_or_anxious": 100,
+    "happy": 100,
+    "motivational": 100,
+    "neutral_or_mixed": 300,
+    "romantic": 100,
+    "sad": 200,
+    "stressed": 100
+  },
+  "text_length_summary": {
+    "chars_mean": 54.34,
+    "chars_median": 54.0,
+    "words_mean": 10.82,
+    "words_median": 11.0
+  },
+  "dataset_path": "C:\\Users\\Urie\\Documents\\CApstone!\\EmoTune-Capstone_project\\dataset\\emotune_dataset_1200.csv",
+  "cleaned_dataset_path": "C:\\Users\\Urie\\Documents\\CApstone!\\EmoTune-Capstone_project\\dataset\\emotune_dataset_1200.cleaned.csv"
+}

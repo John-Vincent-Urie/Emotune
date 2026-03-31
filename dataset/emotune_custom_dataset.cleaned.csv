@@ -1,0 +1,165 @@
+text,emotion,text_length_chars,text_length_words,recommended_label
+I'm so happy today everything is going great!,happy,45,8,happy
+Just got promoted at work! Best day ever!,happy,41,8,happy
+My team won the championship! I'm ecstatic!,happy,43,7,happy
+Got an A on my exam feeling on top of the world!,happy,48,12,happy
+Birthday celebration with all my friends was amazing!,happy,53,8,happy
+My baby took their first steps today!,happy,37,7,happy
+Woke up and everything just feels right today,happy,45,8,happy
+Feeling grateful for all the good things in my life,happy,51,10,happy
+The sun is shining and I feel amazing,happy,37,8,happy
+I got accepted into my dream university!,happy,40,7,happy
+I miss my grandmother so much. She passed away last year.,sad,57,11,sad
+My best friend is moving to another country. I feel lost.,sad,57,11,sad
+Failed my exam after studying for weeks. So disappointed.,sad,57,9,sad
+Nobody remembered my birthday today.,sad,36,5,sad
+Looking at old photos makes me sad about how things changed.,sad,60,11,sad
+My dog passed away yesterday. I am heartbroken.,sad,47,8,sad
+The person I love doesn't feel the same way.,sad,44,9,sad
+I feel like crying but I don't even know why.,sad,45,10,sad
+Everything reminds me of what I've lost.,sad,40,7,sad
+Didn't get the job. Back to square one.,sad,39,8,sad
+I can't believe they lied to me. I'm furious!,angry,45,9,angry
+This traffic is making me so mad. I'm going to be late again!,angry,61,13,angry
+My roommate keeps leaving dishes in the sink I'm fed up!,angry,56,11,angry
+Why do people keep interrupting me? I'm losing my patience.,angry,59,10,angry
+They gave away my seat on the plane even though I booked it!,angry,60,13,angry
+My colleague takes credit for all my work. I'm livid.,angry,53,10,angry
+The service at this restaurant was absolutely terrible.,angry,55,8,angry
+Why won't anyone listen to what I have to say?,angry,46,10,angry
+I'm going to crush this workout today! Nothing can stop me!,motivational,59,11,motivational
+Every failure is just a stepping stone to success.,motivational,50,9,motivational
+Starting my business today. Excited for this new chapter!,motivational,57,9,motivational
+I believe in myself. I can achieve anything I set my mind to!,motivational,61,13,motivational
+Training for a marathon. No pain no gain!,motivational,41,8,motivational
+Going after my dreams no matter what anyone says.,motivational,49,9,motivational
+Today I choose to be unstoppable.,motivational,33,6,motivational
+Rising up after every fall makes me stronger.,motivational,45,8,motivational
+I have my first job interview tomorrow. I'm terrified.,fear,54,9,fear_or_anxious
+There's a strange noise outside. I'm scared to check.,fear,53,9,fear_or_anxious
+I have anxiety about flying but I have a trip next week.,fear,56,12,fear_or_anxious
+Presenting in front of 500 people next week. Petrified.,fear,55,9,fear_or_anxious
+I'm worried something bad might happen to my family.,fear,52,9,fear_or_anxious
+The darkness in this neighborhood at night scares me.,fear,53,9,fear_or_anxious
+I feel like something terrible is about to happen.,fear,50,9,fear_or_anxious
+I feel empty inside. Nothing brings me joy anymore.,depressing,51,9,sad
+What's the point of anything? I can't see the light.,depressing,52,10,sad
+I've been feeling numb for weeks. Everything feels grey.,depressing,56,9,sad
+I don't want to get out of bed. Life feels meaningless.,depressing,55,11,sad
+The darkness inside me won't go away no matter what I do.,depressing,57,12,sad
+I can't remember the last time I felt something.,depressing,48,9,sad
+Every day feels like a struggle just to exist.,depressing,46,9,sad
+I just found out I'm pregnant! Complete shock!,surprising,46,8,neutral_or_mixed
+My long lost sibling just called me out of nowhere!,surprising,51,10,neutral_or_mixed
+Won the lottery today. I still can't believe it!,surprising,48,9,neutral_or_mixed
+My boss just gave me an unexpected bonus. What a surprise!,surprising,58,11,neutral_or_mixed
+Ran into my childhood friend at the airport in another country!,surprising,63,11,neutral_or_mixed
+I opened my mail and found I'd inherited money from an uncle I never knew.,surprising,74,15,neutral_or_mixed
+The twist at the end of this story completely blew my mind!,surprising,59,12,neutral_or_mixed
+I have three deadlines tomorrow and I haven't started any of them.,stressed,66,12,stressed
+My boss wants the report in an hour. I'm overwhelmed.,stressed,53,10,stressed
+Balancing work school and family is burning me out.,stressed,51,9,stressed
+I can't sleep because I'm thinking about everything I need to do.,stressed,65,12,stressed
+Finals week is here and I feel like I'm drowning.,stressed,49,10,stressed
+Too many responsibilities not enough time. Completely overwhelmed.,stressed,66,8,stressed
+My heart is racing and I can't calm down.,stressed,41,9,stressed
+Just finished meditating. Feeling so peaceful and centered.,calm,59,8,calm
+Sitting by the ocean and watching the sunset. Pure bliss.,calm,57,10,calm
+Everything is in order and I feel at peace with the world.,calm,58,12,calm
+Reading a good book with a cup of tea. Perfectly content.,calm,57,11,calm
+A quiet Sunday morning with no plans. This is what I needed.,calm,60,12,calm
+Breathing slowly and letting the tension dissolve.,calm,50,7,calm
+The world is quiet tonight and I feel at home in myself.,calm,56,12,calm
+I have 500 friends on social media but I feel completely alone.,lonely,63,12,neutral_or_mixed
+Moved to a new city and don't know anyone here.,lonely,47,10,neutral_or_mixed
+Everyone seems to have their own lives. Nobody checks on me.,lonely,60,11,neutral_or_mixed
+Sitting at home alone on a Friday night. Missing connection.,lonely,60,10,neutral_or_mixed
+Even in a crowd I feel isolated and invisible.,lonely,46,9,neutral_or_mixed
+The silence in my apartment is deafening tonight.,lonely,49,8,neutral_or_mixed
+I texted three people and no one replied.,lonely,41,8,neutral_or_mixed
+I'm so in love. Every moment with them feels magical.,romantic,53,10,romantic
+Got flowers from my partner unexpectedly. My heart is full.,romantic,59,10,romantic
+Planning a surprise date for my anniversary. Love is beautiful.,romantic,63,10,romantic
+The way they look at me makes me feel like the only person in the world.,romantic,72,16,romantic
+First date tonight! I have butterflies!,romantic,39,6,romantic
+Love letters remind me why I fell for them in the first place.,romantic,62,13,romantic
+Everything feels brighter when they're around.,romantic,46,6,romantic
+Heard that song from 2008 and suddenly I'm 16 again.,nostalgic,52,10,neutral_or_mixed
+Found my old diary. Remembering who I used to be.,nostalgic,49,10,neutral_or_mixed
+Drove past my childhood home today. So many memories.,nostalgic,53,9,neutral_or_mixed
+Rewatching old cartoons from my childhood. Simpler times.,nostalgic,57,8,neutral_or_mixed
+Old photos with friends I've lost touch with. Miss those days.,nostalgic,62,11,neutral_or_mixed
+The smell of that food reminds me of my grandmother's kitchen.,nostalgic,62,11,neutral_or_mixed
+Listening to the music I grew up with fills me with bittersweet longing.,nostalgic,72,13,neutral_or_mixed
+I got the job offer but it means leaving my family behind.,mixed,58,12,neutral_or_mixed
+Happy it's my birthday but also reflecting on time passing.,mixed,59,10,neutral_or_mixed
+Graduated today! Proud but nervous about what comes next.,mixed,57,9,neutral_or_mixed
+My relationship ended. Sad but also relieved somehow.,mixed,53,8,neutral_or_mixed
+Moving to my dream city but terrified of starting over.,mixed,55,10,neutral_or_mixed
+I don't know how to feel about this situation.,mixed,46,9,neutral_or_mixed
+My emotions are all over the place today.,mixed,41,8,neutral_or_mixed
+I woke up feeling joyful and full of energy,happy,43,9,happy
+My heart feels tired and low,sad,28,6,sad
+I feel disrespected and irritated,angry,33,5,angry
+I believe I can handle this challenge,motivational,37,7,motivational
+I feel tense and worried right now,fear,34,7,fear_or_anxious
+Everything feels dull and empty lately,depressing,38,6,sad
+That result caught me completely off guard,surprising,42,7,neutral_or_mixed
+I feel overwhelmed by my workload,stressed,33,6,stressed
+Everything feels quiet and manageable,calm,37,5,calm
+I am craving connection and closeness,lonely,37,6,neutral_or_mixed
+Being with them makes my heart feel full,romantic,40,8,romantic
+I keep thinking about simpler days,nostalgic,34,6,neutral_or_mixed
+My emotions are conflicted right now,mixed,36,6,neutral_or_mixed
+My mood is light and positive right now,happy,39,8,happy
+I feel like I am carrying quiet grief,sad,37,8,sad
+I am frustrated and close to snapping,angry,37,7,angry
+I choose discipline over excuses today,motivational,38,6,motivational
+My mind keeps expecting something bad,fear,37,6,fear_or_anxious
+I cannot find meaning in anything today,depressing,39,7,sad
+I am stunned by this sudden news,surprising,32,7,neutral_or_mixed
+I have too much to do and too little time,stressed,41,10,stressed
+My breathing is slow and peaceful,calm,33,6,calm
+The silence feels very loud tonight,lonely,35,6,neutral_or_mixed
+Their presence makes everything feel warmer,romantic,43,6,romantic
+I feel pulled back to old memories,nostalgic,34,7,neutral_or_mixed
+I feel both hopeful and uncertain at once,mixed,41,8,neutral_or_mixed
+Today feels bright and hopeful,happy,30,5,happy
+I am missing someone important to me,sad,36,7,sad
+My patience is running out quickly,angry,34,6,angry
+I am focused on progress and consistency,motivational,40,7,motivational
+I am nervous about what might happen next,fear,41,8,fear_or_anxious
+I feel numb and disconnected from joy,depressing,37,7,sad
+I am shocked by what just happened,surprising,34,7,neutral_or_mixed
+I cannot relax because deadlines are close,stressed,42,7,stressed
+I am at ease with this moment,calm,29,7,calm
+I feel isolated even around other people,lonely,40,7,neutral_or_mixed
+I feel deeply in love right now,romantic,31,7,romantic
+This moment reminds me of my childhood,nostalgic,38,7,neutral_or_mixed
+I feel happy and sad at the same time,mixed,37,9,neutral_or_mixed
+I feel grateful for the good things around me,happy,45,9,happy
+I feel heavy and down today,sad,27,6,sad
+This situation is making me really mad,angry,38,7,angry
+Every setback is fuel for my growth,motivational,35,7,motivational
+I am afraid of making the wrong choice,fear,38,8,fear_or_anxious
+I feel stuck in a dark emotional space,depressing,38,8,sad
+I did not expect this at all,surprising,28,7,neutral_or_mixed
+My thoughts are racing from pressure,stressed,36,6,stressed
+I feel centered and emotionally balanced,calm,40,6,calm
+I feel distant from everyone lately,lonely,35,6,neutral_or_mixed
+I feel tender and affectionate today,romantic,36,6,romantic
+Old memories are washing over me tonight,nostalgic,40,7,neutral_or_mixed
+Part of me is excited and part of me is afraid,mixed,46,11,neutral_or_mixed
+I am celebrating a small win and smiling,happy,40,8,happy
+Nothing feels as warm as it used to,sad,35,8,sad
+I am upset and struggling to stay calm,angry,38,8,angry
+I am ready to push forward and improve,motivational,38,8,motivational
+I feel anxious and unsure about this outcome,fear,44,8,fear_or_anxious
+Getting through the day feels exhausting,depressing,40,6,sad
+This twist was totally unexpected,surprising,33,5,neutral_or_mixed
+I feel stretched thin by responsibilities,stressed,41,6,stressed
+I feel grounded and steady right now,calm,36,7,calm
+I wish someone would check in on me,lonely,35,8,neutral_or_mixed
+I keep smiling when I think about them,romantic,38,8,romantic
+I miss how life felt years ago,nostalgic,30,7,neutral_or_mixed
+I cannot describe this complicated feeling,mixed,42,6,neutral_or_mixed

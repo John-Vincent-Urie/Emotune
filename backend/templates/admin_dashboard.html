@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EmoTune Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#080b0f;--surface:#0e1318;--card:#131920;--border:#1e2730;--border2:#243040;--text:#e8edf2;--muted:#6b7d8e;--lime:#9eff65;--lime2:#c5ff9a;--teal:#4dffd2;--blue:#4da6ff;--red:#ff4d6d;--orange:#ff9a3c;--purple:#b06aff;--yellow:#ffd166}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex}
+.sidebar{width:240px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;overflow-y:auto}
+.logo-area{padding:28px 24px 20px;border-bottom:1px solid var(--border)}
+.logo-circle{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#7effd4,#89e0ff,#ddff7e);display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.logo-wave{display:flex;align-items:center;gap:2px}
+.logo-wave span{display:block;width:3px;background:#000;border-radius:2px;animation:wave 1.2s ease-in-out infinite}
+.logo-wave span:nth-child(1){height:8px;animation-delay:0s}.logo-wave span:nth-child(2){height:14px;animation-delay:.1s}.logo-wave span:nth-child(3){height:18px;animation-delay:.2s}.logo-wave span:nth-child(4){height:14px;animation-delay:.3s}.logo-wave span:nth-child(5){height:8px;animation-delay:.4s}.logo-wave span:nth-child(6){height:14px;animation-delay:.1s}.logo-wave span:nth-child(7){height:18px;animation-delay:.2s}.logo-wave span:nth-child(8){height:14px;animation-delay:.3s}.logo-wave span:nth-child(9){height:8px;animation-delay:0s}
+@keyframes wave{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.4)}}
+.logo-name{font-family:'Space Mono',monospace;font-style:italic;font-size:18px;background:linear-gradient(135deg,var(--lime),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.logo-sub{font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+nav{flex:1;padding:16px 12px}
+.nav-section{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:12px 12px 6px;font-family:'Space Mono',monospace}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;transition:all .15s;color:var(--muted);font-size:14px;font-weight:500;margin-bottom:2px;border:1px solid transparent}
+.nav-item:hover{background:var(--card);color:var(--text);border-color:var(--border)}
+.nav-item.active{background:rgba(158,255,101,.08);color:var(--lime);border-color:rgba(158,255,101,.2)}
+.nav-icon{font-size:16px;width:20px;text-align:center}
+.sidebar-footer{padding:16px 12px;border-top:1px solid var(--border)}
+.admin-badge{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card);border-radius:10px;border:1px solid var(--border)}
+.admin-avatar{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--lime),var(--teal));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#000}
+.admin-info{flex:1;min-width:0}.admin-name{font-size:13px;font-weight:600}.admin-role{font-size:11px;color:var(--muted)}
+.main{margin-left:240px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+.topbar{padding:20px 32px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface);position:sticky;top:0;z-index:10}
+.page-title{font-family:'Space Mono',monospace;font-size:20px;font-weight:700}.page-title span{color:var(--lime)}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.refresh-btn{padding:8px 16px;background:transparent;border:1px solid var(--border2);border-radius:8px;color:var(--muted);cursor:pointer;font-size:13px;font-family:'DM Sans',sans-serif;transition:all .15s}
+.refresh-btn:hover{border-color:var(--lime);color:var(--lime)}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--lime);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+.content{padding:32px;flex:1}
+.page{display:none}.page.active{display:block}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative;overflow:hidden;transition:border-color .2s}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent-color,var(--lime))}
+.stat-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-family:'Space Mono',monospace;margin-bottom:8px}
+.stat-value{font-size:32px;font-weight:700;font-family:'Space Mono',monospace;line-height:1;margin-bottom:6px}
+.stat-change{font-size:12px;color:var(--lime)}
+.stat-icon{position:absolute;top:18px;right:18px;font-size:24px;opacity:.15}
+.charts-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:28px}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.chart-title{font-size:14px;font-weight:600;font-family:'Space Mono',monospace}
+.chart-badge{font-size:11px;padding:3px 8px;border-radius:20px;background:rgba(158,255,101,.1);color:var(--lime);border:1px solid rgba(158,255,101,.2);font-family:'Space Mono',monospace}
+.chart-container{position:relative;height:220px}
+.bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px}
+.mood-list{display:flex;flex-direction:column;gap:10px}
+.mood-row{display:flex;align-items:center;gap:12px}
+.mood-emoji{font-size:18px;width:28px;text-align:center}
+.mood-info{flex:1}
+.mood-name{font-size:13px;font-weight:500;margin-bottom:4px;display:flex;justify-content:space-between}
+.mood-count{color:var(--muted);font-size:12px}
+.mood-bar-bg{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.mood-bar-fill{height:100%;border-radius:3px;transition:width 1s cubic-bezier(.4,0,.2,1)}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.section-title{font-family:'Space Mono',monospace;font-size:15px;font-weight:700}
+.search-bar{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px 14px;width:260px;transition:border-color .15s}
+.search-bar:focus-within{border-color:var(--lime)}
+.search-bar input{background:none;border:none;outline:none;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;width:100%}
+.search-bar input::placeholder{color:var(--muted)}
+.table-wrap{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+table{width:100%;border-collapse:collapse}
+thead tr{border-bottom:1px solid var(--border)}
+th{padding:14px 20px;text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-family:'Space Mono',monospace;font-weight:400}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:rgba(255,255,255,.02)}
+td{padding:14px 20px;font-size:13px}
+.user-cell{display:flex;align-items:center;gap:10px}
+.user-avatar{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0}
+.user-name{font-weight:500;font-size:13px}.user-email{font-size:11px;color:var(--muted)}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500}
+.badge.green{background:rgba(77,255,210,.1);color:var(--teal);border:1px solid rgba(77,255,210,.2)}
+.badge.gray{background:rgba(107,125,142,.15);color:var(--muted);border:1px solid var(--border)}
+.delete-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:6px 10px;border-radius:6px;font-size:13px;transition:all .15s;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:4px}
+.delete-btn:hover{background:rgba(255,77,109,.1);color:var(--red)}
+.pagination{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+.page-btns{display:flex;gap:4px}
+.page-btn{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:'DM Sans',sans-serif}
+.page-btn:hover{border-color:var(--lime);color:var(--lime)}
+.page-btn.active{background:var(--lime);color:#000;border-color:var(--lime);font-weight:700}
+#login-page{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:1000}
+.login-card{width:400px;background:var(--card);border:1px solid var(--border);border-radius:24px;padding:40px}
+.login-logo{display:flex;align-items:center;gap:14px;margin-bottom:32px}
+.login-title{font-family:'Space Mono',monospace;font-size:22px;font-style:italic;background:linear-gradient(135deg,var(--lime),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.login-subtitle{font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.form-label{font-size:12px;color:var(--muted);margin-bottom:6px;display:block;font-family:'Space Mono',monospace}
+.form-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color .15s;margin-bottom:16px}
+.form-input:focus{border-color:var(--lime)}
+.login-btn{width:100%;padding:12px;background:linear-gradient(135deg,var(--lime),var(--lime2));border:none;border-radius:10px;color:#000;font-weight:700;font-size:15px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:opacity .15s;margin-top:4px}
+.login-btn:hover{opacity:.9}
+.login-error{font-size:13px;color:var(--red);background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.2);border-radius:8px;padding:10px 14px;margin-bottom:16px;display:none}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:500}
+.modal-overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:32px;width:400px;text-align:center}
+.modal-icon{font-size:48px;margin-bottom:12px}.modal-title{font-size:18px;font-weight:700;margin-bottom:8px;font-family:'Space Mono',monospace}
+.modal-text{font-size:14px;color:var(--muted);margin-bottom:24px;line-height:1.5}
+.modal-btns{display:flex;gap:10px}
+.btn-cancel{flex:1;padding:11px;background:none;border:1px solid var(--border);border-radius:10px;color:var(--text);cursor:pointer;font-size:14px;font-family:'DM Sans',sans-serif;transition:border-color .15s}
+.btn-delete{flex:1;padding:11px;background:var(--red);border:none;border-radius:10px;color:#fff;cursor:pointer;font-weight:600;font-size:14px;font-family:'DM Sans',sans-serif}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 18px;font-size:13px;transform:translateY(80px);opacity:0;transition:all .3s cubic-bezier(.4,0,.2,1);z-index:600}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-color:rgba(158,255,101,.3)}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+@media(max-width:1100px){.stats-grid{grid-template-columns:repeat(2,1fr)}.charts-grid{grid-template-columns:1fr}.bottom-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#7effd4,#89e0ff,#ddff7e);display:flex;align-items:center;justify-content:center;">
+        <div style="display:flex;align-items:center;gap:2px;">
+          <span style="display:block;width:3px;height:8px;background:#000;border-radius:2px;"></span>
+          <span style="display:block;width:3px;height:14px;background:#000;border-radius:2px;"></span>
+          <span style="display:block;width:3px;height:18px;background:#000;border-radius:2px;"></span>
+          <span style="display:block;width:3px;height:14px;background:#000;border-radius:2px;"></span>
+          <span style="display:block;width:3px;height:8px;background:#000;border-radius:2px;"></span>
+        </div>
+      </div>
+      <div><div class="login-title">EmoTune</div><div class="login-subtitle">Admin Dashboard</div></div>
+    </div>
+    <div class="login-error" id="login-error">Invalid credentials. Please try again.</div>
+    <label class="form-label">Email</label>
+    <input class="form-input" id="login-email" type="email" placeholder="admin@emotune.com">
+    <label class="form-label">Password</label>
+    <input class="form-input" id="login-password" type="password" placeholder="••••••••">
+    <button class="login-btn" onclick="doLogin()">Sign In →</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none;width:100%;">
+  <aside class="sidebar">
+    <div class="logo-area">
+      <div class="logo-circle">
+        <div class="logo-wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="logo-name">EmoTune</div>
+      <div class="logo-sub">Admin Panel</div>
+    </div>
+    <nav>
+      <div class="nav-section">Main</div>
+      <div class="nav-item active" onclick="showPage('dashboard',this)"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" onclick="showPage('users',this)"><span class="nav-icon">👥</span> Users</div>
+      <div class="nav-section" style="margin-top:8px;">Analytics</div>
+      <div class="nav-item" onclick="showPage('moods',this)"><span class="nav-icon">🎭</span> Mood Analytics</div>
+      <div class="nav-item" onclick="showPage('playlists',this)"><span class="nav-icon">🎵</span> Playlists</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge">
+        <div class="admin-avatar">A</div>
+        <div class="admin-info"><div class="admin-name" id="admin-username">Admin</div><div class="admin-role">Super Admin</div></div>
+        <span style="cursor:pointer;color:var(--muted);font-size:14px;" onclick="doLogout()" title="Logout">⏻</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="page-title" id="topbar-title">Admin <span>Dashboard</span></div>
+      <div class="topbar-right">
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);"><div class="live-dot"></div> Live</div>
+        <button class="refresh-btn" onclick="loadDashboard()">↻ Refresh</button>
+      </div>
+    </div>
+    <div class="content">
+
+      <!-- DASHBOARD PAGE -->
+      <div class="page active" id="page-dashboard">
+        <div class="stats-grid">
+          <div class="stat-card" style="--accent-color:var(--lime);">
+            <div class="stat-label">Total Users</div>
+            <div class="stat-value" id="stat-total" style="color:var(--lime);">—</div>
+            <div class="stat-change" id="stat-total-change">Loading...</div>
+            <div class="stat-icon">👤</div>
+          </div>
+          <div class="stat-card" style="--accent-color:var(--teal);">
+            <div class="stat-label">Spotify Connected</div>
+            <div class="stat-value" id="stat-spotify" style="color:var(--teal);">—</div>
+            <div class="stat-change" id="stat-spotify-change">Loading...</div>
+            <div class="stat-icon">🎵</div>
+          </div>
+          <div class="stat-card" style="--accent-color:var(--blue);">
+            <div class="stat-label">Total Prompts</div>
+            <div class="stat-value" id="stat-prompts" style="color:var(--blue);">—</div>
+            <div class="stat-change">All time</div>
+            <div class="stat-icon">💬</div>
+          </div>
+          <div class="stat-card" style="--accent-color:var(--orange);">
+            <div class="stat-label">Top Mood</div>
+            <div class="stat-value" id="stat-top-mood" style="color:var(--orange);font-size:18px;">—</div>
+            <div class="stat-change" id="stat-top-mood-count" style="color:var(--muted);">Loading...</div>
+            <div class="stat-icon">😊</div>
+          </div>
+        </div>
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-header"><div class="chart-title">Monthly Playlists Generated</div><div class="chart-badge">Last 6 months</div></div>
+            <div class="chart-container"><canvas id="monthlyChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header"><div class="chart-title">Mood Distribution</div><div class="chart-badge">All time</div></div>
+            <div class="chart-container"><canvas id="moodPieChart"></canvas></div>
+          </div>
+        </div>
+        <div class="bottom-grid">
+          <div class="chart-card">
+            <div class="chart-header"><div class="chart-title">Top Moods Ranking</div></div>
+            <div class="mood-list" id="mood-bars"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header"><div class="chart-title">Recent Users</div></div>
+            <div id="recent-activity" style="display:flex;flex-direction:column;gap:10px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- USERS PAGE -->
+      <div class="page" id="page-users">
+        <div class="section-header">
+          <div class="section-title">User Management</div>
+          <div class="search-bar"><span style="color:var(--muted);">🔍</span><input type="text" id="user-search" placeholder="Search users..." oninput="filterUsers(this.value)"></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>User</th><th>Joined</th><th>Prompts</th><th>Spotify</th><th>Actions</th></tr></thead>
+            <tbody id="users-tbody"><tr><td colspan="5" style="text-align:center;padding:40px;color:var(--muted);">Loading users...</td></tr></tbody>
+          </table>
+          <div class="pagination"><span id="users-count">— users</span><div class="page-btns" id="page-btns"></div></div>
+        </div>
+      </div>
+
+      <!-- MOODS PAGE -->
+      <div class="page" id="page-moods">
+        <div class="section-header"><div class="section-title">Mood Analytics</div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+          <div class="chart-card"><div class="chart-header"><div class="chart-title">Mood Frequency</div></div><div class="chart-container"><canvas id="moodBarChart"></canvas></div></div>
+          <div class="chart-card"><div class="chart-header"><div class="chart-title">Mood Breakdown</div></div><div class="chart-container"><canvas id="moodDonutChart"></canvas></div></div>
+        </div>
+        <div class="chart-card"><div class="chart-header"><div class="chart-title">All Moods Detail</div></div><div id="mood-detail-list" style="display:flex;flex-direction:column;gap:12px;padding-top:8px;"></div></div>
+      </div>
+
+      <!-- PLAYLISTS PAGE -->
+      <div class="page" id="page-playlists">
+        <div class="section-header"><div class="section-title">Playlist Statistics</div></div>
+        <div class="chart-card" style="margin-bottom:16px;">
+          <div class="chart-header"><div class="chart-title">Playlists Per Month</div><div class="chart-badge">Trend</div></div>
+          <div style="height:300px;"><canvas id="playlistTrendChart"></canvas></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+          <div class="stat-card" style="--accent-color:var(--purple);"><div class="stat-label">This Month</div><div class="stat-value" id="pl-this-month" style="color:var(--purple);">—</div><div class="stat-icon">📅</div></div>
+          <div class="stat-card" style="--accent-color:var(--blue);"><div class="stat-label">Last Month</div><div class="stat-value" id="pl-last-month" style="color:var(--blue);">—</div><div class="stat-icon">📆</div></div>
+          <div class="stat-card" style="--accent-color:var(--lime);"><div class="stat-label">Total All Time</div><div class="stat-value" id="pl-total" style="color:var(--lime);">—</div><div class="stat-icon">🎵</div></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal">
+    <div class="modal-icon">🗑️</div>
+    <div class="modal-title">Delete Account</div>
+    <div class="modal-text" id="modal-text">Are you sure? This cannot be undone.</div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-delete" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const API='http://127.0.0.1:8000/api';
+let token=localStorage.getItem('emotune_admin_token')||'';
+let allUsers=[],deleteUserId=null,monthlyData=[],moodData=[];
+let mC,mPC,mBC,mDC,tC;
+const EC={happy:'#ffd166',sad:'#4da6ff',angry:'#ff4d6d',motivational:'#ff9a3c',fear:'#b06aff',depressing:'#6b7d8e',surprising:'#ff69b4',stressed:'#ff6b6b',calm:'#4dffd2',lonely:'#778899',romantic:'#ff85c8',nostalgic:'#deb887',mixed:'#9370db'};
+const EE={happy:'😊',sad:'😢',angry:'😠',motivational:'💪',fear:'😨',depressing:'😔',surprising:'😲',stressed:'😤',calm:'😌',lonely:'🥺',romantic:'💕',nostalgic:'🌅',mixed:'🎭'};
+
+async function doLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const pass=document.getElementById('login-password').value;
+  document.getElementById('login-error').style.display='none';
+  if(!email||!pass){document.getElementById('login-error').textContent='Please enter email and password.';document.getElementById('login-error').style.display='block';return;}
+  try{
+    const r=await fetch(`${API}/users/login/`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass})});
+    const d=await r.json();
+    if(d.access){
+      if(!d.user?.is_staff&&!d.user?.is_superuser){document.getElementById('login-error').textContent='Access denied. Admin accounts only.';document.getElementById('login-error').style.display='block';return;}
+      token=d.access;localStorage.setItem('emotune_admin_token',token);
+      document.getElementById('admin-username').textContent=d.user.username||'Admin';
+      showApp();loadDashboard();
+    } else {
+      document.getElementById('login-error').textContent=d.error||'Invalid credentials.';
+      document.getElementById('login-error').style.display='block';
+    }
+  }catch(e){
+    document.getElementById('login-error').textContent='Cannot connect to server at '+API+'. Make sure Django is running.';
+    document.getElementById('login-error').style.display='block';
+  }
+}
+
+function showApp(){document.getElementById('login-page').style.display='none';document.getElementById('app').style.display='flex';}
+function doLogout(){localStorage.removeItem('emotune_admin_token');token='';location.reload();}
+
+function showPage(name,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');el.classList.add('active');
+  const titles={dashboard:'Admin <span>Dashboard</span>',users:'User <span>Management</span>',moods:'Mood <span>Analytics</span>',playlists:'Playlist <span>Statistics</span>'};
+  document.getElementById('topbar-title').innerHTML=titles[name]||name;
+  if(name==='users')loadUsers();
+  if(name==='moods')renderMoodAnalytics();
+  if(name==='playlists')renderPlaylists();
+}
+
+async function loadDashboard(){
+  try{
+    const h={'Authorization':`Bearer ${token}`};
+    const[dR,uR]=await Promise.all([fetch(`${API}/admin/dashboard/`,{headers:h}),fetch(`${API}/admin/users/`,{headers:h})]);
+    if(!dR.ok)throw new Error('Auth failed');
+    const dash=await dR.json();const users=await uR.json();
+    allUsers=users;monthlyData=dash.monthly_playlists||[];moodData=dash.mood_distribution||[];
+    renderStats(users);renderMonthlyChart();renderMoodPie();renderMoodBars();renderActivity(users);
+  }catch(e){console.warn('Using demo data:',e.message);loadDemo();}
+}
+
+function loadDemo(){
+  allUsers=genUsers();
+  monthlyData=[{month:'2024-10-01',count:45},{month:'2024-11-01',count:62},{month:'2024-12-01',count:88},{month:'2025-01-01',count:71},{month:'2025-02-01',count:95},{month:'2025-03-01',count:112}];
+  moodData=[{detected_emotion:'sad',count:234},{detected_emotion:'happy',count:198},{detected_emotion:'stressed',count:167},{detected_emotion:'lonely',count:143},{detected_emotion:'motivational',count:121},{detected_emotion:'calm',count:98},{detected_emotion:'angry',count:87},{detected_emotion:'romantic',count:76},{detected_emotion:'nostalgic',count:65},{detected_emotion:'fear',count:54},{detected_emotion:'depressing',count:43},{detected_emotion:'surprising',count:38},{detected_emotion:'mixed',count:29}];
+  renderStats(allUsers);renderMonthlyChart();renderMoodPie();renderMoodBars();renderActivity(allUsers);
+}
+
+function renderStats(users){
+  document.getElementById('stat-total').textContent=users.length;
+  document.getElementById('stat-total-change').textContent='↑ Active users';
+  const sc=users.filter(u=>u.is_spotify_connected).length;
+  document.getElementById('stat-spotify').textContent=sc;
+  document.getElementById('stat-spotify-change').textContent=users.length?`${Math.round(sc/users.length*100)}% of users`:'0%';
+  document.getElementById('stat-prompts').textContent=moodData.reduce((s,m)=>s+m.count,0);
+  if(moodData.length){const t=moodData[0];document.getElementById('stat-top-mood').textContent=(EE[t.detected_emotion]||'')+' '+t.detected_emotion;document.getElementById('stat-top-mood-count').textContent=`${t.count} prompts`;}
+}
+
+function renderMonthlyChart(){
+  const ctx=document.getElementById('monthlyChart');if(!ctx)return;if(mC)mC.destroy();
+  mC=new Chart(ctx,{type:'line',data:{labels:monthlyData.map(d=>{const dt=new Date(d.month);return dt.toLocaleDateString('en',{month:'short',year:'2-digit'});}),datasets:[{label:'Playlists',data:monthlyData.map(d=>d.count),borderColor:'#9eff65',backgroundColor:'rgba(158,255,101,.08)',borderWidth:2,pointBackgroundColor:'#9eff65',pointRadius:4,fill:true,tension:.4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#1e2730'},ticks:{color:'#6b7d8e',font:{size:11}}},y:{grid:{color:'#1e2730'},ticks:{color:'#6b7d8e',font:{size:11}},beginAtZero:true}}}});
+}
+
+function renderMoodPie(){
+  const ctx=document.getElementById('moodPieChart');if(!ctx)return;if(mPC)mPC.destroy();
+  const t6=moodData.slice(0,6);
+  mPC=new Chart(ctx,{type:'doughnut',data:{labels:t6.map(m=>m.detected_emotion),datasets:[{data:t6.map(m=>m.count),backgroundColor:t6.map(m=>EC[m.detected_emotion]||'#6b7d8e'),borderColor:'#131920',borderWidth:3}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'bottom',labels:{color:'#6b7d8e',font:{size:10},padding:8,boxWidth:10}}}}});
+}
+
+function renderMoodBars(){
+  const el=document.getElementById('mood-bars');if(!el)return;
+  const max=moodData[0]?.count||1;
+  el.innerHTML=moodData.slice(0,7).map(m=>`<div class="mood-row"><span class="mood-emoji">${EE[m.detected_emotion]||'🎵'}</span><div class="mood-info"><div class="mood-name"><span>${m.detected_emotion}</span><span class="mood-count">${m.count}</span></div><div class="mood-bar-bg"><div class="mood-bar-fill" style="width:${m.count/max*100}%;background:${EC[m.detected_emotion]||'#9eff65'}"></div></div></div></div>`).join('');
+}
+
+function renderActivity(users){
+  const el=document.getElementById('recent-activity');if(!el)return;
+  const cols=['#9eff65','#4dffd2','#4da6ff','#b06aff','#ff9a3c'];
+  const recent=[...users].sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0)).slice(0,5);
+  el.innerHTML=recent.map((u,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--surface);border-radius:10px;"><div style="width:32px;height:32px;border-radius:8px;background:${cols[i%cols.length]}22;color:${cols[i%cols.length]};border:1px solid ${cols[i%cols.length]}44;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">${(u.username||'U')[0].toUpperCase()}</div><div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.username||'User'}</div><div style="font-size:11px;color:var(--muted);">Joined ${fmtDate(u.created_at)}</div></div><div style="font-size:11px;color:var(--muted);white-space:nowrap;">${u.prompt_count||0} prompts</div></div>`).join('');
+}
+
+let curPage=1;const PER=10;
+
+async function loadUsers(){
+  if(!allUsers.length){try{const r=await fetch(`${API}/admin/users/`,{headers:{'Authorization':`Bearer ${token}`}});if(r.ok)allUsers=await r.json();else throw new Error();}catch(e){if(!allUsers.length)allUsers=genUsers();}}
+  renderUsersTable(allUsers);
+}
+
+function filterUsers(q){const ql=q.toLowerCase();renderUsersTable(allUsers.filter(u=>(u.username||'').toLowerCase().includes(ql)||(u.email||'').toLowerCase().includes(ql)));}
+function renderUsersTable(users){curPage=1;renderPage(users,1);}
+
+function renderPage(users,page){
+  const start=(page-1)*PER;const pu=users.slice(start,start+PER);
+  const cols=['#9eff65','#4dffd2','#4da6ff','#b06aff','#ff9a3c','#ff4d6d','#ffd166'];
+  document.getElementById('users-tbody').innerHTML=pu.length?pu.map((u,i)=>`<tr><td><div class="user-cell"><div class="user-avatar" style="background:${cols[(start+i)%cols.length]}22;color:${cols[(start+i)%cols.length]};border:1px solid ${cols[(start+i)%cols.length]}44;">${(u.username||'U')[0].toUpperCase()}</div><div><div class="user-name">${u.username||'—'}</div><div class="user-email">${u.email||'—'}</div></div></div></td><td style="color:var(--muted);font-size:12px;">${fmtDate(u.created_at)}</td><td><span style="font-family:'Space Mono',monospace;">${u.prompt_count||0}</span></td><td>${u.is_spotify_connected?'<span class="badge green">✓ Connected</span>':'<span class="badge gray">Not connected</span>'}</td><td><button class="delete-btn" onclick="openDeleteModal(${u.id},'${(u.username||'').replace(/'/g,'')}')" >🗑 Delete</button></td></tr>`).join(''):'<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted);">No users found</td></tr>';
+  document.getElementById('users-count').textContent=`${users.length} user${users.length!==1?'s':''}`;
+  const tot=Math.ceil(users.length/PER);
+  document.getElementById('page-btns').innerHTML=Array.from({length:tot},(_,i)=>`<button class="page-btn ${i+1===page?'active':''}" onclick="changePage(${i+1})">${i+1}</button>`).join('');
+}
+
+function changePage(p){const q=document.getElementById('user-search').value.toLowerCase();const f=q?allUsers.filter(u=>(u.username||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q)):allUsers;curPage=p;renderPage(f,p);}
+
+function openDeleteModal(id,name){deleteUserId=id;document.getElementById('modal-text').textContent=`Delete "${name}"? This action cannot be undone.`;document.getElementById('delete-modal').classList.add('open');}
+function closeModal(){document.getElementById('delete-modal').classList.remove('open');deleteUserId=null;}
+
+async function confirmDelete(){
+  if(!deleteUserId)return;
+  try{await fetch(`${API}/admin/users/${deleteUserId}/`,{method:'DELETE',headers:{'Authorization':`Bearer ${token}`}});}catch(e){}
+  allUsers=allUsers.filter(u=>u.id!==deleteUserId);
+  showToast('✅ User deleted successfully','success');closeModal();renderUsersTable(allUsers);
+}
+
+function renderMoodAnalytics(){
+  if(!moodData.length)return;
+  const bCtx=document.getElementById('moodBarChart');
+  if(bCtx){if(mBC)mBC.destroy();mBC=new Chart(bCtx,{type:'bar',data:{labels:moodData.map(m=>m.detected_emotion),datasets:[{data:moodData.map(m=>m.count),backgroundColor:moodData.map(m=>EC[m.detected_emotion]||'#9eff65'),borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#1e2730'},ticks:{color:'#6b7d8e',font:{size:10}}},y:{grid:{color:'#1e2730'},ticks:{color:'#6b7d8e'},beginAtZero:true}}}});}
+  const dCtx=document.getElementById('moodDonutChart');
+  if(dCtx){if(mDC)mDC.destroy();mDC=new Chart(dCtx,{type:'doughnut',data:{labels:moodData.map(m=>m.detected_emotion),datasets:[{data:moodData.map(m=>m.count),backgroundColor:moodData.map(m=>EC[m.detected_emotion]||'#9eff65'),borderColor:'#131920',borderWidth:3}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'right',labels:{color:'#6b7d8e',font:{size:10},padding:6,boxWidth:10}}}}});}
+  const tot=moodData.reduce((s,m)=>s+m.count,0);const max=moodData[0]?.count||1;
+  document.getElementById('mood-detail-list').innerHTML=moodData.map(m=>`<div style="display:flex;align-items:center;gap:14px;"><span style="font-size:20px;width:28px;text-align:center;">${EE[m.detected_emotion]||'🎵'}</span><div style="flex:1;"><div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:13px;font-weight:500;">${m.detected_emotion}</span><span style="font-size:12px;color:var(--muted);">${m.count} · ${(m.count/tot*100).toFixed(1)}%</span></div><div class="mood-bar-bg"><div class="mood-bar-fill" style="width:${m.count/max*100}%;background:${EC[m.detected_emotion]||'#9eff65'}"></div></div></div></div>`).join('');
+}
+
+function renderPlaylists(){
+  const at=monthlyData.reduce((s,m)=>s+m.count,0);
+  document.getElementById('pl-total').textContent=at;
+  document.getElementById('pl-this-month').textContent=monthlyData[monthlyData.length-1]?.count||0;
+  document.getElementById('pl-last-month').textContent=monthlyData[monthlyData.length-2]?.count||0;
+  const ctx=document.getElementById('playlistTrendChart');if(!ctx)return;if(tC)tC.destroy();
+  tC=new Chart(ctx,{type:'bar',data:{labels:monthlyData.map(d=>{const dt=new Date(d.month);return dt.toLocaleDateString('en',{month:'long',year:'numeric'});}),datasets:[{label:'Playlists',data:monthlyData.map(d=>d.count),backgroundColor:'rgba(158,255,101,.15)',borderColor:'#9eff65',borderWidth:2,borderRadius:8}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#1e2730'},ticks:{color:'#6b7d8e'}},y:{grid:{color:'#1e2730'},ticks:{color:'#6b7d8e'},beginAtZero:true}}}});
+}
+
+function fmtDate(s){if(!s)return'—';try{return new Date(s).toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'});}catch(e){return'—';}}
+function showToast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),3000);}
+
+function genUsers(){
+  const ns=['maria_santos','juan_dela_cruz','ana_reyes','carlos_garcia','lea_mendoza','miguel_torres','grace_lim','ryan_uy','jasmine_go','kevin_tan','patricia_cruz','mark_ramos','claire_dg','jerome_sy','kate_villanueva'];
+  return ns.map((n,i)=>({id:i+1,username:n,email:`${n}@gmail.com`,is_spotify_connected:Math.random()>.4,created_at:new Date(Date.now()-Math.random()*90*86400000).toISOString(),prompt_count:Math.floor(Math.random()*80)+1}));
+}
+
+document.getElementById('login-password').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+// Auto-login if token saved
+if(token){showApp();loadDashboard();}
+</script>
+</body>
+</html>

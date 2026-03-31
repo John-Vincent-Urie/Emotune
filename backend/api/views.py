@@ -1,0 +1,1696 @@
+"""
+EmoTune Main API Views
+Handles emotion analysis, recommendations, Spotify auth
+"""
+import random
+import json
+import logging
+from django.conf import settings
+from django.core import signing
+from django.http import JsonResponse
+from django.utils import timezone
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
+from rest_framework.response import Response
+from rest_framework import status
+from django.contrib.auth import get_user_model
+from django.db.models import Count, Avg
+from django.urls import reverse
+from datetime import timedelta
+
+from .spotify_service import spotify_service
+from .lightfm_ranker import lightfm_music_ranker
+from .recommendation_session import (
+    apply_outcome_mode,
+    build_session_plan,
+    normalize_outcome_mode,
+    normalize_taste_profile,
+    outcome_mode_config,
+    should_persist_recommendation_context,
+    update_session_plan_progress,
+)
+from ml.emotion_classifier import EMOTIONS, get_classifier, get_ai_response
+from ml.plutchik_mapper import build_plutchik_profile
+from users.models import PromptHistory, UserPreference, FavoriteTrack, ListeningSession
+from users.serializers import PromptHistorySerializer
+
+User = get_user_model()
+logger = logging.getLogger(__name__)
+
+RECOMMENDATION_CONTINUATION_SALT = 'emotune.recommendation.continuation'
+RECOMMENDATION_CONTINUATION_VERSION = 1
+RECOVERY_TRIGGER_EMOTIONS = frozenset({'sad', 'stressed', 'depressing', 'angry'})
+RECOVERY_SUPPORT_EMOTION_MAP = {
+    'sad': 'calm',
+    'stressed': 'calm',
+    'depressing': 'calm',
+    'angry': 'motivational',
+}
+RECOVERY_TRIGGER_CONFIDENCE = 0.90
+RECOVERY_CHECK_INTERVAL_TRACKS = 5
+OUTCOME_SUPPORT_MESSAGES = {
+    'calm_me_down': "Let's bring the energy down gently.",
+    'help_me_focus': "Let's build a steadier lane for focus.",
+    'lift_me_up': "Let's nudge the mood upward a little.",
+    'sleep': "Let's keep things softer and more sleep-friendly.",
+}
+
+
+def _fallback_analysis():
+    other_weight = 0.65 / max(len(EMOTIONS) - 1, 1)
+    all_scores = {emotion: other_weight for emotion in EMOTIONS}
+    all_scores['mixed'] = 0.35
+    return {
+        'emotion': 'mixed',
+        'confidence': all_scores['mixed'],
+        'all_scores': all_scores,
+        'top_emotions': [
+            {'emotion': 'mixed', 'confidence': all_scores['mixed']},
+            {'emotion': 'calm', 'confidence': all_scores.get('calm', 0.0)},
+        ],
+        'secondary_emotion': 'calm',
+        'prediction_source': 'system',
+        'prediction_strategy': 'system_fallback',
+        'confidence_band': 'low',
+        'confidence_margin': all_scores['mixed'] - all_scores.get('calm', 0.0),
+        'fallback_used': True,
+        'fallback_reason': 'classifier_error',
+        'needs_review': True,
+        'label_schema_version': 'v1',
+    }
+
+
+def _safe_probability(value):
+    try:
+        probability = float(value or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+    if probability > 1.0:
+        probability = probability / 100.0
+    return max(0.0, min(probability, 1.0))
+
+
+def _safe_int(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _to_bool(value, default=False):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    text = str(value).strip().lower()
+    if text in {'true', '1', 'yes', 'y', 'fine', 'im fine now', "i'm fine now"}:
+        return True
+    if text in {'false', '0', 'no', 'n', 'not yet'}:
+        return False
+    return default
+
+
+def _music_picker_data_for_history(history):
+    data = history.music_picker_data if history else {}
+    return dict(data) if isinstance(data, dict) else {}
+
+
+def _history_allows_personalization_learning(history):
+    music_picker_data = _music_picker_data_for_history(history)
+    personalization = music_picker_data.get('personalization')
+    if isinstance(personalization, dict) and personalization.get('train_session') is False:
+        return False
+    return True
+
+
+def _request_outcome_mode(request):
+    return normalize_outcome_mode(request.data.get('outcome_mode'))
+
+
+def _request_session_length_minutes(request):
+    raw_value = request.data.get('session_length_minutes')
+    if raw_value in (None, ''):
+        return None
+    value = _safe_int(raw_value, 0)
+    return max(value, 0)
+
+
+def _request_check_in_frequency_tracks(request):
+    raw_value = request.data.get('check_in_frequency_tracks')
+    if raw_value in (None, ''):
+        return None
+    value = _safe_int(raw_value, 0)
+    return max(value, 0) or None
+
+
+def _request_taste_profile(request):
+    raw_value = request.data.get('taste_profile')
+    if not isinstance(raw_value, dict):
+        raw_value = {}
+    return normalize_taste_profile(raw_value)
+
+
+def _session_plan_for_history(history):
+    session_plan = _music_picker_data_for_history(history).get('session_plan')
+    return dict(session_plan) if isinstance(session_plan, dict) else None
+
+
+def _build_recovery_plan(*, result=None, history=None, existing_plan=None):
+    existing = dict(existing_plan) if isinstance(existing_plan, dict) else {}
+
+    if existing.get('eligible'):
+        original_emotion = str(existing.get('original_emotion') or '').strip().lower()
+        support_emotion = str(existing.get('support_emotion') or '').strip().lower()
+        trigger_confidence = _safe_probability(existing.get('trigger_confidence'))
+    else:
+        if history is not None:
+            original_emotion = str(history.detected_emotion or '').strip().lower()
+            trigger_confidence = _safe_probability(history.emotion_confidence)
+        else:
+            result = result or {}
+            original_emotion = str(result.get('emotion') or '').strip().lower()
+            trigger_confidence = _safe_probability(result.get('confidence'))
+        support_emotion = RECOVERY_SUPPORT_EMOTION_MAP.get(original_emotion, '')
+
+    if (
+        original_emotion not in RECOVERY_TRIGGER_EMOTIONS
+        or support_emotion not in EMOTIONS
+        or trigger_confidence < RECOVERY_TRIGGER_CONFIDENCE
+    ):
+        return None
+
+    existing_next_checkpoint = existing.get('next_checkpoint_tracks')
+    next_checkpoint_tracks = (
+        None
+        if existing_next_checkpoint is None and bool(existing.get('transition_applied'))
+        else max(
+            _safe_int(existing_next_checkpoint, RECOVERY_CHECK_INTERVAL_TRACKS),
+            1,
+        )
+    )
+
+    return {
+        'eligible': True,
+        'original_emotion': original_emotion,
+        'support_emotion': support_emotion,
+        'trigger_confidence': trigger_confidence,
+        'check_interval_tracks': max(
+            _safe_int(existing.get('check_interval_tracks'), RECOVERY_CHECK_INTERVAL_TRACKS),
+            1,
+        ),
+        'next_checkpoint_tracks': next_checkpoint_tracks,
+        'last_prompt_tracks': max(_safe_int(existing.get('last_prompt_tracks'), 0), 0),
+        'tracks_played': max(_safe_int(existing.get('tracks_played'), 0), 0),
+        'prompts_shown': max(_safe_int(existing.get('prompts_shown'), 0), 0),
+        'not_yet_count': max(_safe_int(existing.get('not_yet_count'), 0), 0),
+        'phase': str(existing.get('phase') or 'support').strip().lower() or 'support',
+        'transition_applied': bool(existing.get('transition_applied', False)),
+    }
+
+
+def _recovery_plan_for_history(history):
+    existing_plan = _music_picker_data_for_history(history).get('recovery_plan')
+    return _build_recovery_plan(history=history, existing_plan=existing_plan)
+
+
+def _build_recovery_recommendation_profile(recovery_plan, *, transition=False):
+    if not isinstance(recovery_plan, dict) or not recovery_plan.get('eligible'):
+        return None
+
+    original_emotion = str(recovery_plan.get('original_emotion') or '').strip().lower()
+    support_emotion = str(recovery_plan.get('support_emotion') or '').strip().lower()
+    if original_emotion not in EMOTIONS or support_emotion not in EMOTIONS:
+        return None
+
+    primary_emotion = support_emotion if transition else original_emotion
+    secondary_emotion = original_emotion if transition else support_emotion
+    all_scores = {emotion_name: 0.0 for emotion_name in EMOTIONS}
+    all_scores[primary_emotion] = 0.5
+    all_scores[secondary_emotion] = 0.5
+
+    return {
+        'emotion': primary_emotion,
+        'confidence': 0.5,
+        'all_scores': all_scores,
+        'top_emotions': [
+            {'emotion': primary_emotion, 'confidence': 0.5},
+            {'emotion': secondary_emotion, 'confidence': 0.5},
+        ],
+        'secondary_emotion': secondary_emotion,
+        'prediction_source': 'recovery_support',
+        'prediction_strategy': (
+            'feel_better_transition_blend'
+            if transition
+            else 'high_intensity_recovery_support_blend'
+        ),
+        'confidence_band': 'high',
+        'confidence_margin': 0.0,
+        'fallback_used': False,
+        'fallback_reason': None,
+        'needs_review': False,
+        'label_schema_version': 'v1',
+    }
+
+
+def _spotify_redirect_uri(request):
+    configured_redirect_uri = str(
+        getattr(settings, 'SPOTIFY_REDIRECT_URI', '') or ''
+    ).strip()
+    if configured_redirect_uri:
+        return configured_redirect_uri
+    return request.build_absolute_uri(reverse('spotify_callback'))
+
+
+def _progressive_initial_budget_seconds():
+    return max(
+        float(
+            getattr(settings, 'SPOTIFY_PROGRESSIVE_INITIAL_BUDGET_SECONDS', 2.5) or 2.5
+        ),
+        0.5,
+    )
+
+
+def _progressive_initial_candidate_limit():
+    return max(
+        int(
+            getattr(settings, 'SPOTIFY_PROGRESSIVE_INITIAL_CANDIDATE_LIMIT', 6) or 6
+        ),
+        1,
+    )
+
+
+def _progressive_initial_track_limit():
+    return max(
+        int(getattr(settings, 'SPOTIFY_PROGRESSIVE_INITIAL_TRACK_LIMIT', 1) or 1),
+        1,
+    )
+
+
+def _progressive_continuation_budget_seconds():
+    return max(
+        float(
+            getattr(
+                settings,
+                'SPOTIFY_PROGRESSIVE_CONTINUATION_BUDGET_SECONDS',
+                8.0,
+            )
+            or 8.0
+        ),
+        1.0,
+    )
+
+
+def _progressive_continuation_candidate_limit():
+    return max(
+        int(
+            getattr(
+                settings,
+                'SPOTIFY_PROGRESSIVE_CONTINUATION_CANDIDATE_LIMIT',
+                20,
+            )
+            or 20
+        ),
+        2,
+    )
+
+
+def _recommendation_continuation_max_age_seconds():
+    return max(
+        int(
+            getattr(
+                settings,
+                'RECOMMENDATION_CONTINUATION_MAX_AGE_SECONDS',
+                900,
+            )
+            or 900
+        ),
+        60,
+    )
+
+
+def _ensure_hybrid_result(result):
+    if not isinstance(result, dict):
+        result = _fallback_analysis()
+
+    existing_scores = result.get('plutchik_scores')
+    if isinstance(existing_scores, dict) and existing_scores:
+        return result
+
+    hybrid_profile = build_plutchik_profile(result.get('all_scores'))
+    return {
+        **result,
+        **hybrid_profile,
+    }
+
+
+def _serialize_recommendation_result(result):
+    result = _ensure_hybrid_result(result)
+
+    return {
+        'emotion': result.get('emotion', 'mixed'),
+        'confidence': float(result.get('confidence', 0.0) or 0.0),
+        'all_scores': result.get('all_scores') or _fallback_analysis()['all_scores'],
+        'top_emotions': result.get('top_emotions') or [],
+        'secondary_emotion': result.get('secondary_emotion'),
+        'plutchik_scores': result.get('plutchik_scores') or {},
+        'plutchik_top_emotions': result.get('plutchik_top_emotions') or [],
+        'plutchik_dominant_emotion': result.get('plutchik_dominant_emotion'),
+        'plutchik_profile_version': result.get('plutchik_profile_version', 'v1'),
+        'prediction_source': result.get('prediction_source', 'system'),
+        'prediction_strategy': result.get('prediction_strategy', 'system_fallback'),
+        'confidence_band': result.get('confidence_band', 'low'),
+        'confidence_margin': float(result.get('confidence_margin', 0.0) or 0.0),
+        'fallback_used': bool(result.get('fallback_used', False)),
+        'fallback_reason': result.get('fallback_reason'),
+        'needs_review': bool(result.get('needs_review', True)),
+        'label_schema_version': result.get('label_schema_version', 'v1'),
+        'outcome_mode': normalize_outcome_mode(result.get('outcome_mode')),
+        'outcome_label': result.get('outcome_label'),
+        'outcome_description': result.get('outcome_description'),
+    }
+
+
+def _build_recommendation_continuation_token(
+    request,
+    *,
+    text,
+    result,
+    persist_history,
+    history_id,
+    outcome_mode,
+    session_plan,
+    taste_profile,
+):
+    return signing.dumps(
+        {
+            'version': RECOMMENDATION_CONTINUATION_VERSION,
+            'user_id': request.user.id if request.user.is_authenticated else None,
+            'text': text,
+            'result': _serialize_recommendation_result(result),
+            'persist_history': bool(persist_history),
+            'history_id': history_id,
+            'outcome_mode': normalize_outcome_mode(outcome_mode),
+            'session_plan': session_plan if isinstance(session_plan, dict) else None,
+            'taste_profile': normalize_taste_profile(taste_profile),
+        },
+        salt=RECOMMENDATION_CONTINUATION_SALT,
+        compress=True,
+    )
+
+
+def _load_recommendation_continuation_token(request, token):
+    payload = signing.loads(
+        token,
+        salt=RECOMMENDATION_CONTINUATION_SALT,
+        max_age=_recommendation_continuation_max_age_seconds(),
+    )
+    expected_user_id = payload.get('user_id')
+    request_user_id = request.user.id if request.user.is_authenticated else None
+    if expected_user_id != request_user_id:
+        raise PermissionError('This playlist continuation token belongs to another user.')
+    return payload
+
+
+def _build_emotion_response_payload(
+    request,
+    *,
+    text,
+    result,
+    persist_history=True,
+    recommendation_stage='full',
+    history_id=None,
+    recommendation_profile=None,
+    recovery_plan=None,
+    outcome_mode='match_mood',
+    session_length_minutes=None,
+    check_in_frequency_tracks=None,
+    taste_profile=None,
+    session_plan=None,
+):
+    if not isinstance(result, dict):
+        logger.warning("Emotion classifier returned invalid payload: %r", result)
+        result = _fallback_analysis()
+    result = _ensure_hybrid_result(result)
+
+    normalized_recommendation_stage = (
+        str(recommendation_stage or 'full').strip().lower() or 'full'
+    )
+    normalized_outcome_mode = normalize_outcome_mode(outcome_mode)
+    normalized_taste_profile = normalize_taste_profile(taste_profile)
+    has_custom_session_request = (
+        session_length_minutes is not None
+        or normalized_outcome_mode != 'match_mood'
+    )
+    is_initial_stage = normalized_recommendation_stage == 'initial'
+    is_continuation_stage = normalized_recommendation_stage == 'continuation'
+    emotion = result.get('emotion', 'mixed')
+    confidence = result.get('confidence', 1.0)
+    all_scores = result.get('all_scores', _fallback_analysis()['all_scores'])
+    top_emotions = result.get('top_emotions', [])
+    prediction_source = result.get('prediction_source', 'system')
+    prediction_strategy = result.get('prediction_strategy', 'system_fallback')
+    confidence_band = result.get('confidence_band', 'low')
+    confidence_margin = result.get('confidence_margin', 0.0)
+    fallback_used = bool(result.get('fallback_used', False))
+    fallback_reason = result.get('fallback_reason')
+    needs_review = bool(result.get('needs_review', True))
+    secondary_emotion = result.get('secondary_emotion')
+    plutchik_scores = result.get('plutchik_scores') or {}
+    plutchik_top_emotions = result.get('plutchik_top_emotions') or []
+    plutchik_dominant_emotion = result.get('plutchik_dominant_emotion')
+    plutchik_profile_version = result.get('plutchik_profile_version', 'v1')
+    outcome_profile = _ensure_hybrid_result(
+        apply_outcome_mode(result, normalized_outcome_mode)
+    )
+    outcome_label = outcome_profile.get('outcome_label')
+    outcome_description = outcome_profile.get('outcome_description')
+    recommendation_target_emotion = outcome_profile.get('emotion', emotion)
+    if not isinstance(session_plan, dict):
+        session_plan = (
+            build_session_plan(
+                outcome_mode=normalized_outcome_mode,
+                session_length_minutes=session_length_minutes,
+                check_in_frequency_tracks=check_in_frequency_tracks,
+            )
+            if has_custom_session_request
+            else None
+        )
+    recovery_plan = _build_recovery_plan(
+        result=result,
+        existing_plan=recovery_plan,
+    )
+    if recommendation_profile is None:
+        if recovery_plan and not recovery_plan.get('transition_applied'):
+            recommendation_profile = _build_recovery_recommendation_profile(
+                recovery_plan,
+                transition=False,
+            )
+        else:
+            recommendation_profile = outcome_profile
+
+    if not isinstance(recommendation_profile, dict):
+        recommendation_profile = result
+    else:
+        recommendation_profile = _ensure_hybrid_result(recommendation_profile)
+
+    recommendation_emotion = recommendation_profile.get('emotion', emotion)
+    recommendation_all_scores = (
+        recommendation_profile.get('all_scores')
+        or all_scores
+    )
+    recommendation_top_emotions = (
+        recommendation_profile.get('top_emotions')
+        or top_emotions
+    )
+    recommendation_target_emotion = recommendation_profile.get(
+        'emotion',
+        recommendation_target_emotion,
+    )
+
+    # Get AI response message
+    ai_response = get_ai_response(emotion)
+    outcome_prefix = OUTCOME_SUPPORT_MESSAGES.get(normalized_outcome_mode)
+    if outcome_prefix:
+        ai_response = f"{outcome_prefix} {ai_response}"
+
+    # Get adaptive recommendations (check user preferences first)
+    tracks = []
+    user = request.user if request.user.is_authenticated else None
+    
+    if user:
+        # Check if user has strong preferences for this emotion
+        top_prefs = UserPreference.objects.filter(
+            user=user,
+            emotion=recommendation_target_emotion,
+            play_count__gte=3,  # Played 3+ times = strong preference
+        ).exclude(
+            artist_name__iexact='Open in Spotify',
+        ).order_by('-play_count')[:5]
+
+        if top_prefs.exists():
+            # Include preferred tracks
+            for pref in top_prefs:
+                tracks.append({
+                    'id': pref.spotify_track_id,
+                    'name': pref.track_name,
+                    'artist': pref.artist_name,
+                    'album': '',
+                    'image': '',
+                    'preview_url': None,
+                    'duration_ms': 0,
+                    'spotify_url': f'https://open.spotify.com/track/{pref.spotify_track_id}',
+                    'uri': f'spotify:track:{pref.spotify_track_id}',
+                    'is_preferred': True,
+                    'recommendation_source': 'user_preference',
+                    'selection_reasons': ['emotion_preference', 'user_preference'],
+                    'personalization_score': float(pref.play_count or 0) + 2.0,
+                })
+
+    # Get Spotify recommendations
+    preferred_artists = getattr(user, 'preferred_artists', []) if user else []
+    spotify_result = {
+        'tracks': [],
+        'source': 'fallback',
+        'used_fallback': True,
+        'fallback_reason': 'recommendation_lookup_failed',
+    }
+    spotify_lookup_limit = (
+        _progressive_initial_candidate_limit()
+        if is_initial_stage
+        else _progressive_continuation_candidate_limit()
+        if is_continuation_stage
+        else 20
+    )
+    spotify_lookup_include_personalization = (
+        not is_initial_stage and not is_continuation_stage
+    )
+    spotify_lookup_time_budget_seconds = (
+        _progressive_initial_budget_seconds()
+        if is_initial_stage
+        else _progressive_continuation_budget_seconds()
+        if is_continuation_stage
+        else None
+    )
+    spotify_query_mode = 'continuation' if is_continuation_stage else 'default'
+
+    try:
+        spotify_result = spotify_service.get_recommendations_with_details(
+            recommendation_emotion,
+            user=user,
+            preferred_artists=preferred_artists,
+            top_emotions=recommendation_top_emotions,
+            all_scores=recommendation_all_scores,
+            limit=spotify_lookup_limit,
+            include_personalization=spotify_lookup_include_personalization,
+            time_budget_seconds=spotify_lookup_time_budget_seconds,
+            query_mode=spotify_query_mode,
+            taste_profile=normalized_taste_profile,
+        )
+    except Exception:
+        logger.exception(
+            "Spotify recommendation lookup failed for emotion %r and outcome %r",
+            recommendation_emotion,
+            normalized_outcome_mode,
+        )
+    spotify_tracks = spotify_result.get('tracks') or []
+    
+    # Merge: preferred tracks first, then Spotify tracks
+    seen_ids = {t['id'] for t in tracks}
+    for t in spotify_tracks:
+        if t['id'] not in seen_ids:
+            tracks.append(t)
+            seen_ids.add(t['id'])
+
+    ranking_limit = spotify_lookup_limit
+    tracks = spotify_service.sanitize_recommendations(tracks, limit=ranking_limit)
+    tracks = spotify_service.rank_tracks_for_emotion(
+        tracks,
+        emotion=recommendation_emotion,
+        top_emotions=recommendation_top_emotions,
+        preferred_artists=preferred_artists,
+        confidence_band=confidence_band,
+        limit=ranking_limit,
+        taste_profile=normalized_taste_profile,
+    )
+    heuristic_selected_track = spotify_service.select_primary_track(tracks)
+    if is_initial_stage:
+        recommended_tracks = tracks[: _progressive_initial_track_limit()]
+        selected_track = heuristic_selected_track
+        if not isinstance(selected_track, dict) and recommended_tracks:
+            selected_track = recommended_tracks[0]
+        if isinstance(selected_track, dict):
+            recommended_tracks = [selected_track]
+        selected_track_source = (
+            selected_track.get('recommendation_source')
+            if isinstance(selected_track, dict)
+            else None
+        )
+        music_picker_strategy = 'quick_primary_track'
+        music_picker_reason = (
+            'Returned the fastest high-confidence Spotify match first while the full '
+            'playlist keeps loading in the background.'
+        )
+        music_picker_used_fallback = bool(spotify_result.get('used_fallback'))
+        music_picker_intent = 'track'
+        music_picker_artist_name = (
+            str(selected_track.get('artist') or '').strip() or None
+            if isinstance(selected_track, dict)
+            else None
+        )
+        music_picker_track_name = (
+            str(selected_track.get('name') or '').strip() or None
+            if isinstance(selected_track, dict)
+            else None
+        )
+        music_picker_playlist_category = recommendation_emotion
+        music_picker_confirmation = (
+            (
+                f"Starting with {music_picker_track_name} by {music_picker_artist_name} "
+                "while the rest of the playlist loads."
+            )
+            if music_picker_track_name and music_picker_artist_name
+            else None
+        )
+        playlist_result = {
+            'tracks': recommended_tracks,
+            'selected_track': selected_track,
+            'playlist_track_ids': [
+                str(track.get('id'))
+                for track in recommended_tracks
+                if isinstance(track, dict) and str(track.get('id') or '').strip()
+            ],
+            'strategy': music_picker_strategy,
+            'reason': music_picker_reason,
+            'used_fallback': music_picker_used_fallback,
+            'provider': 'spotify_progressive',
+            'model': 'quick_primary_track',
+            'error': spotify_result.get('fallback_reason'),
+            'confidence': None,
+            'intent': music_picker_intent,
+            'artist_name': music_picker_artist_name,
+            'track_name': music_picker_track_name,
+            'playlist_category': music_picker_playlist_category,
+            'confirmation': music_picker_confirmation,
+        }
+    else:
+        playlist_result = lightfm_music_ranker.pick_playlist(
+            prompt_text=text,
+            emotion=recommendation_emotion,
+            top_emotions=recommendation_top_emotions,
+            all_scores=recommendation_all_scores,
+            confidence_band=confidence_band,
+            confidence_margin=confidence_margin,
+            candidates=tracks,
+            preferred_artists=preferred_artists,
+            user=user,
+            taste_profile=normalized_taste_profile,
+        )
+        recommended_tracks = playlist_result.get('tracks') or tracks[:20]
+        selected_track = playlist_result.get('selected_track') or heuristic_selected_track
+        selected_track_source = (
+            selected_track.get('recommendation_source')
+            if isinstance(selected_track, dict)
+            else None
+        )
+        music_picker_strategy = playlist_result.get('strategy') or 'heuristic_playlist'
+        music_picker_reason = playlist_result.get('reason')
+        music_picker_used_fallback = bool(playlist_result.get('used_fallback', True))
+        music_picker_intent = playlist_result.get('intent')
+        music_picker_artist_name = playlist_result.get('artist_name')
+        music_picker_track_name = playlist_result.get('track_name')
+        music_picker_playlist_category = playlist_result.get('playlist_category')
+        music_picker_confirmation = playlist_result.get('confirmation')
+
+    # Save prompt history
+    continuation_token = None
+    if user and persist_history:
+        active_session_plan = (
+            update_session_plan_progress(
+                session_plan,
+                duration_seconds=0,
+                tracks_played=0,
+            )
+            if isinstance(session_plan, dict)
+            else None
+        )
+        music_picker_data = {
+            'strategy': music_picker_strategy,
+            'reason': music_picker_reason,
+            'used_fallback': music_picker_used_fallback,
+            'outcome_mode': normalized_outcome_mode,
+            'outcome_label': outcome_label,
+            'outcome_description': outcome_description,
+            'search_plan': {
+                'strategy': 'spotify_emotion_candidate_retrieval',
+                'reason': (
+                    'Candidates were retrieved from Spotify personalization, '
+                    'emotion queries, and curated fallbacks before final ranking.'
+                ),
+                'used_fallback': bool(spotify_result.get('used_fallback')),
+                'queries': [],
+                'provider': playlist_result.get('provider'),
+                'model': playlist_result.get('model'),
+                'error': spotify_result.get('fallback_reason'),
+                'confidence': None,
+                'intent': 'candidate_retrieval',
+                'artist_name': None,
+                'track_name': None,
+                'playlist_category': (
+                    playlist_result.get('playlist_category') or emotion
+                ),
+                'confirmation': None,
+            },
+            'selected_track_id': (
+                selected_track.get('id') if isinstance(selected_track, dict) else None
+            ),
+            'playlist_track_ids': playlist_result.get('playlist_track_ids') or [],
+            'selected_track_source': selected_track_source,
+            'candidate_tracks': tracks[:12],
+            'confidence_band': confidence_band,
+            'plutchik_scores': plutchik_scores,
+            'plutchik_top_emotions': plutchik_top_emotions,
+            'plutchik_dominant_emotion': plutchik_dominant_emotion,
+            'plutchik_profile_version': plutchik_profile_version,
+            'llm_provider': playlist_result.get('provider'),
+            'llm_model': playlist_result.get('model'),
+            'llm_error': playlist_result.get('error'),
+            'llm_confidence': playlist_result.get('confidence'),
+            'recommendation_target_emotion': recommendation_target_emotion,
+            'intent': music_picker_intent,
+            'artist_name': music_picker_artist_name,
+            'track_name': music_picker_track_name,
+            'playlist_category': music_picker_playlist_category,
+            'confirmation': music_picker_confirmation,
+            'progressive_stage': 'initial' if is_initial_stage else 'full',
+            'recovery_plan': recovery_plan,
+            'session_plan': active_session_plan,
+            'personalization': normalized_taste_profile,
+        }
+        try:
+            existing_history = None
+            if history_id:
+                existing_history = PromptHistory.objects.filter(
+                    id=history_id,
+                    user=user,
+                ).first()
+
+            if existing_history:
+                existing_history.prompt_text = text
+                existing_history.detected_emotion = emotion
+                existing_history.emotion_confidence = confidence
+                existing_history.emotion_scores = all_scores
+                existing_history.ai_response = ai_response
+                existing_history.playlist_data = recommended_tracks
+                existing_history.music_picker_data = music_picker_data
+                existing_history.save(update_fields=[
+                    'prompt_text',
+                    'detected_emotion',
+                    'emotion_confidence',
+                    'emotion_scores',
+                    'ai_response',
+                    'playlist_data',
+                    'music_picker_data',
+                ])
+                history_id = existing_history.id
+            else:
+                history = PromptHistory.objects.create(
+                    user=user,
+                    prompt_text=text,
+                    detected_emotion=emotion,
+                    emotion_confidence=confidence,
+                    emotion_scores=all_scores,
+                    ai_response=ai_response,
+                    playlist_data=recommended_tracks,
+                    music_picker_data=music_picker_data,
+                )
+                history_id = history.id
+        except Exception:
+            logger.exception("Failed to save prompt history for user %s", user.id)
+            history_id = None
+    elif not user:
+        history_id = None
+
+    if is_initial_stage:
+        continuation_token = _build_recommendation_continuation_token(
+            request,
+            text=text,
+            result=result,
+            persist_history=persist_history,
+            history_id=history_id,
+            outcome_mode=normalized_outcome_mode,
+            session_plan=session_plan,
+            taste_profile=normalized_taste_profile,
+        )
+
+    return {
+        'emotion': emotion,
+        'confidence': round(confidence * 100, 1),
+        'all_scores': {k: round(v * 100, 1) for k, v in all_scores.items()},
+        'top_emotions': [
+            {
+                'emotion': item.get('emotion'),
+                'confidence': round(float(item.get('confidence', 0.0)) * 100, 1),
+            }
+            for item in top_emotions
+        ],
+        'secondary_emotion': secondary_emotion,
+        'plutchik_scores': {
+            emotion_name: round(float(score) * 100, 1)
+            for emotion_name, score in plutchik_scores.items()
+        },
+        'plutchik_top_emotions': [
+            {
+                'emotion': item.get('emotion'),
+                'confidence': round(float(item.get('confidence', 0.0)) * 100, 1),
+            }
+            for item in plutchik_top_emotions
+        ],
+        'plutchik_dominant_emotion': plutchik_dominant_emotion,
+        'plutchik_profile_version': plutchik_profile_version,
+        'outcome_mode': normalized_outcome_mode,
+        'outcome_label': outcome_label,
+        'outcome_description': outcome_description,
+        'recommendation_target_emotion': recommendation_target_emotion,
+        'taste_profile': normalized_taste_profile,
+        'session_plan': session_plan,
+        'prediction_source': prediction_source,
+        'prediction_strategy': prediction_strategy,
+        'confidence_band': confidence_band,
+        'confidence_margin': round(float(confidence_margin) * 100, 1),
+        'prediction_fallback_used': fallback_used,
+        'prediction_fallback_reason': fallback_reason,
+        'needs_review': needs_review,
+        'ai_response': ai_response,
+        'tracks': recommended_tracks,
+        'selected_track': selected_track,
+        'selected_track_source': selected_track_source,
+        'music_picker_strategy': music_picker_strategy,
+        'music_picker_reason': music_picker_reason,
+        'music_picker_used_fallback': music_picker_used_fallback,
+        'music_picker_intent': music_picker_intent,
+        'music_picker_artist_name': music_picker_artist_name,
+        'music_picker_track_name': music_picker_track_name,
+        'music_picker_playlist_category': music_picker_playlist_category,
+        'music_picker_confirmation': music_picker_confirmation,
+        'tracks_source': spotify_result.get('source') or 'fallback',
+        'tracks_fallback_used': bool(spotify_result.get('used_fallback')),
+        'tracks_fallback_reason': spotify_result.get('fallback_reason'),
+        'tracks_personalized': bool(spotify_result.get('personalized')),
+        'tracks_personalization_sources': (
+            spotify_result.get('personalization_sources') or []
+        ),
+        'tracks_personalization_missing_scopes': (
+            spotify_result.get('personalization_missing_scopes') or []
+        ),
+        'progressive_stage': 'initial' if is_initial_stage else 'full',
+        'loading_more_tracks': bool(continuation_token),
+        'continuation_token': continuation_token,
+        'history_id': history_id,
+        'recovery_plan': recovery_plan,
+    }
+
+
+def _build_explicit_emotion_result(emotion):
+    normalized_emotion = str(emotion or '').strip().lower()
+    if normalized_emotion not in EMOTIONS:
+        normalized_emotion = 'mixed'
+
+    all_scores = {emotion_name: 0.0 for emotion_name in EMOTIONS}
+    all_scores[normalized_emotion] = 1.0
+    return {
+        'emotion': normalized_emotion,
+        'confidence': 1.0,
+        'all_scores': all_scores,
+        'top_emotions': [
+            {'emotion': normalized_emotion, 'confidence': 1.0},
+        ],
+        'secondary_emotion': None,
+        'prediction_source': 'direct_emotion_selection',
+        'prediction_strategy': 'explicit_emotion_tab',
+        'confidence_band': 'high',
+        'confidence_margin': 1.0,
+        'fallback_used': False,
+        'fallback_reason': None,
+        'needs_review': False,
+        'label_schema_version': 'v1',
+    }
+
+
+@api_view(['POST'])
+def analyze_emotion(request):
+    """
+    Main endpoint: Analyze user's emotion from text prompt
+    and return AI response + playlist recommendations
+    """
+    text = str(request.data.get('text', '')).strip()
+    if not text:
+        return Response({'error': 'Text is required'}, status=status.HTTP_400_BAD_REQUEST)
+    outcome_mode = _request_outcome_mode(request)
+    session_length_minutes = _request_session_length_minutes(request)
+    check_in_frequency_tracks = _request_check_in_frequency_tracks(request)
+    taste_profile = _request_taste_profile(request)
+
+    # Run BERT emotion classification
+    try:
+        classifier = get_classifier()
+        result = classifier.predict(text)
+    except Exception:
+        logger.exception("Emotion analysis failed for text input")
+        result = _fallback_analysis()
+
+    return Response(
+        _build_emotion_response_payload(
+            request,
+            text=text,
+            result=result,
+            persist_history=True,
+            recommendation_stage='initial',
+            outcome_mode=outcome_mode,
+            session_length_minutes=session_length_minutes,
+            check_in_frequency_tracks=check_in_frequency_tracks,
+            taste_profile=taste_profile,
+        )
+    )
+
+
+@api_view(['POST'])
+def recommend_by_emotion(request):
+    """Return recommendations for an explicitly selected emotion tab."""
+    emotion = str(request.data.get('emotion', '')).strip().lower()
+    if emotion not in EMOTIONS:
+        return Response(
+            {
+                'error': (
+                    'Emotion must be one of: '
+                    + ', '.join(EMOTIONS)
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    text = str(
+        request.data.get('text', '') or f'Play songs for a {emotion} mood.'
+    ).strip()
+    outcome_mode = _request_outcome_mode(request)
+    session_length_minutes = _request_session_length_minutes(request)
+    check_in_frequency_tracks = _request_check_in_frequency_tracks(request)
+    taste_profile = _request_taste_profile(request)
+    persist_history = (
+        bool(request.user.is_authenticated)
+        and should_persist_recommendation_context(
+            outcome_mode=outcome_mode,
+            session_length_minutes=(
+                0 if session_length_minutes is None else session_length_minutes
+            ),
+            taste_profile=taste_profile,
+        )
+    )
+    result = _build_explicit_emotion_result(emotion)
+    return Response(
+        _build_emotion_response_payload(
+            request,
+            text=text,
+            result=result,
+            persist_history=persist_history,
+            recommendation_stage='initial',
+            outcome_mode=outcome_mode,
+            session_length_minutes=session_length_minutes,
+            check_in_frequency_tracks=check_in_frequency_tracks,
+            taste_profile=taste_profile,
+        )
+    )
+
+
+@api_view(['POST'])
+def recommendation_playlist(request):
+    """Continue a progressive recommendation request and return the full playlist."""
+    continuation_token = str(request.data.get('continuation_token', '')).strip()
+    if not continuation_token:
+        return Response(
+            {'error': 'continuation_token is required'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        payload = _load_recommendation_continuation_token(request, continuation_token)
+    except signing.SignatureExpired:
+        return Response(
+            {'error': 'This recommendation request expired. Please try again.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    except signing.BadSignature:
+        return Response(
+            {'error': 'Invalid continuation token.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    except PermissionError as error:
+        return Response({'error': str(error)}, status=status.HTTP_403_FORBIDDEN)
+
+    return Response(
+        _build_emotion_response_payload(
+            request,
+            text=str(payload.get('text', '')).strip(),
+            result=payload.get('result') or _fallback_analysis(),
+            persist_history=bool(payload.get('persist_history', False)),
+            recommendation_stage='continuation',
+            history_id=payload.get('history_id'),
+            outcome_mode=payload.get('outcome_mode'),
+            session_plan=payload.get('session_plan'),
+            taste_profile=payload.get('taste_profile'),
+        )
+    )
+
+
+@api_view(['POST'])
+def check_feel_better(request):
+    """Check whether a high-intensity session should show a recovery prompt."""
+    history_id = request.data.get('history_id')
+    listen_duration = request.data.get('duration', 0)
+    tracks_played = max(_safe_int(request.data.get('tracks_played'), 0), 0)
+
+    response_payload = {
+        'should_prompt': False,
+        'message': None,
+        'history_id': history_id,
+        'tracks_played': tracks_played,
+        'next_checkpoint_tracks': None,
+        'check_interval_tracks': RECOVERY_CHECK_INTERVAL_TRACKS,
+        'recovery_plan': None,
+        'session_plan': None,
+    }
+
+    if history_id and request.user.is_authenticated:
+        try:
+            history = PromptHistory.objects.get(id=history_id, user=request.user)
+        except PromptHistory.DoesNotExist:
+            history = None
+
+        if history is not None:
+            history.session_duration = max(_safe_int(listen_duration), 0)
+            session_plan = update_session_plan_progress(
+                _session_plan_for_history(history),
+                duration_seconds=history.session_duration,
+                tracks_played=tracks_played,
+            )
+            recovery_plan = _recovery_plan_for_history(history)
+            music_picker_data = _music_picker_data_for_history(history)
+            if session_plan:
+                music_picker_data['session_plan'] = session_plan
+                response_payload['session_plan'] = session_plan
+                response_payload['next_checkpoint_tracks'] = session_plan.get('next_check_in_tracks')
+                response_payload['check_interval_tracks'] = max(
+                    _safe_int(session_plan.get('check_in_after_tracks'), RECOVERY_CHECK_INTERVAL_TRACKS),
+                    1,
+                )
+            if recovery_plan:
+                recovery_plan['tracks_played'] = max(
+                    tracks_played,
+                    _safe_int(recovery_plan.get('tracks_played'), 0),
+                )
+                music_picker_data['recovery_plan'] = recovery_plan
+
+                checkpoint = max(
+                    _safe_int(
+                        recovery_plan.get('next_checkpoint_tracks'),
+                        RECOVERY_CHECK_INTERVAL_TRACKS,
+                    ),
+                    1,
+                )
+                response_payload.update({
+                    'history_id': history.id,
+                    'tracks_played': recovery_plan['tracks_played'],
+                    'next_checkpoint_tracks': checkpoint,
+                    'check_interval_tracks': max(
+                        _safe_int(
+                            recovery_plan.get('check_interval_tracks'),
+                            RECOVERY_CHECK_INTERVAL_TRACKS,
+                        ),
+                        1,
+                    ),
+                    'recovery_plan': recovery_plan,
+                })
+
+                if (
+                    recovery_plan.get('phase') == 'support'
+                    and not recovery_plan.get('transition_applied')
+                    and recovery_plan['tracks_played'] >= checkpoint
+                ):
+                    response_payload.update({
+                        'should_prompt': True,
+                        'message': (
+                            f"You've listened to {recovery_plan['tracks_played']} songs. "
+                            "Are you feeling better right now?"
+                        ),
+                    })
+
+            if (
+                not response_payload['should_prompt']
+                and session_plan
+                and not session_plan.get('completed')
+                and tracks_played >= max(
+                    _safe_int(session_plan.get('next_check_in_tracks'), 0),
+                    1,
+                )
+            ):
+                response_payload.update({
+                    'should_prompt': True,
+                    'message': (
+                        str(session_plan.get('check_in_prompt') or '').strip()
+                        or 'How is this session feeling so far?'
+                    ),
+                    'next_checkpoint_tracks': session_plan.get('next_check_in_tracks'),
+                })
+
+            history.music_picker_data = music_picker_data
+            history.save(update_fields=['session_duration', 'music_picker_data'])
+
+    return Response({
+        **response_payload,
+    })
+
+
+@api_view(['POST'])
+def feel_better_response(request):
+    """Handle the recovery prompt response and optionally transition the playlist."""
+    history_id = request.data.get('history_id')
+    response_val = _to_bool(request.data.get('felt_better', True), default=True)
+    listen_duration = max(_safe_int(request.data.get('duration'), 0), 0)
+    tracks_played = max(_safe_int(request.data.get('tracks_played'), 0), 0)
+
+    if not (history_id and request.user.is_authenticated):
+        return Response({'status': 'ok', 'action': 'noop'})
+
+    try:
+        history = PromptHistory.objects.get(id=history_id, user=request.user)
+    except PromptHistory.DoesNotExist:
+        return Response(
+            {'status': 'error', 'message': 'Listening session not found.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    recovery_plan = _recovery_plan_for_history(history)
+    music_picker_data = _music_picker_data_for_history(history)
+    session_plan = update_session_plan_progress(
+        _session_plan_for_history(history),
+        duration_seconds=listen_duration,
+        tracks_played=tracks_played,
+    )
+
+    if not recovery_plan and not session_plan:
+        history.felt_better_response = response_val
+        history.session_duration = listen_duration
+        history.save(update_fields=['felt_better_response', 'session_duration'])
+        return Response({'status': 'ok', 'action': 'noop'})
+
+    if session_plan:
+        session_plan['last_response'] = 'felt_better' if response_val else 'not_yet'
+        interval = max(
+            _safe_int(
+                session_plan.get('check_in_after_tracks'),
+                RECOVERY_CHECK_INTERVAL_TRACKS,
+            ),
+            1,
+        )
+        if response_val:
+            session_plan['completed'] = True
+            session_plan['next_check_in_tracks'] = None
+        else:
+            session_plan['completed'] = False
+            session_plan['next_check_in_tracks'] = tracks_played + interval
+        music_picker_data['session_plan'] = session_plan
+
+        if not recovery_plan:
+            history.felt_better_response = response_val
+            history.session_duration = listen_duration
+            history.music_picker_data = music_picker_data
+            history.save(update_fields=[
+                'felt_better_response',
+                'session_duration',
+                'music_picker_data',
+            ])
+            return Response({
+                'status': 'ok',
+                'action': 'session_complete' if response_val else 'continue_playlist',
+                'message': (
+                    str(session_plan.get('completion_message') or '').strip()
+                    if response_val
+                    else (
+                        f"Okay, I will check in again after {interval} more songs."
+                    )
+                ),
+                'history_id': history.id,
+                'next_checkpoint_tracks': session_plan.get('next_check_in_tracks'),
+                'check_interval_tracks': interval,
+                'session_plan': session_plan,
+            })
+
+    recovery_plan['tracks_played'] = max(
+        tracks_played,
+        _safe_int(recovery_plan.get('tracks_played'), 0),
+    )
+    recovery_plan['last_prompt_tracks'] = recovery_plan['tracks_played']
+    recovery_plan['prompts_shown'] = _safe_int(recovery_plan.get('prompts_shown'), 0) + 1
+
+    if not response_val:
+        interval = max(
+            _safe_int(
+                recovery_plan.get('check_interval_tracks'),
+                RECOVERY_CHECK_INTERVAL_TRACKS,
+            ),
+            1,
+        )
+        recovery_plan['not_yet_count'] = (
+            _safe_int(recovery_plan.get('not_yet_count'), 0) + 1
+        )
+        recovery_plan['next_checkpoint_tracks'] = (
+            recovery_plan['tracks_played'] + interval
+        )
+        recovery_plan['phase'] = 'support'
+        recovery_plan['transition_applied'] = False
+
+        music_picker_data['recovery_plan'] = recovery_plan
+        history.felt_better_response = False
+        history.session_duration = listen_duration
+        history.music_picker_data = music_picker_data
+        history.save(update_fields=[
+            'felt_better_response',
+            'session_duration',
+            'music_picker_data',
+        ])
+        return Response({
+            'status': 'ok',
+            'action': 'continue_playlist',
+            'message': 'Okay, I will check in again after 5 more songs.',
+            'history_id': history.id,
+            'next_checkpoint_tracks': recovery_plan['next_checkpoint_tracks'],
+            'check_interval_tracks': interval,
+            'recovery_plan': recovery_plan,
+            'session_plan': session_plan,
+        })
+
+    recovery_plan['phase'] = 'transition'
+    recovery_plan['transition_applied'] = True
+    recovery_plan['next_checkpoint_tracks'] = None
+
+    transition_result = _build_recovery_recommendation_profile(
+        recovery_plan,
+        transition=True,
+    )
+    payload = _build_emotion_response_payload(
+        request,
+        text=history.prompt_text,
+        result=transition_result,
+        persist_history=False,
+        recommendation_stage='full',
+        history_id=history.id,
+        recovery_plan=recovery_plan,
+        outcome_mode=music_picker_data.get('outcome_mode'),
+        session_plan=session_plan,
+        taste_profile=music_picker_data.get('personalization'),
+    )
+
+    music_picker_data.update({
+        'recovery_plan': recovery_plan,
+        'session_plan': session_plan,
+        'recovery_transition': {
+            'applied_at': timezone.now().isoformat(),
+            'emotion': payload.get('emotion'),
+            'tracks': payload.get('tracks') or [],
+        },
+    })
+    history.felt_better_response = True
+    history.session_duration = listen_duration
+    history.ai_response = payload.get('ai_response') or history.ai_response
+    history.playlist_data = payload.get('tracks') or history.playlist_data
+    history.music_picker_data = music_picker_data
+    history.save(update_fields=[
+        'felt_better_response',
+        'session_duration',
+        'ai_response',
+        'playlist_data',
+        'music_picker_data',
+    ])
+
+    return Response({
+        'status': 'ok',
+        'action': 'transition_playlist',
+        **payload,
+    })
+
+
+# Spotify Auth
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def spotify_app_remote_config(request):
+    """Expose public Spotify App Remote config to the mobile client."""
+    return Response({
+        'client_id': settings.SPOTIFY_CLIENT_ID,
+        'redirect_uri': settings.SPOTIFY_APP_REMOTE_REDIRECT_URI,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def spotify_auth_url(request):
+    """Get Spotify OAuth URL"""
+    user_id = request.query_params.get('user_id', '')
+    redirect_uri = _spotify_redirect_uri(request)
+    logger.info(
+        "Generating Spotify auth URL for user_id=%s redirect_uri=%s",
+        user_id or 'anonymous',
+        redirect_uri,
+    )
+    url = spotify_service.get_auth_url(state=str(user_id), redirect_uri=redirect_uri)
+    return Response({'auth_url': url})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def spotify_callback(request):
+    """Handle Spotify OAuth callback"""
+    code = request.query_params.get('code')
+    state = request.query_params.get('state')  # user_id
+    redirect_uri = _spotify_redirect_uri(request)
+    
+    if not code:
+        return Response({'error': 'No code provided'}, status=400)
+    
+    token_data = spotify_service.exchange_code(code, redirect_uri=redirect_uri)
+    
+    if 'access_token' not in token_data:
+        logger.warning(
+            "Spotify callback token exchange failed for state=%s redirect_uri=%s reason=%s error=%s",
+            state,
+            redirect_uri,
+            token_data.get('reason'),
+            token_data.get('error'),
+        )
+        return Response(
+            {
+                'error': 'Spotify token exchange failed.',
+                'message': (
+                    token_data.get('recommended_action')
+                    or 'Spotify could not finish the login handshake.'
+                ),
+                'spotify_token_error': spotify_service.api_error_payload(
+                    token_data,
+                    default_message='Spotify token exchange failed.',
+                )['spotify'],
+            },
+            status=400,
+        )
+    
+    access_token = token_data['access_token']
+    refresh_token = token_data.get('refresh_token')
+    expires_in = token_data.get('expires_in', 3600)
+    granted_scopes = (
+        spotify_service._normalize_scopes(token_data.get('scope'))
+        or spotify_service._requested_scopes()
+    )
+    
+    # Get Spotify user info
+    profile_result = spotify_service.get_user_profile_result(access_token)
+    spotify_profile = profile_result.get('data') if profile_result.get('ok') else None
+    if not profile_result.get('ok'):
+        logger.warning(
+            "Spotify profile lookup during callback failed state=%s status=%s reason=%s error=%s",
+            state,
+            profile_result.get('status_code'),
+            profile_result.get('reason'),
+            profile_result.get('error'),
+        )
+
+    if profile_result.get('reason') == 'developer_allowlist_required':
+        logger.warning(
+            "Spotify callback blocked by developer allowlist for state=%s redirect_uri=%s",
+            state,
+            redirect_uri,
+        )
+        return Response(
+            {
+                'error': 'Spotify blocked this account for the EmoTune application.',
+                'message': (
+                    'Spotify rejected this login because the selected Spotify account is not '
+                    'registered for the EmoTune app in the Spotify Developer Dashboard.'
+                ),
+                'spotify_profile_error': spotify_service.api_error_payload(
+                    profile_result,
+                    default_message='Spotify profile validation failed.',
+                )['spotify'],
+            },
+            status=403,
+        )
+    
+    # Update user if state (user_id) provided
+    if state:
+        try:
+            user = User.objects.get(id=int(state))
+            previous_spotify_id = str(user.spotify_id or '').strip() or None
+            user.spotify_access_token = access_token
+            user.spotify_refresh_token = refresh_token
+            if granted_scopes:
+                user.spotify_granted_scopes = granted_scopes
+            user.spotify_token_expires = timezone.now() + timedelta(seconds=expires_in)
+            user.is_spotify_connected = True
+            if spotify_profile:
+                user.spotify_id = spotify_profile.get('id')
+            if (
+                previous_spotify_id
+                and spotify_profile
+                and previous_spotify_id != spotify_profile.get('id')
+            ):
+                logger.warning(
+                    "Spotify account changed for user=%s old_spotify_id=%s new_spotify_id=%s",
+                    user.id,
+                    previous_spotify_id,
+                    spotify_profile.get('id'),
+                )
+            user.save()
+            logger.info(
+                "Spotify OAuth completed for user=%s spotify_id=%s spotify_email=%s expires_in=%s scopes=%s",
+                user.id,
+                user.spotify_id,
+                spotify_profile.get('email') if spotify_profile else None,
+                expires_in,
+                granted_scopes,
+            )
+        except (User.DoesNotExist, ValueError):
+            pass
+    
+    response_payload = {
+        'access_token': access_token,
+        'spotify_profile': spotify_profile,
+        'message': 'Spotify connected successfully!'
+    }
+    if not profile_result.get('ok'):
+        response_payload['warning'] = (
+            'Spotify authorized EmoTune, but Spotify profile validation failed right after '
+            'login. Check the connected Spotify account and Spotify Developer Dashboard '
+            'settings.'
+        )
+        response_payload['spotify_profile_error'] = spotify_service.api_error_payload(
+            profile_result,
+            default_message='Spotify profile validation failed.',
+        )['spotify']
+    return Response(response_payload)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def spotify_debug_status(request):
+    """Return Spotify auth and playback diagnostics for the authenticated user."""
+    diagnostics = spotify_service.get_playback_debug_status(request.user)
+    logger.info(
+        "Spotify debug status for user=%s connected=%s premium=%s devices=%s active=%s",
+        request.user.id,
+        diagnostics['spotify_connected'],
+        diagnostics['account']['has_premium'],
+        diagnostics['devices']['device_count'],
+        diagnostics['devices']['has_active_device'],
+    )
+    return Response(diagnostics)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def spotify_prepare_playback(request):
+    """Prepare Spotify playback by validating scopes and activating a device."""
+    device_id = request.data.get('device_id')
+    preparation = spotify_service.prepare_playback(request.user, device_id=device_id)
+    logger.info(
+        "Spotify prepare playback for user=%s ok=%s transfer_attempted=%s transfer_succeeded=%s blocking=%s",
+        request.user.id,
+        preparation['ok'],
+        preparation['transfer_attempted'],
+        preparation['transfer_succeeded'],
+        preparation['blocking_issue'],
+    )
+    return Response(preparation)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def spotify_player_control(request):
+    """Control Spotify playback through the Spotify Web API."""
+    action = request.data.get('action')
+    uri = request.data.get('uri')
+    device_id = request.data.get('device_id')
+    position_ms = request.data.get('position_ms')
+    shuffle_enabled = request.data.get('shuffle_enabled')
+    repeat_mode = request.data.get('repeat_mode')
+    control_result = spotify_service.execute_playback_command(
+        request.user,
+        action=action,
+        uri=uri,
+        device_id=device_id,
+        position_ms=position_ms,
+        shuffle_enabled=shuffle_enabled,
+        repeat_mode=repeat_mode,
+    )
+    logger.info(
+        "Spotify player control user=%s action=%s ok=%s blocking=%s device=%s",
+        request.user.id,
+        action,
+        control_result['ok'],
+        control_result['blocking_issue'],
+        control_result['selected_device_name'],
+    )
+    return Response(control_result)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def spotify_disconnect(request):
+    """Disconnect the authenticated user's linked Spotify account."""
+    user = request.user
+    previous_spotify_id = str(user.spotify_id or '').strip() or None
+
+    user.spotify_access_token = None
+    user.spotify_refresh_token = None
+    user.spotify_granted_scopes = []
+    user.spotify_token_expires = None
+    user.spotify_id = None
+    user.is_spotify_connected = False
+    user.save(update_fields=[
+        'spotify_access_token',
+        'spotify_refresh_token',
+        'spotify_granted_scopes',
+        'spotify_token_expires',
+        'spotify_id',
+        'is_spotify_connected',
+        'updated_at',
+    ])
+
+    logger.info(
+        "Spotify disconnected for user=%s previous_spotify_id=%s",
+        user.id,
+        previous_spotify_id,
+    )
+    return Response({
+        'ok': True,
+        'message': 'Spotify disconnected successfully.',
+        'previous_spotify_id': previous_spotify_id,
+    })
+
+
+@api_view(['GET'])
+def search_artists(request):
+    """Search artists for preference selection"""
+    query = request.query_params.get('q', '')
+    if not query:
+        return Response([])
+
+    search_result = spotify_service.search_catalog(
+        query,
+        'artist',
+        user=request.user if request.user.is_authenticated else None,
+        limit=5,
+    )
+    if search_result['ok']:
+        return Response(search_result['items'])
+
+    return Response(
+        spotify_service.api_error_payload(
+            search_result,
+            default_message='Spotify artist search failed.',
+        ),
+        status=spotify_service.upstream_http_status(search_result),
+    )
+
+
+@api_view(['GET'])
+def search_tracks(request):
+    """Search tracks"""
+    query = request.query_params.get('q', '')
+    if not query:
+        return Response([])
+
+    search_result = spotify_service.search_catalog(
+        query,
+        'track',
+        user=request.user if request.user.is_authenticated else None,
+        limit=20,
+    )
+    if search_result['ok']:
+        return Response(search_result['items'])
+
+    return Response(
+        spotify_service.api_error_payload(
+            search_result,
+            default_message='Spotify track search failed.',
+        ),
+        status=spotify_service.upstream_http_status(search_result),
+    )
+
+
+# Admin Views
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_dashboard(request):
+    """Admin dashboard stats"""
+    total_users = User.objects.filter(is_staff=False).count()
+    
+    # Monthly stats for last 6 months
+    from django.db.models.functions import TruncMonth
+    monthly_playlists = (
+        PromptHistory.objects
+        .annotate(month=TruncMonth('created_at'))
+        .values('month')
+        .annotate(count=Count('id'))
+        .order_by('month')
+    )
+    
+    # Mood distribution
+    mood_distribution = (
+        PromptHistory.objects
+        .values('detected_emotion')
+        .annotate(count=Count('id'))
+        .order_by('-count')
+    )
+    
+    return Response({
+        'total_users': total_users,
+        'monthly_playlists': list(monthly_playlists),
+        'mood_distribution': list(mood_distribution),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_users(request):
+    """Admin: list all users"""
+    query = request.query_params.get('q', '')
+    users = User.objects.filter(is_staff=False)
+    if query:
+        users = users.filter(username__icontains=query) | users.filter(email__icontains=query)
+    
+    data = [{
+        'id': u.id,
+        'username': u.username,
+        'email': u.email,
+        'is_spotify_connected': u.is_spotify_connected,
+        'created_at': u.created_at,
+        'prompt_count': u.prompt_history.count(),
+    } for u in users]
+    
+    return Response(data)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAdminUser])
+def admin_delete_user(request, user_id):
+    """Admin: delete a user"""
+    try:
+        user = User.objects.get(id=user_id, is_staff=False)
+        user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found'}, status=404)
+
+
+from django.shortcuts import render
+
+def admin_panel(request):
+    """Serve the Admin Dashboard HTML interface"""
+    return render(request, "admin_dashboard.html")
+
