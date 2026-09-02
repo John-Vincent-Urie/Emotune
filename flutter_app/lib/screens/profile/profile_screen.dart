@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../controllers/spotify_connection_controller.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/recommendation_studio_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../widgets/recommendation_session_controls.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -20,13 +20,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<dynamic> _artists = [];
   List<dynamic> _searchResults = [];
   final _artistSearchCtrl = TextEditingController();
-  bool _isConnectingSpotify = false;
-  bool _isDisconnectingSpotify = false;
+  final _spotifyConnection = SpotifyConnectionController();
   bool _isSavingArtists = false;
 
   @override
   void initState() {
     super.initState();
+    _spotifyConnection.addListener(_onSpotifyConnectionChanged);
     _loadArtists();
   }
 
@@ -63,8 +63,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
+    _spotifyConnection.removeListener(_onSpotifyConnectionChanged);
+    _spotifyConnection.dispose();
     _artistSearchCtrl.dispose();
     super.dispose();
+  }
+
+  void _onSpotifyConnectionChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -100,9 +108,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await auth.logout();
-              if (mounted) {
-                Navigator.pushReplacementNamed(context, '/welcome');
-              }
+              if (!context.mounted) return;
+              Navigator.pushReplacementNamed(context, '/welcome');
             },
           ),
         ],
@@ -113,78 +120,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Profile header
-            Center(
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: AppColors.accent.withOpacity(0.2),
-                    child: Text(
-                      (user['username'] as String? ?? 'U')[0].toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 40,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.accent,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    user['username'] ?? '',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                  Text(
-                    user['email'] ?? '',
-                    style: TextStyle(
-                      color: isDark ? Colors.white54 : Colors.black54,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: (user['is_spotify_connected'] == true
-                              ? Colors.green
-                              : Colors.grey)
-                          .withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: user['is_spotify_connected'] == true
-                            ? Colors.green
-                            : Colors.grey,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.music_note,
-                            size: 14,
-                            color: user['is_spotify_connected'] == true
-                                ? Colors.green
-                                : Colors.grey),
-                        const SizedBox(width: 4),
-                        Text(
-                          user['is_spotify_connected'] == true
-                              ? 'Spotify Connected'
-                              : 'Spotify Not Connected',
-                          style: TextStyle(
-                            color: user['is_spotify_connected'] == true
-                                ? Colors.green
-                                : Colors.grey,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _ProfileHeader(user: user, isDark: isDark),
 
             const SizedBox(height: 32),
 
@@ -266,7 +202,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         backgroundImage: artist['image'] != null
                             ? NetworkImage(artist['image'])
                             : null,
-                        backgroundColor: AppColors.accent.withOpacity(0.2),
+                        backgroundColor: AppColors.accent.withValues(alpha: 0.2),
                         child: artist['image'] == null
                             ? Text(name[0],
                                 style: const TextStyle(color: AppColors.accent))
@@ -299,7 +235,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: _artists.map<Widget>((a) {
                 return Chip(
                   label: Text(a.toString()),
-                  backgroundColor: AppColors.accent.withOpacity(0.15),
+                  backgroundColor: AppColors.accent.withValues(alpha: 0.15),
                   labelStyle: const TextStyle(color: AppColors.accent),
                   deleteIcon: const Icon(Icons.close,
                       size: 16, color: AppColors.accent),
@@ -371,8 +307,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 12),
             RecommendationSessionControls(
-              selectedOutcomeMode: studio.selectedOutcomeMode,
-              onOutcomeModeChanged: studio.setOutcomeMode,
               sessionLengthMinutes: studio.sessionLengthMinutes,
               onSessionLengthChanged: studio.setSessionLengthMinutes,
               checkInFrequencyTracks: studio.checkInFrequencyTracks,
@@ -385,7 +319,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onTrainOnThisSessionChanged: studio.setTrainOnThisSession,
               title: 'Recommendation Studio',
               subtitle:
-                  'Shape the outcome mode, session timing, and taste controls that EmoTune should use by default.',
+                  'Shape the session timing and taste controls that EmoTune should use by default.',
             ),
 
             const SizedBox(height: 24),
@@ -414,14 +348,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _divider(isDark),
                   _settingsTile(
                     Icons.music_note,
-                    _isConnectingSpotify
+                    _spotifyConnection.isConnecting
                         ? 'Connecting Spotify...'
                         : 'Connect Spotify',
-                    _isConnectingSpotify
+                    _spotifyConnection.isConnecting
                         ? null
-                        : () => _connectSpotify(user['id'].toString()),
+                        : () => _spotifyConnection.connect(context),
                     isDark,
-                    trailing: _isConnectingSpotify
+                    trailing: _spotifyConnection.isConnecting
                         ? const SizedBox(
                             width: 18,
                             height: 18,
@@ -436,14 +370,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _divider(isDark),
                     _settingsTile(
                       Icons.link_off,
-                      _isDisconnectingSpotify
+                      _spotifyConnection.isDisconnecting
                           ? 'Disconnecting Spotify...'
                           : 'Disconnect Spotify',
-                      _isDisconnectingSpotify
+                      _spotifyConnection.isDisconnecting
                           ? null
-                          : _disconnectSpotifyFromProfile,
+                          : () => _spotifyConnection.disconnect(context),
                       isDark,
-                      trailing: _isDisconnectingSpotify
+                      trailing: _spotifyConnection.isDisconnecting
                           ? const SizedBox(
                               width: 18,
                               height: 18,
@@ -460,44 +394,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _sectionTitle(String title, bool isDark) => Text(
-        title,
-        style: TextStyle(
-          color: isDark ? Colors.white : Colors.black87,
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
-      );
-
-  Widget _card(bool isDark, {required Widget child}) => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200),
-        ),
-        child: child,
-      );
-
-  Widget _divider(bool isDark) => Divider(
-        color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
-        height: 1,
-      );
-
-  Widget _settingsTile(
-      IconData icon, String title, VoidCallback? onTap, bool isDark,
-      {Widget? trailing}) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: AppColors.accent),
-      title: Text(title,
-          style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
-      trailing: trailing ?? const Icon(Icons.chevron_right, color: Colors.grey),
-      onTap: onTap,
     );
   }
 
@@ -621,7 +517,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               await context
                   .read<AuthProvider>()
                   .updateProfile({'username': usernameCtrl.text});
-              if (mounted) Navigator.pop(ctx);
+              if (ctx.mounted) Navigator.pop(ctx);
             },
             child: const Text('Save'),
           ),
@@ -663,7 +559,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ElevatedButton(
             onPressed: () async {
               await ApiService.changePassword(oldCtrl.text, newCtrl.text);
-              if (mounted) Navigator.pop(ctx);
+              if (ctx.mounted) Navigator.pop(ctx);
             },
             child: const Text('Change'),
           ),
@@ -671,165 +567,120 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+}
 
-  Future<void> _connectSpotify(String userId) async {
-    if (_isConnectingSpotify) {
-      return;
-    }
+Widget _sectionTitle(String title, bool isDark) => Text(
+      title,
+      style: TextStyle(
+        color: isDark ? Colors.white : Colors.black87,
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+      ),
+    );
 
-    setState(() => _isConnectingSpotify = true);
+Widget _card(bool isDark, {required Widget child}) => Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+            color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200),
+      ),
+      child: child,
+    );
 
-    try {
-      final url = await ApiService.getSpotifyAuthUrl(userId);
-      final uri = Uri.parse(url);
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
+Widget _divider(bool isDark) => Divider(
+      color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
+      height: 1,
+    );
 
-      if (!mounted) {
-        return;
-      }
+Widget _settingsTile(
+    IconData icon, String title, VoidCallback? onTap, bool isDark,
+    {Widget? trailing}) {
+  return ListTile(
+    contentPadding: EdgeInsets.zero,
+    leading: Icon(icon, color: AppColors.accent),
+    title: Text(title,
+        style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+    trailing: trailing ?? const Icon(Icons.chevron_right, color: Colors.grey),
+    onTap: onTap,
+  );
+}
 
-      if (!launched) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open Spotify login')),
-        );
-        return;
-      }
+/// The avatar/username/email/Spotify-connection-badge block at the top of
+/// the profile screen, pulled out of `build()` since it's a large
+/// self-contained, purely-display section.
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({required this.user, required this.isDark});
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Finish Spotify login in your browser, then return to the app.',
-          ),
-        ),
-      );
+  final Map<String, dynamic> user;
+  final bool isDark;
 
-      final connected = await _waitForSpotifyConnection();
-
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            connected
-                ? 'Spotify connected successfully.'
-                : 'Spotify login is still pending. Return here after finishing in the browser.',
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Spotify connection failed')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isConnectingSpotify = false);
-      }
-    }
-  }
-
-  Future<bool> _waitForSpotifyConnection() async {
-    final auth = context.read<AuthProvider>();
-    final deadline = DateTime.now().add(const Duration(minutes: 2));
-
-    while (DateTime.now().isBefore(deadline)) {
-      await Future.delayed(const Duration(seconds: 2));
-
-      if (!mounted) {
-        return false;
-      }
-
-      final reloaded = await auth.reloadUser();
-      final user = auth.user;
-
-      if (reloaded && user?['is_spotify_connected'] == true) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  Future<void> _disconnectSpotifyFromProfile() async {
-    if (_isDisconnectingSpotify) {
-      return;
-    }
-
-    final shouldDisconnect = await showDialog<bool>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('Disconnect Spotify?'),
-            content: const Text(
-              'This removes the linked Spotify account from EmoTune so you can reconnect with a different account.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Cancel'),
+  @override
+  Widget build(BuildContext context) {
+    final isSpotifyConnected = user['is_spotify_connected'] == true;
+    return Center(
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 50,
+            backgroundColor: AppColors.accent.withValues(alpha: 0.2),
+            child: Text(
+              (user['username'] as String? ?? 'U')[0].toUpperCase(),
+              style: const TextStyle(
+                fontSize: 40,
+                fontWeight: FontWeight.bold,
+                color: AppColors.accent,
               ),
-              ElevatedButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: const Text('Disconnect'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            user['username'] ?? '',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
+          Text(
+            user['email'] ?? '',
+            style: TextStyle(
+              color: isDark ? Colors.white54 : Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: (isSpotifyConnected ? Colors.green : Colors.grey)
+                  .withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isSpotifyConnected ? Colors.green : Colors.grey,
               ),
-            ],
-          ),
-        ) ??
-        false;
-
-    if (!shouldDisconnect || !mounted) {
-      return;
-    }
-
-    setState(() => _isDisconnectingSpotify = true);
-
-    try {
-      await ApiService.disconnectSpotify();
-
-      final reloaded = await context.read<AuthProvider>().reloadUser();
-
-      if (!mounted) {
-        return;
-      }
-
-      if (reloaded) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Spotify disconnected from EmoTune. You can now connect a different Spotify account.',
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.music_note,
+                    size: 14,
+                    color: isSpotifyConnected ? Colors.green : Colors.grey),
+                const SizedBox(width: 4),
+                Text(
+                  isSpotifyConnected
+                      ? 'Spotify Connected'
+                      : 'Spotify Not Connected',
+                  style: TextStyle(
+                    color: isSpotifyConnected ? Colors.green : Colors.grey,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Spotify was disconnected, but the profile did not refresh yet. Reopen the screen if needed.',
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Spotify disconnect failed: $e'),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isDisconnectingSpotify = false);
-      }
-    }
+        ],
+      ),
+    );
   }
 }

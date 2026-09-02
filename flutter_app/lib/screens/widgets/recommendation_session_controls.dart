@@ -5,8 +5,8 @@ import '../../theme/app_theme.dart';
 class RecommendationSessionControls extends StatelessWidget {
   const RecommendationSessionControls({
     super.key,
-    required this.selectedOutcomeMode,
-    required this.onOutcomeModeChanged,
+    this.selectedOutcomeMode,
+    this.onOutcomeModeChanged,
     required this.sessionLengthMinutes,
     required this.onSessionLengthChanged,
     required this.checkInFrequencyTracks,
@@ -22,8 +22,8 @@ class RecommendationSessionControls extends StatelessWidget {
         'Shape the playlist around the outcome you want, how long you want support, and whether this session should teach personalization.',
   });
 
-  final String selectedOutcomeMode;
-  final ValueChanged<String> onOutcomeModeChanged;
+  final String? selectedOutcomeMode;
+  final ValueChanged<String>? onOutcomeModeChanged;
   final int? sessionLengthMinutes;
   final ValueChanged<int?> onSessionLengthChanged;
   final int? checkInFrequencyTracks;
@@ -88,6 +88,8 @@ class RecommendationSessionControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onOutcomeModeChanged = this.onOutcomeModeChanged;
+    final showOutcomeMode = onOutcomeModeChanged != null;
     final selectedMode = _modeOptions.firstWhere(
       (option) => option.value == selectedOutcomeMode,
       orElse: () => _modeOptions.first,
@@ -106,7 +108,7 @@ class RecommendationSessionControls extends StatelessWidget {
             ? null
             : [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 18,
                   offset: const Offset(0, 10),
                 ),
@@ -158,39 +160,41 @@ class RecommendationSessionControls extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          _SectionLabel(
-            label: 'Outcome Mode',
-            helper: selectedMode.description,
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _modeOptions.map((option) {
-              final isSelected = option.value == selectedOutcomeMode;
-              return ChoiceChip(
-                label: Text(option.label),
-                selected: isSelected,
-                onSelected: (_) => onOutcomeModeChanged(option.value),
-                selectedColor: AppColors.accent.withOpacity(0.18),
-                labelStyle: TextStyle(
-                  color: isSelected
-                      ? (isDark ? AppColors.accent : Colors.black87)
-                      : (isDark ? Colors.white70 : Colors.black54),
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                ),
-                side: BorderSide(
-                  color: isSelected
-                      ? AppColors.accent
-                      : (isDark ? Colors.white12 : Colors.black12),
-                ),
-                backgroundColor: isDark
-                    ? const Color(0xFF1B1B1B)
-                    : Colors.grey.shade50,
-              );
-            }).toList(),
-          ),
+          if (showOutcomeMode) ...[
+            const SizedBox(height: 16),
+            _SectionLabel(
+              label: 'Outcome Mode',
+              helper: selectedMode.description,
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _modeOptions.map((option) {
+                final isSelected = option.value == selectedOutcomeMode;
+                return ChoiceChip(
+                  label: Text(option.label),
+                  selected: isSelected,
+                  onSelected: (_) => onOutcomeModeChanged(option.value),
+                  selectedColor: AppColors.accent.withValues(alpha: 0.18),
+                  labelStyle: TextStyle(
+                    color: isSelected
+                        ? (isDark ? AppColors.accent : Colors.black87)
+                        : (isDark ? Colors.white70 : Colors.black54),
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                  side: BorderSide(
+                    color: isSelected
+                        ? AppColors.accent
+                        : (isDark ? Colors.white12 : Colors.black12),
+                  ),
+                  backgroundColor: isDark
+                      ? const Color(0xFF1B1B1B)
+                      : Colors.grey.shade50,
+                );
+              }).toList(),
+            ),
+          ],
           const SizedBox(height: 16),
           const _SectionLabel(
             label: 'Session Length',
@@ -206,7 +210,7 @@ class RecommendationSessionControls extends StatelessWidget {
                 label: Text(option.label),
                 selected: isSelected,
                 onSelected: (_) => onSessionLengthChanged(option.value),
-                selectedColor: AppColors.gradientStart.withOpacity(0.18),
+                selectedColor: AppColors.gradientStart.withValues(alpha: 0.18),
                 labelStyle: TextStyle(
                   color: isSelected
                       ? (isDark ? Colors.white : Colors.black87)
@@ -238,7 +242,7 @@ class RecommendationSessionControls extends StatelessWidget {
                 label: Text(option.label),
                 selected: isSelected,
                 onSelected: (_) => onCheckInFrequencyChanged(option.value),
-                selectedColor: AppColors.gradientMid.withOpacity(0.18),
+                selectedColor: AppColors.gradientMid.withValues(alpha: 0.18),
                 labelStyle: TextStyle(
                   color: isSelected
                       ? (isDark ? Colors.white : Colors.black87)
@@ -270,7 +274,7 @@ class RecommendationSessionControls extends StatelessWidget {
                 label: Text(option.label),
                 selected: isSelected,
                 onSelected: (_) => onFamiliarityChanged(option.value),
-                selectedColor: AppColors.gradientEnd.withOpacity(0.18),
+                selectedColor: AppColors.gradientEnd.withValues(alpha: 0.18),
                 labelStyle: TextStyle(
                   color: isSelected
                       ? (isDark ? Colors.white : Colors.black87)
@@ -398,7 +402,7 @@ class _ToggleRow extends StatelessWidget {
           const SizedBox(width: 12),
           Switch.adaptive(
             value: value,
-            activeColor: AppColors.accent,
+            activeThumbColor: AppColors.accent,
             onChanged: onChanged,
           ),
         ],
