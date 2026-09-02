@@ -263,9 +263,10 @@ class RecommendationSessionControls extends StatelessWidget {
           const _SectionLabel(
             label: 'Taste Control',
             helper:
-                'Balanced keeps the ranked picks, More familiar opens with the '
-                'songs you hearted for that emotion, and More discovery pulls '
-                'fresh Spotify tracks instead of the built-in list.',
+                'Balanced opens with the EmoTune list for that emotion, More '
+                'familiar opens with the songs you hearted for it, and More '
+                'discovery pulls fresh Spotify tracks instead of the built-in '
+                'list.',
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -297,7 +298,8 @@ class RecommendationSessionControls extends StatelessWidget {
           const SizedBox(height: 16),
           _ToggleRow(
             title: 'Prefer instrumental',
-            subtitle: 'Push the ranking toward lower-lyric tracks when possible.',
+            subtitle: 'Search for instrumental music first, then rank it above '
+                'vocal-led tracks.',
             value: preferInstrumental,
             onChanged: onPreferInstrumentalChanged,
           ),

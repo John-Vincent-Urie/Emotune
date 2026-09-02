@@ -258,9 +258,27 @@ LIGHTFM_RECOMMENDER_USER_ALPHA = env_float(
     'LIGHTFM_RECOMMENDER_USER_ALPHA',
     0.000001,
 )
+# LightFM only earns its 40% share of the ranking once there is enough
+# behaviour to learn from. Below these floors a fresh model is fitting noise,
+# so the deterministic emotion ranking is the better answer and the ranker
+# hands back its heuristic result instead.
 LIGHTFM_RECOMMENDER_MIN_INTERACTIONS = env_int(
     'LIGHTFM_RECOMMENDER_MIN_INTERACTIONS',
-    3,
+    200,
+)
+LIGHTFM_RECOMMENDER_MIN_USER_INTERACTIONS = env_int(
+    'LIGHTFM_RECOMMENDER_MIN_USER_INTERACTIONS',
+    20,
+)
+# The corpus is rebuilt on every request, so the history scans are bounded by
+# age and row count instead of growing with the whole database.
+LIGHTFM_RECOMMENDER_HISTORY_DAYS = env_int(
+    'LIGHTFM_RECOMMENDER_HISTORY_DAYS',
+    120,
+)
+LIGHTFM_RECOMMENDER_MAX_HISTORY_ROWS = env_int(
+    'LIGHTFM_RECOMMENDER_MAX_HISTORY_ROWS',
+    2000,
 )
 LLM_MUSIC_PICKER_ENABLED = env_bool(
     'LLM_MUSIC_PICKER_ENABLED',

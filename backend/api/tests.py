@@ -3416,6 +3416,7 @@ class LightFMMusicRankerTests(TestCase):
         ranker = LightFMMusicRanker()
         ranker.enabled = True
         ranker.min_interactions = 1
+        ranker.min_user_interactions = 0
 
         with patch.object(
             ranker,
@@ -3558,6 +3559,8 @@ class LightFMMusicRankerTests(TestCase):
 
         ranker = LightFMMusicRanker()
         ranker.enabled = True
+        ranker.min_interactions = 1
+        ranker.min_user_interactions = 1
 
         with patch.object(
             ranker,

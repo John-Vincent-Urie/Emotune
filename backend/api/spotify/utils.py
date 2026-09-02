@@ -548,39 +548,83 @@ def _taste_discovery_bonus(track, taste_profile):
             return -0.06, 'taste:familiar'
     return 0.0, None
 
-def _taste_instrumental_bonus(text_blob, taste_profile):
+INSTRUMENTAL_TERMS = (
+    'instrumental',
+    'instrumentals',
+    'ambient',
+    'piano',
+    'study',
+    'focus',
+    'meditation',
+    'meditative',
+    'sleep',
+    'classical',
+    'orchestral',
+    'soundtrack',
+    'score',
+    'lofi',
+    'lo-fi',
+    'lo fi',
+)
+
+# Words that mark a recording as vocal-led or vocal-heavy. "ft." is here
+# because that is how the app's own playlist document writes a feature credit.
+VOCAL_TERMS = (
+    'feat.',
+    'feat',
+    'ft.',
+    'featuring',
+    'vocal',
+    'vocals',
+    'karaoke',
+    'live',
+    'remix',
+)
+
+
+def _term_pattern(terms):
+    """Match whole words only.
+
+    Substring matching used to read "Alive" as a live recording and
+    "Sleepless" as sleep music, so every term is anchored to word boundaries
+    that tolerate the punctuation in "feat." and "lo-fi".
+    """
+    return re.compile(
+        r'(?<![a-z0-9])(?:%s)(?![a-z0-9])'
+        % '|'.join(re.escape(term) for term in sorted(terms, key=len, reverse=True))
+    )
+
+
+_INSTRUMENTAL_PATTERN = _term_pattern(INSTRUMENTAL_TERMS)
+_VOCAL_PATTERN = _term_pattern(VOCAL_TERMS)
+
+
+def _taste_instrumental_signal(text_blob, taste_profile):
+    """How instrumental a track reads: ``1``, ``-1``, or ``0`` when unknown.
+
+    Returns ``(signal, reason)``. The signal is unscaled on purpose -- the
+    candidate ranker and the LightFM blender score on different ranges, and
+    both need the same reading of the track, not the same number.
+    """
     if not taste_profile.get('prefer_instrumental'):
-        return 0.0, None
+        return 0, None
 
     normalized_blob = str(text_blob or '').strip().lower()
-    instrumental_terms = (
-        'instrumental',
-        'ambient',
-        'piano',
-        'study',
-        'focus',
-        'meditation',
-        'sleep',
-        'classical',
-        'soundtrack',
-        'lofi',
-        'lo-fi',
-    )
-    vocal_terms = (
-        'feat.',
-        'featuring',
-        'karaoke',
-        'live',
-        'remix',
-    )
+    instrumental_hit = bool(_INSTRUMENTAL_PATTERN.search(normalized_blob))
+    vocal_hit = bool(_VOCAL_PATTERN.search(normalized_blob))
 
-    bonus = 0.0
-    if any(term in normalized_blob for term in instrumental_terms):
-        bonus += 0.18
-    if any(term in normalized_blob for term in vocal_terms):
-        bonus -= 0.07
-    if bonus > 0:
-        return bonus, 'taste:instrumental'
-    if bonus < 0:
-        return bonus, 'taste:less_instrumental_fit'
-    return 0.0, None
+    if instrumental_hit and not vocal_hit:
+        return 1, 'taste:instrumental'
+    if vocal_hit and not instrumental_hit:
+        return -1, 'taste:less_instrumental_fit'
+    return 0, None
+
+
+def _taste_instrumental_bonus(text_blob, taste_profile, *, weight=0.8):
+    """The instrumental signal scaled for the candidate ranker's score range.
+
+    Candidate scores there run from roughly 1 to 5, where source weight alone
+    spans 0.8 to 3.4, so the old +/-0.18 nudge could only break exact ties.
+    """
+    signal, reason = _taste_instrumental_signal(text_blob, taste_profile)
+    return signal * weight, reason

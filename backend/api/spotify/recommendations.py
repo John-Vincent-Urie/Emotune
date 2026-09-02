@@ -34,6 +34,7 @@ from .constants import (
     CURATED_CONTEXT_LIBRARY,
     CURATED_PLAYABLE_CONTEXTS,
     MUSIC_PICKER_DOC_SEED_SOURCE,
+    MUSIC_PICKER_DOC_SEED_TRACKS,
     HAPPY_SEED_TRACKS,
     SAD_SEED_TRACKS,
     ANGRY_SEED_TRACKS,
@@ -54,6 +55,9 @@ logger = logging.getLogger('api.spotify_service')
 # Sources that are the same for everyone regardless of what Spotify holds.
 STATIC_TRACK_SOURCES = frozenset({'curated_fallback'})
 
+# What a track resolved from the docs/music.md list is tagged with.
+MUSIC_DOC_TRACK_SOURCE = 'music_md_playlist'
+
 
 def _without_static_tracks(tracks):
     """Drop the hardcoded curated tracks from a candidate group."""
@@ -71,6 +75,129 @@ def _shuffled(tracks):
     return shuffled
 
 
+def _music_doc_seeds(emotion):
+    """The docs/music.md songs for an emotion as (title, artist) match keys."""
+    seeds = MUSIC_PICKER_DOC_SEED_TRACKS.get(str(emotion or '').strip().lower()) or []
+    return [
+        (
+            _canonical_track_title(seed.get('track')),
+            str(seed.get('artist') or '').strip().lower(),
+        )
+        for seed in seeds
+        if _canonical_track_title(seed.get('track'))
+    ]
+
+
+def _music_doc_position(track, seeds):
+    """Where a track sits in the document, or None when it is not on it."""
+    title = _canonical_track_title(
+        track.get('playlist_seed_track') or track.get('name')
+    )
+    if not title:
+        return None
+
+    artist = str(
+        track.get('playlist_seed_artist') or track.get('artist') or ''
+    ).strip().lower()
+    for position, (seed_title, seed_artist) in enumerate(seeds):
+        if seed_title != title:
+            continue
+        if (
+            not seed_artist
+            or not artist
+            or seed_artist in artist
+            or artist in seed_artist
+        ):
+            return position
+    return None
+
+
+def music_doc_tracks(tracks, emotion, limit=None):
+    """The docs/music.md songs for this emotion, in document order.
+
+    "Balanced" is the lane that promises that static per-emotion list, so the
+    blender and the taste-control pass in views both need the same answer to
+    "which of these candidates came from the document". Matches come back
+    flagged, so the app can say which songs are the static ones -- a document
+    song that Spotify returned for a mood phrase rather than for its own title
+    query carries no seed metadata of its own.
+    """
+    seeds = _music_doc_seeds(emotion)
+    if not seeds:
+        return []
+
+    matched = []
+    seen_keys = set()
+    for track in tracks or []:
+        if not isinstance(track, dict):
+            continue
+        position = _music_doc_position(track, seeds)
+        if position is None:
+            continue
+        key = track.get('uri') or track.get('id')
+        if key:
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+        matched.append((position, len(matched), track))
+
+    matched.sort(key=lambda item: (item[0], item[1]))
+    ordered = [{**track, 'is_music_doc_pick': True} for _, _, track in matched]
+    return ordered[:limit] if limit else ordered
+
+
+def _pool_candidates(
+    pool_tracks,
+    *,
+    emotion,
+    limit,
+    seen_track_ids,
+    seen_track_match_keys,
+    taste_profile,
+):
+    """Sample the shared pool, leading with the document list for Balanced.
+
+    The pool is built from the same queries a live request runs, so it already
+    holds this emotion's docs/music.md songs -- but a random sample of six out
+    of a hundred almost never contains one, which is how Balanced ended up
+    opening on an arbitrary pooled track instead of the list it promises.
+    """
+    if limit <= 0:
+        return []
+
+    normalized_taste = _normalize_taste_profile(taste_profile)
+    leads = []
+    if (
+        normalized_taste.get('familiarity') == 'balanced'
+        and not normalized_taste.get('prefer_instrumental')
+    ):
+        working_ids = set(seen_track_ids or ())
+        working_keys = set(seen_track_match_keys or ())
+        for track in music_doc_tracks(
+            pool_tracks, emotion, limit=max(limit // 2, 1),
+        ):
+            track_id = track.get('id')
+            match_key = _track_match_key(track)
+            if not track_id or track_id in working_ids:
+                continue
+            if match_key and match_key in working_keys:
+                continue
+            working_ids.add(track_id)
+            if match_key:
+                working_keys.add(match_key)
+            leads.append(track)
+        seen_track_ids = working_ids
+        seen_track_match_keys = working_keys
+
+    sampled = pool.sample_tracks(
+        pool_tracks,
+        limit=max(limit - len(leads), 0),
+        seen_track_ids=seen_track_ids,
+        seen_track_match_keys=seen_track_match_keys,
+    )
+    return leads + sampled
+
+
 class SpotifyRecommendationEngine:
     def __init__(self, service):
         self.service = service
@@ -86,6 +213,7 @@ class SpotifyRecommendationEngine:
         seed_artist_name=None,
         seed_track_name=None,
         query_mode='default',
+        taste_profile=None,
     ):
         """Build layered Spotify search queries from strongest to broadest match."""
         normalized_emotion = str(emotion or 'mixed').strip().lower() or 'mixed'
@@ -128,7 +256,38 @@ class SpotifyRecommendationEngine:
             if ' '.join(str(query or '').strip().split())
         ]
 
+        primary_profile = EMOTION_QUERY_PROFILES.get(
+            normalized_emotion,
+            EMOTION_QUERY_PROFILES['mixed'],
+        )
+
         queries = []
+
+        # "Prefer instrumental" has to reach the search, not just the ranking:
+        # no amount of re-ordering turns a pool of vocal pop into instrumental
+        # music. A request only gets through the first handful of queries before
+        # its candidate slots or its time budget run out, so these open the list
+        # in both stages -- the per-emotion document songs are all vocal, and
+        # this listener asked for the opposite.
+        #
+        # The emotion word alone is a poor instrumental query: "mixed
+        # instrumental" comes back as songs titled "Mixed Signals". The mood
+        # phrase and a genre filter return music that is actually instrumental,
+        # and usually says so in its title -- which is the only instrumental
+        # signal available, because Spotify's audio-features endpoint answers
+        # 403 for apps registered after November 2024.
+        if _normalize_taste_profile(taste_profile).get('prefer_instrumental'):
+            instrumental_phrase = (
+                primary_profile.get('phrases', [normalized_emotion])[0]
+                if isinstance(primary_profile, dict)
+                else normalized_emotion
+            )
+            queries.extend([
+                f'instrumental {instrumental_phrase}',
+                'genre:"ambient" instrumental',
+                f'{instrumental_phrase} piano instrumental',
+            ])
+
         if continuation_mode:
             queries.extend(
                 self.service._build_curated_emotion_queries(
@@ -149,11 +308,6 @@ class SpotifyRecommendationEngine:
                 )
             )
             queries.extend(normalized_llm_queries)
-
-        primary_profile = EMOTION_QUERY_PROFILES.get(
-            normalized_emotion,
-            EMOTION_QUERY_PROFILES['mixed'],
-        )
 
         queries.extend(
             self.service._build_curated_emotion_queries(
@@ -614,6 +768,15 @@ class SpotifyRecommendationEngine:
 
             base_source = str(track.get('recommendation_source') or '').strip()
             source_weight = EMOTION_SOURCE_WEIGHTS.get(base_source, 1.0)
+            if (
+                normalized_taste_profile.get('prefer_instrumental')
+                and base_source.lower() == MUSIC_DOC_TRACK_SOURCE
+            ):
+                # The document list carries the heaviest source weight in the
+                # table because it is the lane every request defaults to. A
+                # listener who asked for instrumental music opted out of that
+                # default, so its songs rank as ordinary catalog tracks here.
+                source_weight = EMOTION_SOURCE_WEIGHTS['spotify_catalog']
             if source_weight:
                 score += source_weight
                 if base_source:
@@ -841,6 +1004,21 @@ class SpotifyRecommendationEngine:
             search_quota = min(len(search_ranked), max(3 if non_mixed_emotion else 2, (limit * 3) // 5))
             fallback_quota = min(len(fallback_ranked), max(2, limit // 4)) if fallback_ranked and not search_ranked else 0
         else:
+            # Balanced is the static lane: the docs/music.md songs for this
+            # emotion open the playlist in document order, and the ranked picks
+            # fill in behind them. Not when the listener asked for instrumental
+            # music, though -- that list is vocal pop, and the explicit ask
+            # wins over the default lane.
+            if not _normalize_taste_profile(taste_profile).get('prefer_instrumental'):
+                append_from(
+                    music_doc_tracks(
+                        [*search_ranked, *personalized_ranked, *fallback_ranked],
+                        emotion,
+                        limit=max(limit // 2, 1),
+                    ),
+                    limit,
+                )
+
             if search_ranked:
                 search_quota = min(
                     len(search_ranked),
@@ -1265,11 +1443,13 @@ class SpotifyRecommendationEngine:
             # fallback list that everyone would otherwise share.
             offline_pool_lookup = pool.read_pool(emotion)
             if offline_pool_lookup:
-                pooled_tracks = pool.sample_tracks(
+                pooled_tracks = _pool_candidates(
                     offline_pool_lookup['tracks'],
+                    emotion=emotion,
                     limit=max(desired_candidate_total - len(all_tracks), 0),
                     seen_track_ids=seen_track_ids,
                     seen_track_match_keys=seen_track_match_keys,
+                    taste_profile=taste_profile,
                 )
                 if pooled_tracks:
                     logger.info(
@@ -1350,18 +1530,23 @@ class SpotifyRecommendationEngine:
             seed_artist_name=seed_artist_name,
             seed_track_name=seed_track_name,
             query_mode=query_mode,
+            taste_profile=taste_profile,
         )
         token_index = 0
         normalized_query_mode = str(query_mode or 'default').strip().lower() or 'default'
         # A request can be served from the shared pool when its candidates are
         # allowed to be emotion-generic. "Play more like this song" requests
         # (seed track/artist) and continuation pages are not: they asked for
-        # something specific, so they always go to Spotify.
+        # something specific, so they always go to Spotify. "Prefer
+        # instrumental" is the same kind of ask -- the pool is whatever the
+        # emotion returned for everyone, mostly vocal, and a share of one
+        # live query cannot pull it back.
         pool_lookup = (
             pool.read_pool(emotion)
             if normalized_query_mode == 'default'
             and not seed_track_name
             and not seed_artist_name
+            and not _normalize_taste_profile(taste_profile).get('prefer_instrumental')
             else None
         )
 
@@ -1403,11 +1588,13 @@ class SpotifyRecommendationEngine:
                     search_tracks.extend(live_tracks)
                     all_tracks.extend(live_tracks)
 
-                pooled_tracks = pool.sample_tracks(
+                pooled_tracks = _pool_candidates(
                     pool_lookup['tracks'],
+                    emotion=emotion,
                     limit=max(desired_candidate_total - len(all_tracks), 0),
                     seen_track_ids=seen_track_ids,
                     seen_track_match_keys=seen_track_match_keys,
+                    taste_profile=taste_profile,
                 )
                 for track in pooled_tracks:
                     seen_track_ids.add(track['id'])

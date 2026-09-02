@@ -1,5 +1,6 @@
-"""Taste control behavior: balanced ranks, familiar replays this emotion's
-favorites first, discovery stays off the static curated list."""
+"""Taste control behavior: balanced opens with the docs/music.md list for the
+emotion, familiar replays this emotion's favorites first, discovery stays off
+the static curated list."""
 
 from unittest.mock import patch
 
@@ -27,6 +28,12 @@ def _track(track_id, name, source='spotify_catalog', artist='Artist'):
 
 
 CATALOG_TRACKS = [_track(f'catalog-{index}', f'Catalog {index}') for index in range(1, 6)]
+# docs/music.md pairs these songs with "calm"; #1 and #3 on the list, out of
+# document order so the ordering is actually exercised.
+MUSIC_DOC_TRACKS = [
+    _track('doc-golden-hour', 'Golden Hour', artist='JVKE'),
+    _track('doc-birds', 'Birds of a Feather', artist='Billie Eilish'),
+]
 CURATED_TRACKS = [
     _track(f'curated-{index}', f'Curated {index}', source='curated_fallback')
     for index in range(1, 4)
@@ -131,20 +138,8 @@ class TasteControlPlaylistTests(APITestCase):
         self.client.force_authenticate(user=self.user)
 
     def _analyze(self, familiarity, tracks=None):
-        with patch('api.views.get_classifier') as mock_classifier, \
-                patch(
-                    'api.views.spotify_service.get_recommendations_with_details'
-                ) as mock_tracks:
-            mock_classifier.return_value.predict.return_value = PREDICTION
-            mock_tracks.return_value = {
-                'tracks': list(CATALOG_TRACKS if tracks is None else tracks),
-                'source': 'spotify',
-                'used_fallback': False,
-                'fallback_reason': None,
-                'personalized': False,
-                'personalization_sources': [],
-                'personalization_missing_scopes': [],
-            }
+        """The progressive first response: one track, chosen to play now."""
+        with self._spotify_returning(tracks):
             response = self.client.post(
                 '/api/analyze/',
                 {
@@ -155,6 +150,45 @@ class TasteControlPlaylistTests(APITestCase):
             )
         self.assertEqual(response.status_code, 200)
         return response.json()
+
+    def _full_playlist(self, familiarity, tracks=None):
+        """The second response: the whole playlist behind the first track."""
+        body = self._analyze(familiarity, tracks=tracks)
+        self.assertTrue(body['continuation_token'])
+        with self._spotify_returning(tracks):
+            response = self.client.post(
+                '/api/recommendation-playlist/',
+                {'continuation_token': body['continuation_token']},
+                format='json',
+            )
+        self.assertEqual(response.status_code, 200)
+        return response.json()
+
+    def _spotify_returning(self, tracks=None):
+        classifier_patch = patch('api.views.get_classifier')
+        spotify_patch = patch(
+            'api.views.spotify_service.get_recommendations_with_details'
+        )
+
+        class _Patches:
+            def __enter__(self):
+                classifier_patch.start().return_value.predict.return_value = PREDICTION
+                spotify_patch.start().return_value = {
+                    'tracks': list(CATALOG_TRACKS if tracks is None else tracks),
+                    'source': 'spotify',
+                    'used_fallback': False,
+                    'fallback_reason': None,
+                    'personalized': False,
+                    'personalization_sources': [],
+                    'personalization_missing_scopes': [],
+                }
+                return self
+
+            def __exit__(self, *exc_info):
+                patch.stopall()
+                return False
+
+        return _Patches()
 
     def _favorite(self, track_id, emotion):
         return FavoriteTrack.objects.create(
@@ -184,6 +218,49 @@ class TasteControlPlaylistTests(APITestCase):
         body = self._analyze('familiar')
         self.assertTrue(body['tracks'])
         self.assertNotEqual(body['tracks'][0]['id'], 'fav-angry')
+
+    def test_balanced_plays_the_music_doc_song_first(self):
+        # The first stage only asks Spotify for a handful of candidates, so the
+        # fixture stays inside that window.
+        body = self._analyze('balanced', tracks=CATALOG_TRACKS[:2] + MUSIC_DOC_TRACKS)
+        self.assertEqual(body['selected_track']['id'], 'doc-birds')
+        self.assertEqual([track['id'] for track in body['tracks']], ['doc-birds'])
+
+    def test_balanced_playlist_opens_in_document_order(self):
+        body = self._full_playlist('balanced', tracks=CATALOG_TRACKS + MUSIC_DOC_TRACKS)
+        self.assertEqual(
+            [track['id'] for track in body['tracks']][:2],
+            ['doc-birds', 'doc-golden-hour'],
+        )
+
+    def test_balanced_playlist_keeps_the_ranked_picks_behind_the_doc_songs(self):
+        body = self._full_playlist('balanced', tracks=CATALOG_TRACKS + MUSIC_DOC_TRACKS)
+        self.assertEqual(
+            sorted(track['id'] for track in body['tracks']),
+            sorted(
+                track['id'] for track in CATALOG_TRACKS + MUSIC_DOC_TRACKS
+            ),
+        )
+
+    def test_balanced_flags_the_doc_songs_for_the_app(self):
+        body = self._full_playlist('balanced', tracks=CATALOG_TRACKS + MUSIC_DOC_TRACKS)
+        flagged = {
+            track['id'] for track in body['tracks']
+            if track.get('is_music_doc_pick')
+        }
+        self.assertEqual(flagged, {'doc-birds', 'doc-golden-hour'})
+
+    def test_balanced_keeps_the_ranking_when_no_doc_song_was_found(self):
+        body = self._full_playlist('balanced')
+        self.assertEqual(
+            [track['id'] for track in body['tracks']],
+            [track['id'] for track in CATALOG_TRACKS],
+        )
+
+    def test_familiar_still_beats_the_music_doc_list(self):
+        self._favorite('fav-first', 'calm')
+        body = self._full_playlist('familiar', tracks=CATALOG_TRACKS + MUSIC_DOC_TRACKS)
+        self.assertEqual(body['tracks'][0]['id'], 'fav-first')
 
     def test_balanced_does_not_pull_favorites_forward(self):
         self._favorite('fav-first', 'calm')
@@ -240,6 +317,31 @@ class BlendTasteControlTests(APITestCase):
             )
             orders.add(tuple(track['id'] for track in blended))
         self.assertGreater(len(orders), 1)
+
+    def test_balanced_blend_leads_with_the_music_doc_songs(self):
+        blended = spotify_service.blend_recommendation_groups(
+            emotion='calm',
+            search_tracks=list(CATALOG_TRACKS) + list(MUSIC_DOC_TRACKS),
+            limit=10,
+            taste_profile={'familiarity': 'balanced'},
+        )
+        self.assertEqual(
+            [track['id'] for track in blended][:2],
+            ['doc-birds', 'doc-golden-hour'],
+        )
+
+    def test_balanced_blend_matches_doc_songs_by_seed_metadata(self):
+        renamed = dict(MUSIC_DOC_TRACKS[1])
+        renamed['name'] = 'Birds of a Feather (Live)'
+        renamed['playlist_seed_track'] = 'Birds of a Feather'
+        renamed['playlist_seed_artist'] = 'Billie Eilish'
+        blended = spotify_service.blend_recommendation_groups(
+            emotion='calm',
+            search_tracks=list(CATALOG_TRACKS) + [renamed],
+            limit=10,
+            taste_profile={'familiarity': 'balanced'},
+        )
+        self.assertEqual(blended[0]['id'], 'doc-birds')
 
     def test_balanced_blend_is_deterministic(self):
         orders = {

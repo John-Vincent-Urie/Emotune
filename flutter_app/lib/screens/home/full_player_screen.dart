@@ -664,6 +664,9 @@ class _SessionPlanCard extends StatelessWidget {
     final nextCheckIn = player.sessionNextCheckInTrack;
     final chips = <String>[
       _familiarityLabel(player.familiarity),
+      // Balanced opens with the static per-emotion list, so say when the song
+      // playing is one of those picks.
+      if (player.currentTrack?['is_music_doc_pick'] == true) 'EmoTune pick',
       if (player.preferInstrumental) 'Instrumental bias',
       if (!player.trainOnThisSession) 'Learning paused',
       if (player.isSessionComplete) 'Check-ins complete',

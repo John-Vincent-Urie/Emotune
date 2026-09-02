@@ -16,6 +16,35 @@ Backend base URL:
 - local machine: `http://127.0.0.1:8000/api`
 - Android emulator: `http://10.0.2.2:8000/api`
 
+### LightFM is optional, and does not install from `requirements.txt`
+
+`lightfm==1.17` predates PEP 517 build isolation, so a plain
+`pip install -r requirements.txt` stops on it with
+`AttributeError: 'dict' object has no attribute '__LIGHTFM_SETUP__'`. The rest
+of the requirements install fine; the app runs without it and ranks playlists
+with the deterministic emotion ranking instead.
+
+To install it on Linux, add the Python headers first -- the build compiles C
+extensions -- and skip build isolation:
+
+```bash
+sudo apt install python3-dev
+pip install --no-build-isolation lightfm==1.17
+```
+
+It stays disabled on Windows unless `LIGHTFM_RECOMMENDER_ALLOW_WINDOWS=true`,
+because the native build crashes there.
+
+Installing it is not enough to put it in charge of ranking. LightFM takes 40%
+of the final score, so it only engages once there is behaviour to learn from:
+`LIGHTFM_RECOMMENDER_MIN_INTERACTIONS` interactions in the corpus (200) *and*
+`LIGHTFM_RECOMMENDER_MIN_USER_INTERACTIONS` for the person asking (20). Below
+either floor the request is served by the emotion ranking and the response
+reports `lightfm_insufficient_interactions` or
+`lightfm_insufficient_user_interactions`. There is no saved model -- the corpus
+is rebuilt per request -- so the history scans are bounded by
+`LIGHTFM_RECOMMENDER_HISTORY_DAYS` and `LIGHTFM_RECOMMENDER_MAX_HISTORY_ROWS`.
+
 ## 2. Flutter Setup
 
 ```bash

@@ -7,13 +7,16 @@ only reorders the candidate set using historical interactions, user features,
 item features, and the current emotion context.
 """
 from collections import Counter, defaultdict
+from datetime import timedelta
 import logging
 import platform
 import re
 
 import numpy as np
 from django.conf import settings
+from django.utils import timezone
 
+from api.spotify.utils import _taste_instrumental_signal
 from users.models import FavoriteTrack, ListeningSession, PromptHistory, UserPreference
 
 logger = logging.getLogger(__name__)
@@ -57,7 +60,25 @@ class LightFMMusicRanker:
             0.0,
         )
         self.min_interactions = max(
-            int(getattr(settings, 'LIGHTFM_RECOMMENDER_MIN_INTERACTIONS', 3) or 3),
+            int(getattr(settings, 'LIGHTFM_RECOMMENDER_MIN_INTERACTIONS', 200) or 200),
+            1,
+        )
+        self.min_user_interactions = max(
+            int(
+                getattr(settings, 'LIGHTFM_RECOMMENDER_MIN_USER_INTERACTIONS', 20)
+                or 20
+            ),
+            0,
+        )
+        self.history_days = max(
+            int(getattr(settings, 'LIGHTFM_RECOMMENDER_HISTORY_DAYS', 120) or 120),
+            1,
+        )
+        self.max_history_rows = max(
+            int(
+                getattr(settings, 'LIGHTFM_RECOMMENDER_MAX_HISTORY_ROWS', 2000)
+                or 2000
+            ),
             1,
         )
 
@@ -216,6 +237,21 @@ class LightFMMusicRanker:
                 'error': 'lightfm_insufficient_interactions',
             }
 
+        # A corpus can clear the floor on other people's listening while this
+        # user is still a stranger to the model. Ranking their playlist off
+        # strangers' embeddings is worse than the emotion ranking they would
+        # get otherwise, so they wait until they have their own history.
+        request_user_interactions = sum(
+            1
+            for user_id, _item_id in interactions_by_pair
+            if user_id == corpus['request_user_id']
+        )
+        if request_user_interactions < self.min_user_interactions:
+            return {
+                'ok': False,
+                'error': 'lightfm_insufficient_user_interactions',
+            }
+
         dataset = Dataset()
         dataset.fit(
             sorted(corpus['user_ids']),
@@ -306,12 +342,13 @@ class LightFMMusicRanker:
             item_id: float(score)
             for item_id, score in zip(candidate_ids, prediction_scores)
         }
+        confidence = self._ranking_confidence(lightfm_scores)
         ranked_tracks = self._blend_scores(
             candidates,
             lightfm_scores,
             taste_profile=taste_profile,
+            confidence=confidence,
         )
-        confidence = self._ranking_confidence(lightfm_scores)
         return {
             'ok': True,
             'tracks': ranked_tracks,
@@ -332,6 +369,14 @@ class LightFMMusicRanker:
         candidates,
         preferred_artists,
     ):
+        """Build the interaction corpus for this request.
+
+        There is no persisted model: the corpus is rebuilt and refitted on
+        every request, so the two scans that grow without limit -- listening
+        sessions and prompt history -- are bounded by age and row count.
+        Favorites and preferences stay unbounded; they are small and are the
+        strongest signal the app has.
+        """
         request_user_id = self._request_user_id(user, emotion)
         user_ids = {request_user_id}
         item_ids = set()
@@ -420,7 +465,13 @@ class LightFMMusicRanker:
                 + min(max(preference.total_listen_time or 0, 0) / 900.0, 1.5),
             )
 
-        for session in ListeningSession.objects.select_related('user', 'prompt_history').all():
+        learning_window_start = timezone.now() - timedelta(days=self.history_days)
+
+        for session in ListeningSession.objects.select_related(
+            'user', 'prompt_history',
+        ).filter(created_at__gte=learning_window_start).order_by(
+            '-created_at',
+        )[:self.max_history_rows]:
             if not self._history_allows_learning(getattr(session, 'prompt_history', None)):
                 continue
             user_id = self._user_id(session.user_id)
@@ -446,7 +497,9 @@ class LightFMMusicRanker:
                 + (0.8 if session.completed else 0.0),
             )
 
-        for history in PromptHistory.objects.select_related('user').all():
+        for history in PromptHistory.objects.select_related('user').filter(
+            created_at__gte=learning_window_start,
+        ).order_by('-created_at')[:self.max_history_rows]:
             if not self._history_allows_learning(history):
                 continue
             user_id = self._user_id(history.user_id)
@@ -508,7 +561,14 @@ class LightFMMusicRanker:
             'interactions': interactions,
         }
 
-    def _blend_scores(self, candidates, lightfm_scores, *, taste_profile=None):
+    def _blend_scores(
+        self,
+        candidates,
+        lightfm_scores,
+        *,
+        taste_profile=None,
+        confidence=None,
+    ):
         emotion_scores = {
             str(track.get('id') or '').strip(): float(track.get('emotion_alignment_score', 0.0) or 0.0)
             for track in candidates
@@ -541,6 +601,15 @@ class LightFMMusicRanker:
             emotion_weight = 0.40
             lightfm_weight = 0.40
             personalization_weight = 0.10
+
+        # Every score map below is min-max normalized, which stretches whatever
+        # LightFM produced across the full range -- a flat, undecided model
+        # would otherwise arrive looking as opinionated as the emotion ranking.
+        # Its own separation between the top two candidates decides how much of
+        # its share it keeps; the rest goes back to the emotion score.
+        confidence_factor = min(max(float(confidence or 0.0), 0.0), 1.0)
+        emotion_weight += lightfm_weight * (1.0 - confidence_factor)
+        lightfm_weight *= confidence_factor
 
         ranked = []
         for index, raw_track in enumerate(candidates):
@@ -622,46 +691,14 @@ class LightFMMusicRanker:
         return 0.0
 
     def _instrumental_bonus(self, track, taste_profile):
-        if not taste_profile.get('prefer_instrumental'):
-            return 0.0, None
-
+        """The shared instrumental reading, scaled for the blended 0-1 range."""
         text_blob = ' '.join([
             str(track.get('name') or '').strip().lower(),
             str(track.get('artist') or '').strip().lower(),
             str(track.get('album') or '').strip().lower(),
         ])
-        instrumental_terms = (
-            'instrumental',
-            'ambient',
-            'lofi',
-            'lo-fi',
-            'piano',
-            'study',
-            'meditation',
-            'sleep',
-            'focus',
-            'classical',
-            'soundtrack',
-        )
-        vocal_terms = (
-            'feat.',
-            'featuring',
-            'karaoke',
-            'remix',
-            'version',
-            'live',
-        )
-
-        bonus = 0.0
-        if any(term in text_blob for term in instrumental_terms):
-            bonus += 0.12
-        if any(term in text_blob for term in vocal_terms):
-            bonus -= 0.06
-        if bonus > 0:
-            return bonus, 'taste:instrumental'
-        if bonus < 0:
-            return bonus, 'taste:less_instrumental_fit'
-        return 0.0, None
+        signal, reason = _taste_instrumental_signal(text_blob, taste_profile)
+        return signal * 0.12, reason
 
     def _heuristic_playlist_result(
         self,

@@ -21,7 +21,7 @@ from datetime import timedelta
 from django.contrib.admin.views.decorators import staff_member_required
 from rest_framework_simplejwt.tokens import AccessToken
 
-from .spotify.recommendations import STATIC_TRACK_SOURCES
+from .spotify.recommendations import STATIC_TRACK_SOURCES, music_doc_tracks
 from .spotify_service import spotify_service
 from .spotify_oauth_state import (
     issue_state as issue_spotify_oauth_state,
@@ -731,14 +731,16 @@ class EmotionResponseBuilder:
 
         # Taste control gets the final say: "more familiar" opens with the
         # favorites saved for this emotion, "more discovery" refuses the static
-        # curated tracks, and "balanced" keeps the ranked order as-is.
+        # curated tracks, and "balanced" opens with the docs/music.md list.
         recommended_tracks, selected_track = _apply_taste_control(
             recommended_tracks,
             selected_track,
             familiarity=normalized_taste_profile.get('familiarity'),
+            prefer_instrumental=normalized_taste_profile.get('prefer_instrumental'),
             emotions=(emotion, recommendation_emotion),
             user=user,
             limit=max(len(recommended_tracks), 1),
+            candidates=tracks,
         )
         selected_track_source = (
             selected_track.get('recommendation_source')
@@ -992,12 +994,28 @@ def _emotion_favorite_leads(emotions, user, limit=20):
     return leads
 
 
-def _apply_taste_control(tracks, selected_track, *, familiarity, emotions, user, limit):
+def _track_identity(track):
+    return str(track.get('uri') or track.get('id') or '').strip()
+
+
+def _apply_taste_control(
+    tracks,
+    selected_track,
+    *,
+    familiarity,
+    emotions,
+    user,
+    limit,
+    candidates=None,
+    prefer_instrumental=False,
+):
     """Give the taste control its final say over the playlist.
 
     Ranking happens upstream; this only enforces what the three settings
     promise the user, and returns ``(tracks, selected_track)``. "Balanced"
-    leaves the ranked order alone.
+    opens with the docs/music.md list for the emotion, pulling it out of
+    ``candidates`` -- the whole ranked pool -- because the first progressive
+    stage hands this only the single track it already chose to play.
     """
     working = [track for track in (tracks or []) if isinstance(track, dict)]
 
@@ -1031,6 +1049,30 @@ def _apply_taste_control(tracks, selected_track, *, familiarity, emotions, user,
                 in STATIC_TRACK_SOURCES
             ):
                 selected_track = fresh[0]
+    elif not prefer_instrumental:
+        # Balanced serves the static list: the songs docs/music.md pairs with
+        # this emotion lead the playlist in document order, however the ranker
+        # happened to score them. An instrumental request skips this -- the
+        # document list is vocal pop, and the ranking already put the
+        # instrumental candidates on top.
+        pool = working + [
+            track for track in (candidates or []) if isinstance(track, dict)
+        ]
+        for candidate_emotion in emotions:
+            # Half the playlist at most, the same share the blender gives the
+            # document, so the ranked picks still get a say.
+            leads = music_doc_tracks(
+                pool, candidate_emotion, limit=max(limit // 2, 1),
+            )
+            if not leads:
+                continue
+            lead_keys = {key for key in map(_track_identity, leads) if key}
+            working = leads + [
+                track for track in working
+                if _track_identity(track) not in lead_keys
+            ]
+            selected_track = leads[0]
+            break
 
     return (working[:limit] if limit else working), selected_track
 
