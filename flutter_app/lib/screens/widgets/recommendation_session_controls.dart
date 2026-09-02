@@ -262,7 +262,10 @@ class RecommendationSessionControls extends StatelessWidget {
           const SizedBox(height: 16),
           const _SectionLabel(
             label: 'Taste Control',
-            helper: 'Bias recommendations toward comfort, discovery, or keep them balanced.',
+            helper:
+                'Balanced keeps the ranked picks, More familiar opens with the '
+                'songs you hearted for that emotion, and More discovery pulls '
+                'fresh Spotify tracks instead of the built-in list.',
           ),
           const SizedBox(height: 10),
           Wrap(

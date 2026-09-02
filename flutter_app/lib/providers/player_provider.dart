@@ -6,11 +6,18 @@ import 'package:just_audio/just_audio.dart';
 
 import '../services/api_service.dart';
 import '../services/spotify_remote_service.dart';
+import 'favorites_manager.dart';
+import 'player_track_utils.dart' as track_utils;
+import 'spotify_availability_tracker.dart';
 
 class PlayerProvider extends ChangeNotifier {
   final AudioPlayer _player = AudioPlayer();
   final SpotifyRemoteService _spotifyRemote = SpotifyRemoteService.instance;
   final math.Random _random = math.Random();
+  late final FavoritesManager _favorites = FavoritesManager(
+    onError: (message) => _errorMessage = message,
+    onChanged: notifyListeners,
+  );
   static const int _spotifyStateRefreshIntervalSeconds = 4;
   static const Duration _remoteWarmupTimeout = Duration(seconds: 2);
   static const Duration _preparedPreviewSeekTimeout =
@@ -22,15 +29,12 @@ class PlayerProvider extends ChangeNotifier {
   Map<String, dynamic>? _currentContext;
   List<Map<String, dynamic>> _playlist = [];
   List<Map<String, dynamic>> _contextQueue = [];
-  final Set<String> _favoriteTrackIds = <String>{};
   int _currentIndex = 0;
   bool _isPlaying = false;
   bool _isLoading = false;
   bool _isUsingSpotifyRemote = false;
   bool _isUsingSpotifyAppRemote = false;
   bool _isRefreshingSpotifyState = false;
-  bool _favoritesLoaded = false;
-  bool _favoritesBusy = false;
   bool _shuffleEnabled = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
@@ -63,6 +67,22 @@ class PlayerProvider extends ChangeNotifier {
   bool _isAdvancingTrack = false;
   bool _isWarmingSpotifyPlayback = false;
   bool _isSeekInProgress = false;
+  late final SpotifyAvailabilityTracker _spotifyAvailability =
+      SpotifyAvailabilityTracker(
+    spotifyRemote: _spotifyRemote,
+    onChanged: notifyListeners,
+  );
+  // Only reasons that block Spotify playback for this account regardless of
+  // path (App Remote SDK on the native app, or the backend-mediated Web
+  // API) belong here. Backend-connection-only problems (not connected,
+  // expired token, missing OAuth scopes) must NOT be included: App Remote
+  // SDK talks to the phone's native Spotify session directly and does not
+  // depend on EmoTune's backend OAuth link, so caching those as a full
+  // block would wrongly skip App Remote playback too.
+  static const Set<String> _sessionFatalBlockingIssues = {
+    'developer_allowlist_required',
+    'premium_required',
+  };
 
   Map<String, dynamic>? get currentTrack => _currentTrack;
   Map<String, dynamic>? get currentContext => _currentContext;
@@ -100,9 +120,9 @@ class PlayerProvider extends ChangeNotifier {
       !_trainOnThisSession;
   bool get isSessionComplete => _sessionPlan?['completed'] == true;
   Duration get sessionProgressDuration =>
-      Duration(seconds: _safeInt(_sessionPlan?['progress_seconds']));
+      Duration(seconds: track_utils.safeInt(_sessionPlan?['progress_seconds']));
   Duration get sessionTargetDuration =>
-      Duration(seconds: _safeInt(_sessionPlan?['target_seconds']));
+      Duration(seconds: track_utils.safeInt(_sessionPlan?['target_seconds']));
   double get sessionProgressFraction {
     final targetSeconds = sessionTargetDuration.inSeconds;
     if (targetSeconds <= 0) {
@@ -120,6 +140,9 @@ class PlayerProvider extends ChangeNotifier {
   bool get isRepeatQueueMode => _repeatMode == 'context';
   bool get isRepeatTrackMode => _repeatMode == 'track';
   bool get isCurrentTrackFavorite => isFavoriteTrack(_currentTrack);
+  bool get isSpotifyBackgroundPlaybackBlocked => _spotifyAvailability.isBlocked;
+  String? get spotifyBackgroundBlockedReason =>
+      _spotifyAvailability.blockedReason;
   String? get playbackStatusCode => _playbackStatusCode;
   String get playbackStatusLabel {
     switch (_playbackStatusCode) {
@@ -168,139 +191,14 @@ class PlayerProvider extends ChangeNotifier {
       _contextQueue.isEmpty &&
       ((_currentTrack == null &&
               (_currentContext?['uri']?.toString().isNotEmpty ?? false)) ||
-          (_currentTrack != null && _isContainerItem(_currentTrack!)));
+          (_currentTrack != null && track_utils.isContainerItem(_currentTrack!)));
 
-  static const Set<String> _supportedSpotifyItemTypes = {
-    'track',
-    'playlist',
-    'album',
-    'artist',
-    'episode',
-    'show',
-  };
-
-  static Map<String, dynamic> normalizeTrack(Map<String, dynamic> rawTrack) {
-    final track = Map<String, dynamic>.from(rawTrack);
-    final rawUri = track['uri']?.toString().trim() ?? '';
-    final rawSpotifyUrl = track['spotify_url']?.toString().trim() ?? '';
-    final rawType = track['item_type']?.toString().trim() ?? '';
-    final rawId = track['id']?.toString().trim() ?? '';
-
-    var itemType = rawType;
-    var itemId = rawId;
-    var uri = rawUri;
-    var spotifyUrl = rawSpotifyUrl;
-
-    if (uri.startsWith('spotify:')) {
-      final parts = uri.split(':');
-      if (parts.length >= 3) {
-        itemType = itemType.isNotEmpty ? itemType : parts[1];
-        itemId = itemId.isNotEmpty ? itemId : parts[2];
-      }
-    }
-
-    if (spotifyUrl.isNotEmpty) {
-      final parsedUri = Uri.tryParse(spotifyUrl);
-      final segments = parsedUri?.pathSegments ?? const <String>[];
-      final parsedType = segments.isNotEmpty ? segments[0] : '';
-      if ((parsedUri?.host ?? '').contains('spotify.com') &&
-          segments.length >= 2 &&
-          _supportedSpotifyItemTypes.contains(parsedType)) {
-        itemType = itemType.isNotEmpty ? itemType : parsedType;
-        itemId = itemId.isNotEmpty ? itemId : segments[1];
-      }
-    }
-
-    if (uri.isEmpty &&
-        itemId.isNotEmpty &&
-        (itemType.isEmpty || _supportedSpotifyItemTypes.contains(itemType))) {
-      final resolvedType = itemType.isNotEmpty ? itemType : 'track';
-      uri = 'spotify:$resolvedType:$itemId';
-    }
-
-    if (spotifyUrl.isEmpty &&
-        itemId.isNotEmpty &&
-        (itemType.isEmpty || _supportedSpotifyItemTypes.contains(itemType))) {
-      final resolvedType = itemType.isNotEmpty ? itemType : 'track';
-      spotifyUrl = 'https://open.spotify.com/$resolvedType/$itemId';
-    }
-
-    track['id'] = itemId.isNotEmpty ? itemId : (uri.isNotEmpty ? uri : rawId);
-    track['item_type'] = itemType.isNotEmpty ? itemType : 'track';
-    track['uri'] = uri;
-    track['spotify_url'] = spotifyUrl;
-    return track;
-  }
-
-  static bool _isContainerType(String itemType) {
-    return {'playlist', 'album', 'artist', 'show', 'collection'}
-        .contains(itemType.trim().toLowerCase());
-  }
-
-  static bool _isContainerItem(Map<String, dynamic> track) {
-    final itemType = track['item_type']?.toString() ?? '';
-    return _isContainerType(itemType);
-  }
+  static Map<String, dynamic> normalizeTrack(Map<String, dynamic> rawTrack) =>
+      track_utils.normalizeTrack(rawTrack);
 
   static List<Map<String, dynamic>> normalizeTrackList(
-      List<dynamic> rawTracks) {
-    return rawTracks
-        .whereType<Map>()
-        .map((track) => normalizeTrack(Map<String, dynamic>.from(track)))
-        .where((track) {
-      final uri = track['uri']?.toString().trim() ?? '';
-      final previewUrl = track['preview_url']?.toString().trim() ?? '';
-      return uri.isNotEmpty || previewUrl.isNotEmpty;
-    }).toList();
-  }
-
-  static int _safeInt(Object? value, [int defaultValue = 0]) {
-    if (value is int) {
-      return value;
-    }
-    if (value is num) {
-      return value.toInt();
-    }
-    return int.tryParse(value?.toString() ?? '') ?? defaultValue;
-  }
-
-  static Map<String, dynamic>? _normalizeObjectMap(dynamic value) {
-    if (value is! Map) {
-      return null;
-    }
-    return Map<String, dynamic>.from(value);
-  }
-
-  static String _normalizeOutcomeMode(String? value) {
-    switch (value?.trim().toLowerCase()) {
-      case 'calm_me_down':
-      case 'help_me_focus':
-      case 'lift_me_up':
-      case 'sleep':
-        return value!.trim().toLowerCase();
-      default:
-        return 'match_mood';
-    }
-  }
-
-  static Map<String, dynamic> _normalizeTasteProfile(
-    dynamic value, {
-    bool? trainOnThisSession,
-  }) {
-    final raw =
-        value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
-    final familiarity =
-        raw['familiarity']?.toString().trim().toLowerCase() ?? 'balanced';
-    return <String, dynamic>{
-      'familiarity': switch (familiarity) {
-        'familiar' => 'familiar',
-        'discovery' => 'discovery',
-        _ => 'balanced',
-      },
-      'prefer_instrumental': raw['prefer_instrumental'] == true,
-      'train_session': trainOnThisSession ?? (raw['train_session'] != false),
-    };
-  }
+          List<dynamic> rawTracks) =>
+      track_utils.normalizeTrackList(rawTracks);
 
   void _applyRecommendationContext({
     Map<String, dynamic>? sessionPlan,
@@ -310,13 +208,13 @@ class PlayerProvider extends ChangeNotifier {
     String? outcomeDescription,
     bool? trainOnThisSession,
   }) {
-    _sessionPlan = _normalizeObjectMap(sessionPlan);
-    _tasteProfile = _normalizeTasteProfile(
+    _sessionPlan = track_utils.normalizeObjectMap(sessionPlan);
+    _tasteProfile = track_utils.normalizeTasteProfile(
       tasteProfile,
       trainOnThisSession: trainOnThisSession,
     );
     _trainOnThisSession = _tasteProfile['train_session'] != false;
-    _outcomeMode = _normalizeOutcomeMode(outcomeMode);
+    _outcomeMode = track_utils.normalizeOutcomeMode(outcomeMode);
     _outcomeLabel = outcomeLabel?.trim().isNotEmpty == true
         ? outcomeLabel!.trim()
         : _sessionPlan?['label']?.toString().trim();
@@ -326,7 +224,7 @@ class PlayerProvider extends ChangeNotifier {
   }
 
   void _applyResponseSessionContext(Map<String, dynamic> result) {
-    final responseSessionPlan = _normalizeObjectMap(result['session_plan']);
+    final responseSessionPlan = track_utils.normalizeObjectMap(result['session_plan']);
     if (responseSessionPlan != null) {
       _sessionPlan = responseSessionPlan;
     }
@@ -343,9 +241,9 @@ class PlayerProvider extends ChangeNotifier {
     updated['progress_seconds'] = math.max(_totalListenTime, 0);
     updated['tracks_played'] = math.max(_completedTrackCount, 0);
 
-    final targetSeconds = _safeInt(updated['target_seconds']);
+    final targetSeconds = track_utils.safeInt(updated['target_seconds']);
     final phaseCutoffSeconds =
-        math.max(_safeInt(updated['phase_cutoff_minutes']) * 60, 60);
+        math.max(track_utils.safeInt(updated['phase_cutoff_minutes']) * 60, 60);
     if (targetSeconds > 0 && _totalListenTime >= targetSeconds) {
       updated['phase'] = 'close';
     } else if (_totalListenTime >= phaseCutoffSeconds) {
@@ -361,44 +259,11 @@ class PlayerProvider extends ChangeNotifier {
     _sessionPlan = updated;
   }
 
-  static String _trackIdentity(Map<String, dynamic> rawTrack) {
-    final track = normalizeTrack(rawTrack);
-    final itemType = track['item_type']?.toString().trim() ?? 'track';
-    final trackId = track['id']?.toString().trim() ?? '';
-    if (trackId.isNotEmpty) {
-      return '$itemType:$trackId';
-    }
-    final uri = track['uri']?.toString().trim() ?? '';
-    if (uri.isNotEmpty) {
-      return uri;
-    }
-    return track['spotify_url']?.toString().trim() ?? '';
-  }
-
   static List<Map<String, dynamic>> mergeTrackLists(
     List<dynamic> currentTracks,
     List<dynamic> incomingTracks,
-  ) {
-    final merged = <Map<String, dynamic>>[];
-    final seenKeys = <String>{};
-
-    void appendAll(List<dynamic> tracks) {
-      for (final rawTrack in tracks.whereType<Map>()) {
-        final normalizedTrack =
-            normalizeTrack(Map<String, dynamic>.from(rawTrack));
-        final identity = _trackIdentity(normalizedTrack);
-        if (identity.isEmpty || seenKeys.contains(identity)) {
-          continue;
-        }
-        seenKeys.add(identity);
-        merged.add(normalizedTrack);
-      }
-    }
-
-    appendAll(currentTracks);
-    appendAll(incomingTracks);
-    return merged;
-  }
+  ) =>
+      track_utils.mergeTrackLists(currentTracks, incomingTracks);
 
   PlayerProvider() {
     _player.positionStream.listen((position) {
@@ -445,6 +310,7 @@ class PlayerProvider extends ChangeNotifier {
       );
     }
     unawaited(refreshFavorites());
+    unawaited(_spotifyAvailability.ensureChecked());
   }
 
   void loadPlaylist(
@@ -472,8 +338,8 @@ class PlayerProvider extends ChangeNotifier {
       outcomeDescription: outcomeDescription,
       trainOnThisSession: trainOnThisSession,
     );
-    _totalListenTime = _safeInt(_sessionPlan?['progress_seconds']);
-    _completedTrackCount = _safeInt(_sessionPlan?['tracks_played']);
+    _totalListenTime = track_utils.safeInt(_sessionPlan?['progress_seconds']);
+    _completedTrackCount = track_utils.safeInt(_sessionPlan?['tracks_played']);
     _nextFeelBetterCheckpoint = _checkpointFromSessionPlan(_sessionPlan) ??
         (historyId != null ? 5 : null);
     _feelBetterPromptOpen = false;
@@ -490,6 +356,7 @@ class PlayerProvider extends ChangeNotifier {
       unawaited(_warmSpotifyPlaybackForTrack(_playlist.first));
     }
     unawaited(refreshFavorites());
+    unawaited(_spotifyAvailability.ensureChecked());
     if (_playlist.isNotEmpty && autoplay) {
       unawaited(playTrackAtIndex(0, preferInstantPreview: true));
     } else {
@@ -550,9 +417,9 @@ class PlayerProvider extends ChangeNotifier {
         _checkpointFromSessionPlan(_sessionPlan) ?? _nextFeelBetterCheckpoint;
 
     if (_currentTrack != null) {
-      final currentIdentity = _trackIdentity(_currentTrack!);
+      final currentIdentity = track_utils.trackIdentity(_currentTrack!);
       final matchedIndex = _playlist.indexWhere(
-        (track) => _trackIdentity(track) == currentIdentity,
+        (track) => track_utils.trackIdentity(track) == currentIdentity,
       );
       if (matchedIndex >= 0) {
         _currentIndex = matchedIndex;
@@ -585,7 +452,7 @@ class PlayerProvider extends ChangeNotifier {
     _playlist[index] = track;
     _currentIndex = index;
     _currentTrack = track;
-    if (_isContainerItem(track)) {
+    if (track_utils.isContainerItem(track)) {
       _currentContext = {
         'uri': track['uri'],
         'title': track['name'],
@@ -607,6 +474,10 @@ class PlayerProvider extends ChangeNotifier {
     if (preferInstantPreview && _hasPreview(track)) {
       unawaited(_warmSpotifyPlaybackForTrack(track));
       await _playPreview(track);
+      return;
+    }
+
+    if (await _tryPlayBlockedSpotifyFallback(track)) {
       return;
     }
 
@@ -671,6 +542,10 @@ class PlayerProvider extends ChangeNotifier {
     _dragPreviewPosition = null;
     _setPlaybackStatus(null);
     notifyListeners();
+
+    if (await _tryPlayBlockedSpotifyFallback(normalizedTrack)) {
+      return;
+    }
 
     await _stopPreviewPlayback();
     final appRemoteError = await _playSpotifyViaAppRemote(normalizedTrack);
@@ -948,91 +823,13 @@ class PlayerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool?> toggleFavoriteForCurrentTrack() async {
-    final track = _currentTrack;
-    final trackId = track?['id']?.toString().trim() ?? '';
-    final itemType =
-        track?['item_type']?.toString().trim().toLowerCase() ?? 'track';
-    if (track == null || trackId.isEmpty || _favoritesBusy) {
-      return null;
-    }
-    if (itemType != 'track') {
-      _errorMessage = 'Only individual songs can be added to favorites.';
-      notifyListeners();
-      return null;
-    }
+  Future<bool?> toggleFavoriteForCurrentTrack() =>
+      _favorites.toggleForTrack(_currentTrack, emotion: _currentEmotion);
 
-    _favoritesBusy = true;
-    final wasFavorite = isFavoriteTrack(track);
-    if (wasFavorite) {
-      _favoriteTrackIds.remove(trackId);
-    } else {
-      _favoriteTrackIds.add(trackId);
-    }
-    _errorMessage = null;
-    notifyListeners();
-    try {
-      if (wasFavorite) {
-        await ApiService.removeFavorite(trackId);
-        _errorMessage = null;
-        notifyListeners();
-        return false;
-      }
+  Future<void> refreshFavorites() => _favorites.refresh();
 
-      await ApiService.addFavorite({
-        'spotify_track_id': trackId,
-        'track_name': track['name'],
-        'artist_name': track['artist'],
-        'album_name': track['album'] ?? '',
-        'album_image': track['image'] ?? '',
-        'preview_url': track['preview_url'],
-        'duration_ms': track['duration_ms'] ?? 0,
-      });
-      _errorMessage = null;
-      notifyListeners();
-      return true;
-    } catch (_) {
-      if (wasFavorite) {
-        _favoriteTrackIds.add(trackId);
-      } else {
-        _favoriteTrackIds.remove(trackId);
-      }
-      _errorMessage = 'Could not update favorites right now.';
-      notifyListeners();
-      return null;
-    } finally {
-      _favoritesBusy = false;
-    }
-  }
-
-  Future<void> refreshFavorites() async {
-    try {
-      final favorites = await ApiService.getFavorites();
-      _favoriteTrackIds
-        ..clear()
-        ..addAll(
-          favorites
-              .whereType<Map>()
-              .map((favorite) =>
-                  favorite['spotify_track_id']?.toString().trim() ?? '')
-              .where((trackId) => trackId.isNotEmpty),
-        );
-      _favoritesLoaded = true;
-      notifyListeners();
-    } catch (_) {
-      if (!_favoritesLoaded) {
-        _favoriteTrackIds.clear();
-      }
-    }
-  }
-
-  bool isFavoriteTrack(Map<String, dynamic>? track) {
-    final trackId = track?['id']?.toString().trim() ?? '';
-    if (trackId.isEmpty) {
-      return false;
-    }
-    return _favoriteTrackIds.contains(trackId);
-  }
+  bool isFavoriteTrack(Map<String, dynamic>? track) =>
+      _favorites.isFavorite(track);
 
   Future<void> _playPreview(Map<String, dynamic> track) async {
     try {
@@ -1052,7 +849,7 @@ class PlayerProvider extends ChangeNotifier {
           'This is a local preview clip. Full playback still needs Spotify in the background.',
         );
       } else {
-        _errorMessage = _isContainerItem(track)
+        _errorMessage = track_utils.isContainerItem(track)
             ? 'This Spotify playlist is still being resolved. Try again in a moment.'
             : 'This recommendation is not directly playable inside the app.';
         _setPlaybackStatus('not_directly_playable', _errorMessage);
@@ -1080,10 +877,10 @@ class PlayerProvider extends ChangeNotifier {
         !_isUsingSpotifyRemote) {
       return false;
     }
-    if (_playlist.length != 1 || !_isContainerItem(_playlist.first)) {
+    if (_playlist.length != 1 || !track_utils.isContainerItem(_playlist.first)) {
       return false;
     }
-    return !_isContainerItem(_currentTrack!);
+    return !track_utils.isContainerItem(_currentTrack!);
   }
 
   bool get _shouldControlRemoteRecommendationQueueLocally {
@@ -1091,10 +888,10 @@ class PlayerProvider extends ChangeNotifier {
     if (!_isUsingSpotifyRemote || track == null) {
       return false;
     }
-    if (_contextQueue.isNotEmpty || _isContainerItem(track)) {
+    if (_contextQueue.isNotEmpty || track_utils.isContainerItem(track)) {
       return false;
     }
-    return _playlist.any((item) => !_isContainerItem(item));
+    return _playlist.any((item) => !track_utils.isContainerItem(item));
   }
 
   bool _hasPreview(Map<String, dynamic> track) {
@@ -1152,14 +949,14 @@ class PlayerProvider extends ChangeNotifier {
         _currentTrack == null) {
       return false;
     }
-    if (_isContainerItem(_currentTrack!) || _contextQueue.isNotEmpty) {
+    if (track_utils.isContainerItem(_currentTrack!) || _contextQueue.isNotEmpty) {
       return false;
     }
-    final currentIdentity = _trackIdentity(_currentTrack!);
+    final currentIdentity = track_utils.trackIdentity(_currentTrack!);
     if (currentIdentity.isEmpty) {
       return false;
     }
-    return _playlist.any((track) => _trackIdentity(track) == currentIdentity);
+    return _playlist.any((track) => track_utils.trackIdentity(track) == currentIdentity);
   }
 
   void _applyOptimisticRemoteTransportState({
@@ -1364,14 +1161,14 @@ class PlayerProvider extends ChangeNotifier {
             historyId: _historyId,
             autoplay: false,
             sessionPlan:
-                _normalizeObjectMap(result['session_plan']) ?? _sessionPlan,
+                track_utils.normalizeObjectMap(result['session_plan']) ?? _sessionPlan,
             tasteProfile:
-                _normalizeObjectMap(result['taste_profile']) ?? _tasteProfile,
+                track_utils.normalizeObjectMap(result['taste_profile']) ?? _tasteProfile,
             outcomeMode: result['outcome_mode']?.toString() ?? _outcomeMode,
             outcomeLabel: result['outcome_label']?.toString() ?? _outcomeLabel,
             outcomeDescription: result['outcome_description']?.toString() ??
                 _outcomeDescription,
-            trainOnThisSession: (_normalizeObjectMap(result['taste_profile']) ??
+            trainOnThisSession: (track_utils.normalizeObjectMap(result['taste_profile']) ??
                     _tasteProfile)['train_session'] !=
                 false,
           );
@@ -1428,30 +1225,6 @@ class PlayerProvider extends ChangeNotifier {
     return int.tryParse(historyId?.toString() ?? '');
   }
 
-  String _composeSpotifyControlMessage(
-    Map<String, dynamic> result, {
-    required String defaultMessage,
-  }) {
-    final recommendedAction =
-        result['recommended_action']?.toString().trim() ?? '';
-    final spotifyError = result['spotify_error'];
-    final spotifyMessage = spotifyError is Map
-        ? spotifyError['error']?.toString().trim() ?? ''
-        : '';
-    final blockingIssue = result['blocking_issue']?.toString().trim() ?? '';
-
-    if (recommendedAction.isNotEmpty) {
-      return recommendedAction;
-    }
-    if (spotifyMessage.isNotEmpty) {
-      return spotifyMessage;
-    }
-    if (blockingIssue.isNotEmpty) {
-      return 'Spotify playback could not continue because of: $blockingIssue.';
-    }
-    return defaultMessage;
-  }
-
   Future<String?> _playSpotifyViaAppRemote(Map<String, dynamic> track) async {
     final uri = track['uri']?.toString().trim() ?? '';
     if (uri.isEmpty) {
@@ -1491,8 +1264,19 @@ class PlayerProvider extends ChangeNotifier {
         return null;
       }
 
-      return 'Spotify could not start playback on this phone yet.';
+      const message = 'Spotify could not start playback on this phone yet.';
+      _spotifyAvailability.markAuthorizationBlocked(message);
+      return message;
     } on SpotifyRemoteException catch (error) {
+      if (error.code == 'spotify_not_installed') {
+        _spotifyAvailability.markBlocked(error.message);
+      } else if (error.code != 'auth_cooldown' &&
+          error.requiresInteractiveAuthorization) {
+        // Spotify's approval screen ran and rejected playback, so repeating
+        // the attempt on the next track only bounces the user back into
+        // Spotify. Stop until the account issue is fixed and the user retries.
+        _spotifyAvailability.markAuthorizationBlocked(error.message);
+      }
       return error.message;
     } on ApiException catch (error) {
       return error.message;
@@ -1525,7 +1309,7 @@ class PlayerProvider extends ChangeNotifier {
     _duration = Duration(milliseconds: _durationFromTrack(track));
 
     final isContainer =
-        _currentTrack != null && _isContainerItem(_currentTrack!);
+        _currentTrack != null && track_utils.isContainerItem(_currentTrack!);
     _setPlaybackStatus(
       isContainer ? 'spotify_queue_loading' : 'spotify_background',
       detail ??
@@ -1571,10 +1355,15 @@ class PlayerProvider extends ChangeNotifier {
         );
         return null;
       }
-      return _composeSpotifyControlMessage(
+      final blockingIssue = result['blocking_issue']?.toString().trim() ?? '';
+      final message = track_utils.composeSpotifyControlMessage(
         result,
         defaultMessage: 'Spotify could not start playback on this device yet.',
       );
+      if (_sessionFatalBlockingIssues.contains(blockingIssue)) {
+        _spotifyAvailability.markBlocked(message);
+      }
+      return message;
     } on SpotifyRemoteException catch (error) {
       return error.message;
     } on ApiException catch (error) {
@@ -1705,7 +1494,7 @@ class PlayerProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       }
-      _errorMessage = _composeSpotifyControlMessage(
+      _errorMessage = track_utils.composeSpotifyControlMessage(
         result,
         defaultMessage: 'Spotify rejected the playback command.',
       );
@@ -1972,7 +1761,7 @@ class PlayerProvider extends ChangeNotifier {
       previewSources.add(
         AudioSource.uri(
           Uri.parse(previewUrl),
-          tag: _trackIdentity(playlist[index]),
+          tag: track_utils.trackIdentity(playlist[index]),
         ),
       );
     }
@@ -2034,7 +1823,7 @@ class PlayerProvider extends ChangeNotifier {
       appendedSources.add(
         AudioSource.uri(
           Uri.parse(previewUrl),
-          tag: _trackIdentity(mergedPlaylist[index]),
+          tag: track_utils.trackIdentity(mergedPlaylist[index]),
         ),
       );
     }
@@ -2137,6 +1926,47 @@ class PlayerProvider extends ChangeNotifier {
       _isWarmingSpotifyPlayback = false;
     }
   }
+
+  /// If a previous attempt this session already found Spotify background
+  /// playback to be unavailable for a non-retryable reason (account not
+  /// allowlisted, no Premium, not connected, etc.), skip straight to the
+  /// preview fallback (or fail fast) instead of repeating the doomed
+  /// App Remote + Web API round trip for every track.
+  Future<bool> _tryPlayBlockedSpotifyFallback(
+    Map<String, dynamic> track,
+  ) async {
+    if (!_spotifyAvailability.isBlocked) {
+      return false;
+    }
+
+    if (_hasPreview(track)) {
+      await _stopPreviewPlayback();
+      await _playPreview(track);
+      if (_playbackStatusCode == 'preview_local') {
+        _setPlaybackStatus(
+          'preview_local',
+          _spotifyAvailability.blockedReason ??
+              'Playing a 30-second preview because full Spotify playback '
+                  'is unavailable right now.',
+        );
+      }
+      notifyListeners();
+      return true;
+    }
+
+    _isUsingSpotifyRemote = false;
+    _isUsingSpotifyAppRemote = false;
+    _isLoading = false;
+    _errorMessage = _spotifyAvailability.blockedReason ??
+        'Spotify background playback is unavailable right now.';
+    _setPlaybackStatus('spotify_background_unavailable', _errorMessage);
+    notifyListeners();
+    return true;
+  }
+
+  /// Force a fresh availability check now, bypassing the cache interval.
+  /// Call this after the user reconnects Spotify or fixes an account issue.
+  Future<void> retrySpotifyBackgroundPlayback() => _spotifyAvailability.retry();
 
   Future<void> _refreshSpotifyPlaybackStateFromBackend({
     Duration delay = Duration.zero,
