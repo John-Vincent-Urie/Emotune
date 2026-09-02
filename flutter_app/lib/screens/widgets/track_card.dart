@@ -32,7 +32,7 @@ class TrackCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: emotionColor.withOpacity(0.1),
+              color: emotionColor.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -54,18 +54,18 @@ class TrackCard extends StatelessWidget {
                               imageUrl: image,
                               fit: BoxFit.cover,
                               placeholder: (_, __) => Container(
-                                color: emotionColor.withOpacity(0.2),
+                                color: emotionColor.withValues(alpha: 0.2),
                                 child: Icon(Icons.music_note,
                                     color: emotionColor, size: 40),
                               ),
                               errorWidget: (_, __, ___) => Container(
-                                color: emotionColor.withOpacity(0.2),
+                                color: emotionColor.withValues(alpha: 0.2),
                                 child: Icon(Icons.music_note,
                                     color: emotionColor, size: 40),
                               ),
                             )
                           : Container(
-                              color: emotionColor.withOpacity(0.2),
+                              color: emotionColor.withValues(alpha: 0.2),
                               child: Center(
                                 child: Icon(Icons.music_note,
                                     color: emotionColor, size: 40),

@@ -56,48 +56,70 @@ def resolve_dataset_path(path: Path | str | None = None) -> Path:
     return (PROJECT_ROOT / dataset_path).resolve()
 
 
-DATASET_PATH = resolve_dataset_path()
-
-
 def load_custom_dataset(path: Path | None = None) -> pd.DataFrame:
-    dataset_path = resolve_dataset_path(path or DATASET_PATH)
+    dataset_path = resolve_dataset_path(path)
     return pd.read_csv(dataset_path)
 
 
-def clean_dataset(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
-    original_count = len(df)
-    working = df.copy()
+def __getattr__(name: str):
+    # Resolve DATASET_PATH lazily on first access (PEP 562) instead of at import
+    # time, so importing this module has no env-var side effect on its own and
+    # `EMOTUNE_DATASET_PATH` is always read fresh.
+    if name == 'DATASET_PATH':
+        return resolve_dataset_path()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-    if 'text' not in working.columns or 'emotion' not in working.columns:
-        raise ValueError("Dataset must contain 'text' and 'emotion' columns.")
 
+def _normalize_text_and_emotion_columns(working: pd.DataFrame) -> pd.DataFrame:
     working['text'] = working['text'].fillna('').astype(str).str.strip()
     working['emotion'] = working['emotion'].fillna('').astype(str).str.strip().str.lower()
+    return working
 
+
+def _filter_empty_rows(working: pd.DataFrame) -> tuple[pd.DataFrame, int, int]:
     empty_text_rows = int((working['text'] == '').sum())
     empty_label_rows = int((working['emotion'] == '').sum())
     working = working[(working['text'] != '') & (working['emotion'] != '')]
+    return working, empty_text_rows, empty_label_rows
 
+
+def _filter_invalid_labels(working: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     invalid_label_rows = int((~working['emotion'].isin(SUPPORTED_EMOTIONS)).sum())
     working = working[working['emotion'].isin(SUPPORTED_EMOTIONS)].copy()
+    return working, invalid_label_rows
 
+
+def _deduplicate(working: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     working['normalized_text'] = (
         working['text']
         .str.lower()
         .str.replace(r'\s+', ' ', regex=True)
         .str.strip()
     )
-
     duplicate_rows = int(
         working.duplicated(subset=['normalized_text', 'emotion']).sum()
     )
     working = working.drop_duplicates(subset=['normalized_text', 'emotion']).copy()
+    return working, duplicate_rows
 
+
+def _add_derived_columns(working: pd.DataFrame) -> pd.DataFrame:
     working['text_length_chars'] = working['text'].str.len()
     working['text_length_words'] = working['normalized_text'].str.split().str.len()
     working['recommended_label'] = working['emotion'].map(RECOMMENDED_REDUCED_LABEL_MAP)
+    return working
 
-    report = {
+
+def _build_cleaning_report(
+    working: pd.DataFrame,
+    *,
+    original_count: int,
+    empty_text_rows: int,
+    empty_label_rows: int,
+    invalid_label_rows: int,
+    duplicate_rows: int,
+) -> dict:
+    return {
         'rows_original': original_count,
         'rows_after_cleaning': int(len(working)),
         'rows_removed': int(original_count - len(working)),
@@ -120,6 +142,29 @@ def clean_dataset(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
             'words_median': round(float(working['text_length_words'].median()), 2) if not working.empty else 0.0,
         },
     }
+
+
+def clean_dataset(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    original_count = len(df)
+    working = df.copy()
+
+    if 'text' not in working.columns or 'emotion' not in working.columns:
+        raise ValueError("Dataset must contain 'text' and 'emotion' columns.")
+
+    working = _normalize_text_and_emotion_columns(working)
+    working, empty_text_rows, empty_label_rows = _filter_empty_rows(working)
+    working, invalid_label_rows = _filter_invalid_labels(working)
+    working, duplicate_rows = _deduplicate(working)
+    working = _add_derived_columns(working)
+
+    report = _build_cleaning_report(
+        working,
+        original_count=original_count,
+        empty_text_rows=empty_text_rows,
+        empty_label_rows=empty_label_rows,
+        invalid_label_rows=invalid_label_rows,
+        duplicate_rows=duplicate_rows,
+    )
 
     cleaned = working.drop(columns=['normalized_text']).reset_index(drop=True)
     return cleaned, report

@@ -4,6 +4,7 @@ from urllib.parse import parse_qs, urlparse
 from unittest.mock import Mock, patch
 
 import numpy as np
+import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
@@ -13,7 +14,13 @@ from rest_framework.test import APIClient
 from api.lightfm_ranker import LightFMMusicRanker
 from api.llm_music_picker import LLMMusicPicker
 from api.recommendation_session import build_session_plan
-from api.spotify_service import EMOTION_QUERY_PROFILES, SpotifyAuthError, spotify_service
+from api.spotify_service import (
+    EMOTION_QUERY_PROFILES,
+    MUSIC_PICKER_DOC_EMOTIONS,
+    SpotifyAuthError,
+    SpotifyService,
+    spotify_service,
+)
 from ml.emotion_classifier import EmotionClassifier
 from ml.plutchik_mapper import build_plutchik_profile
 from users.models import FavoriteTrack, ListeningSession, PromptHistory, UserPreference
@@ -1823,7 +1830,7 @@ class SpotifyRecommendationTests(TestCase):
         self.assertIn('happy nostalgic', queries)
         self.assertTrue(any('artist:"Taylor Swift"' in query for query in queries))
 
-    def test_build_recommendation_queries_uses_curated_sad_seed_tracks(self):
+    def test_build_recommendation_queries_uses_music_doc_sad_seed_tracks(self):
         queries = spotify_service._build_recommendation_queries(
             'sad',
             preferred_artists=[],
@@ -1833,26 +1840,27 @@ class SpotifyRecommendationTests(TestCase):
 
         self.assertEqual(
             queries[0],
-            'track:"Someone You Loved" artist:"Lewis Capaldi"',
+            'track:"The Cure" artist:"Olivia Rodrigo"',
         )
+        self.assertIn('track:"Multo" artist:"Cup of Joe"', queries)
         self.assertIn('sad heartbreak songs', queries)
         self.assertIn('heartbreak ballads', queries)
 
-    def test_build_recommendation_queries_uses_curated_profiles_for_other_emotions(self):
+    def test_build_recommendation_queries_uses_music_doc_profiles_for_other_emotions(self):
         cases = [
             (
                 'angry',
-                'track:"Killing In The Name" artist:"Rage Against The Machine"',
+                'track:"Good Luck, Babe!" artist:"Chappell Roan"',
                 'angry rock songs',
             ),
             (
                 'motivational',
-                'track:"Lose Yourself" artist:"Eminem"',
+                'track:"Unstoppable" artist:"Sia"',
                 'motivational pump up songs',
             ),
             (
                 'fear',
-                'track:"Weightless" artist:"Marconi Union"',
+                'track:"drop dead" artist:"Olivia Rodrigo"',
                 'calming songs for anxiety',
             ),
         ]
@@ -1867,7 +1875,7 @@ class SpotifyRecommendationTests(TestCase):
             self.assertEqual(queries[0], expected_first_query)
             self.assertIn(expected_phrase, queries)
 
-    def test_build_recommendation_queries_continuation_mode_prioritizes_variety(self):
+    def test_build_recommendation_queries_continuation_mode_uses_music_doc_playlist(self):
         queries = spotify_service._build_recommendation_queries(
             'angry',
             preferred_artists=[],
@@ -1876,17 +1884,21 @@ class SpotifyRecommendationTests(TestCase):
             query_mode='continuation',
         )
 
-        self.assertEqual(queries[0], 'angry rock songs')
-        self.assertNotIn(
-            'track:"Killing In The Name" artist:"Rage Against The Machine"',
-            queries[:3],
+        self.assertEqual(
+            queries[0],
+            'track:"Good Luck, Babe!" artist:"Chappell Roan"',
         )
+        self.assertIn('track:"GATILYO" artist:"BLKD"', queries)
+        self.assertIn('angry rock songs', queries)
 
-    def test_emotion_query_profiles_expose_large_seed_catalogs(self):
-        for emotion, profile in EMOTION_QUERY_PROFILES.items():
-            self.assertGreaterEqual(
-                len(profile.get('seed_tracks') or []),
-                50,
+    def test_emotion_query_profiles_use_music_doc_seed_catalogs(self):
+        for emotion in MUSIC_PICKER_DOC_EMOTIONS:
+            profile = EMOTION_QUERY_PROFILES[emotion]
+            seed_tracks = profile.get('seed_tracks') or []
+
+            self.assertEqual(len(seed_tracks), 10, emotion)
+            self.assertTrue(
+                all(seed.get('source') == 'music_doc' for seed in seed_tracks),
                 emotion,
             )
 
@@ -2039,6 +2051,35 @@ class SpotifyRecommendationTests(TestCase):
         )
 
         self.assertEqual([track['id'] for track in filtered], ['track-exact'])
+
+    def test_music_doc_seed_query_is_strict_and_tagged(self):
+        query = 'track:"Espresso" artist:"Sabrina Carpenter"'
+        filtered = spotify_service._filter_tracks_for_query(
+            query,
+            [
+                {
+                    'id': 'track-exact',
+                    'name': 'Espresso',
+                    'artist': 'Sabrina Carpenter',
+                },
+                {
+                    'id': 'track-loose',
+                    'name': 'Espresso Macchiato',
+                    'artist': 'Other Artist',
+                },
+            ],
+            strict=bool(spotify_service._seed_metadata_for_query('happy', query)),
+        )
+        annotated = spotify_service._annotate_tracks_for_query(
+            query,
+            filtered,
+            emotion='happy',
+        )
+
+        self.assertEqual([track['id'] for track in annotated], ['track-exact'])
+        self.assertEqual(annotated[0]['recommendation_source'], 'music_md_playlist')
+        self.assertIn('music_md_playlist_seed', annotated[0]['selection_reasons'])
+        self.assertEqual(annotated[0]['playlist_seed_emotion'], 'happy')
 
     def test_get_recommendations_skips_duplicate_seed_variants_to_keep_diversity(self):
         first_query_tracks = [
@@ -2406,6 +2447,28 @@ class SpotifyRecommendationTests(TestCase):
         self.assertEqual(second_token, 'cached-token')
         mock_post.assert_called_once()
 
+    @override_settings(
+        SPOTIFY_CLIENT_ID='client-id',
+        SPOTIFY_CLIENT_SECRET='client-secret',
+    )
+    def test_client_token_network_error_returns_structured_failure(self):
+        service = SpotifyService()
+
+        with self.assertLogs('api.spotify_service', level='WARNING') as logs:
+            with patch(
+                'api.spotify_service.requests.post',
+                side_effect=requests.ConnectionError('dns lookup failed'),
+            ):
+                result = service.get_client_token_details()
+
+        self.assertFalse(result['ok'])
+        self.assertEqual(result['reason'], 'network_error')
+        self.assertTrue(result['retryable'])
+        self.assertEqual(result['source'], 'client_credentials')
+        self.assertEqual(result['endpoint'], '/api/token')
+        self.assertIn('Spotify could not be reached', result['recommended_action'])
+        self.assertTrue(all(line.startswith('WARNING:') for line in logs.output))
+
     def test_ensure_valid_token_does_not_overwrite_user_when_refresh_fails(self):
         user = User.objects.create_user(
             username='refresh-user',
@@ -2426,6 +2489,42 @@ class SpotifyRecommendationTests(TestCase):
         self.assertEqual(user.spotify_access_token, 'existing-token')
         self.assertEqual(user.spotify_refresh_token, 'refresh-token')
         self.assertLessEqual(user.spotify_token_expires, timezone.now())
+
+    @override_settings(
+        SPOTIFY_CLIENT_ID='client-id',
+        SPOTIFY_CLIENT_SECRET='client-secret',
+    )
+    def test_ensure_valid_token_preserves_network_refresh_failure_reason(self):
+        service = SpotifyService()
+        user = User.objects.create_user(
+            username='refresh-network-user',
+            email='refresh-network@example.com',
+            password='password123',
+        )
+        user.is_spotify_connected = True
+        user.spotify_access_token = 'expired-token'
+        user.spotify_refresh_token = 'refresh-token'
+        user.spotify_token_expires = timezone.now() - timedelta(minutes=5)
+        user.save()
+
+        with patch(
+            'api.spotify_service.requests.post',
+            side_effect=requests.ConnectionError('dns lookup failed'),
+        ):
+            details = service.ensure_valid_token_with_details(user)
+
+        self.assertIsNone(details['access_token'])
+        self.assertTrue(details['refresh_attempted'])
+        self.assertFalse(details['refresh_succeeded'])
+        self.assertEqual(details['refresh_error'], 'network_error')
+        self.assertEqual(details['refresh_failure']['reason'], 'network_error')
+        self.assertIn(
+            'Spotify could not be reached',
+            details['refresh_failure']['recommended_action'],
+        )
+
+        user.refresh_from_db()
+        self.assertEqual(user.spotify_access_token, 'expired-token')
 
     def test_get_recommendations_returns_playable_fallback_tracks_when_spotify_rejects_all_tokens(self):
         with patch.object(
@@ -2536,6 +2635,59 @@ class SpotifyRecommendationTests(TestCase):
         self.assertIsNone(diagnostics['account']['has_premium'])
         self.assertEqual(diagnostics['account']['error_reason'], 'developer_allowlist_required')
         self.assertIn('Development Mode', diagnostics['recommended_action'])
+
+    def test_debug_status_uses_refresh_failure_action_when_refresh_hits_network(self):
+        user = User.objects.create_user(
+            username='debug-refresh-network-user',
+            email='debug-refresh-network@example.com',
+            password='password123',
+        )
+        user.is_spotify_connected = True
+        user.spotify_access_token = 'expired-token'
+        user.spotify_refresh_token = 'refresh-token'
+        user.spotify_token_expires = timezone.now() - timedelta(minutes=5)
+        user.spotify_granted_scopes = [
+            'streaming',
+            'user-modify-playback-state',
+            'user-read-playback-state',
+            'user-read-currently-playing',
+            'app-remote-control',
+        ]
+        user.save()
+
+        refresh_failure = {
+            'source': 'refresh_token',
+            'status_code': None,
+            'reason': 'network_error',
+            'error': 'dns lookup failed',
+            'error_code': None,
+            'recommended_action': (
+                'Spotify could not be reached from the backend. Check internet access, '
+                'firewall settings, and Spotify API availability.'
+            ),
+        }
+
+        with patch.object(
+            spotify_service,
+            'ensure_valid_token_with_details',
+            return_value={
+                'access_token': None,
+                'refresh_attempted': True,
+                'refresh_succeeded': False,
+                'refresh_error': 'network_error',
+                'refresh_failure': refresh_failure,
+                'granted_scopes': user.spotify_granted_scopes,
+            },
+        ):
+            diagnostics = spotify_service.get_playback_debug_status(user)
+
+        self.assertFalse(diagnostics['token']['is_valid'])
+        self.assertEqual(diagnostics['token']['refresh_error'], 'network_error')
+        self.assertEqual(diagnostics['token']['refresh_failure'], refresh_failure)
+        self.assertEqual(
+            diagnostics['recommended_action'],
+            refresh_failure['recommended_action'],
+        )
 
     def test_prepare_playback_returns_allowlist_block_when_devices_endpoint_is_rejected(self):
         user = User.objects.create_user(

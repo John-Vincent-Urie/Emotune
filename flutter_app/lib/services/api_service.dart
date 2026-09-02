@@ -14,8 +14,9 @@ class ApiException implements Exception {
 }
 
 class ApiService {
-  static const Duration _requestTimeout = Duration(seconds: 12);
+  static const Duration _requestTimeout = Duration(seconds: 20);
   static const Duration _probeTimeout = Duration(seconds: 2);
+  static const String _resolvedBaseUrlPrefsKey = 'resolved_api_base_url';
   static const String _configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
   static const List<String> _androidBaseUrlCandidates = [
     'http://127.0.0.1:8000/api',
@@ -35,6 +36,12 @@ class ApiService {
     return 'http://127.0.0.1:8000/api';
   }
 
+  static Future<void> warmUp() async {
+    try {
+      await baseUrl;
+    } catch (_) {}
+  }
+
   static Future<String> get baseUrl async {
     if (_configuredBaseUrl.isNotEmpty) {
       return _configuredBaseUrl;
@@ -43,6 +50,12 @@ class ApiService {
     final cached = _resolvedBaseUrl;
     if (cached != null) {
       return cached;
+    }
+
+    final persisted = await _loadPersistedBaseUrl();
+    if (persisted != null) {
+      _resolvedBaseUrl = persisted;
+      return persisted;
     }
 
     final inFlight = _resolvingBaseUrl;
@@ -54,7 +67,7 @@ class ApiService {
     _resolvingBaseUrl = future;
     try {
       final resolved = await future;
-      _resolvedBaseUrl = resolved;
+      await _cacheResolvedBaseUrl(resolved);
       return resolved;
     } finally {
       _resolvingBaseUrl = null;
@@ -73,6 +86,27 @@ class ApiService {
     }
 
     return _defaultBaseUrl();
+  }
+
+  static Future<String?> _loadPersistedBaseUrl() async {
+    if (kIsWeb || _configuredBaseUrl.isNotEmpty) {
+      return null;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getString(_resolvedBaseUrlPrefsKey)?.trim();
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+    return value;
+  }
+
+  static Future<void> _cacheResolvedBaseUrl(String baseUrl) async {
+    _resolvedBaseUrl = baseUrl;
+    if (kIsWeb || _configuredBaseUrl.isNotEmpty) {
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_resolvedBaseUrlPrefsKey, baseUrl);
   }
 
   static Future<bool> _canReachBaseUrl(String candidateBaseUrl) async {
@@ -240,7 +274,7 @@ class ApiService {
       );
       if (fallbackBaseUrl != null) {
         attemptedBaseUrls.add(fallbackBaseUrl);
-        _resolvedBaseUrl = fallbackBaseUrl;
+        await _cacheResolvedBaseUrl(fallbackBaseUrl);
         final fallbackUri = await _buildUri(
           normalizedPath,
           baseUrlOverride: fallbackBaseUrl,

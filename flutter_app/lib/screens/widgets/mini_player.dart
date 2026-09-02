@@ -42,7 +42,7 @@ class MiniPlayer extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.accent.withOpacity(0.1),
+              color: AppColors.accent.withValues(alpha: 0.1),
               blurRadius: 10,
             ),
           ],
@@ -66,7 +66,7 @@ class MiniPlayer extends StatelessWidget {
                                 fit: BoxFit.cover,
                               )
                             : Container(
-                                color: AppColors.accent.withOpacity(0.3),
+                                color: AppColors.accent.withValues(alpha: 0.3),
                                 child: const Icon(Icons.music_note, size: 20),
                               ),
                       ),

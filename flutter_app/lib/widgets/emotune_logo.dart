@@ -24,7 +24,7 @@ class EmoTuneLogo extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.gradientStart.withOpacity(0.3),
+                color: AppColors.gradientStart.withValues(alpha: 0.3),
                 blurRadius: 20,
                 spreadRadius: 5,
               ),

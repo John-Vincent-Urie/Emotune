@@ -57,7 +57,7 @@ class FullPlayerScreen extends StatelessWidget {
               width: 42,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.35),
+                color: Colors.white.withValues(alpha: 0.35),
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -80,71 +80,11 @@ class FullPlayerScreen extends StatelessWidget {
                               ),
                               const SizedBox(width: 16),
                               Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _queueLabel(player, track),
-                                        style: TextStyle(
-                                          color: Colors.white.withOpacity(0.85),
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        queueTitle,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 28,
-                                          height: 0.95,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                        maxLines: 3,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        queueSubtitle,
-                                        style: TextStyle(
-                                          color: Colors.white.withOpacity(0.75),
-                                          fontSize: 13,
-                                          height: 1.3,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Row(
-                                        children: [
-                                          CircleAvatar(
-                                            radius: 11,
-                                            backgroundColor: Colors.black.withOpacity(0.28),
-                                            child: const Icon(
-                                              Icons.graphic_eq_rounded,
-                                              size: 13,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              queueMeta,
-                                              style: TextStyle(
-                                                color: Colors.white.withOpacity(0.88),
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
+                                child: _HeaderInfo(
+                                  label: _queueLabel(player, track),
+                                  title: queueTitle,
+                                  subtitle: queueSubtitle,
+                                  meta: queueMeta,
                                 ),
                               ),
                             ],
@@ -162,88 +102,14 @@ class FullPlayerScreen extends StatelessWidget {
                             onFavorite: () => _toggleFavorite(context, player, track),
                           ),
                           const SizedBox(height: 14),
-                          SliderTheme(
-                            data: SliderTheme.of(context).copyWith(
-                              trackHeight: 3,
-                              thumbShape: const RoundSliderThumbShape(
-                                enabledThumbRadius: 5,
-                              ),
-                              overlayShape: SliderComponentShape.noOverlay,
-                              activeTrackColor: Colors.white,
-                              inactiveTrackColor: Colors.white24,
-                              thumbColor: Colors.white,
-                            ),
-                            child: Slider(
-                              value: progress.clamp(0.0, 1.0),
-                              onChangeStart:
-                                  sliderEnabled
-                                      ? (_) => player.beginSeekPreview()
-                                      : null,
-                              onChanged:
-                                  sliderEnabled
-                                      ? (value) {
-                                        final duration = Duration(
-                                          milliseconds: (value * durationMs).round(),
-                                        );
-                                        player.updateSeekPreview(duration);
-                                      }
-                                      : null,
-                              onChangeEnd:
-                                  sliderEnabled
-                                      ? (value) {
-                                        final duration = Duration(
-                                          milliseconds: (value * durationMs).round(),
-                                        );
-                                        player.commitSeekPreview(duration);
-                                      }
-                                      : null,
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                _MetaText(_formatDuration(player.displayPosition)),
-                                _MetaText(_formatDuration(player.duration)),
-                              ],
-                            ),
+                          _PlaybackSlider(
+                            player: player,
+                            progress: progress,
+                            durationMs: durationMs,
+                            sliderEnabled: sliderEnabled,
                           ),
                           const SizedBox(height: 22),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Row(
-                              children: [
-                                Text(
-                                  '#',
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.5),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Text(
-                                    'Title',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.5),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.access_time_rounded,
-                                  size: 18,
-                                  color: Colors.white.withOpacity(0.5),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Divider(
-                            height: 1,
-                            color: Colors.white.withOpacity(0.10),
-                          ),
+                          const _QueueColumnHeader(),
                           const SizedBox(height: 8),
                         ],
                       ),
@@ -309,9 +175,9 @@ class FullPlayerScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
+        color: Colors.white.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -319,7 +185,7 @@ class FullPlayerScreen extends StatelessWidget {
           Icon(
             icon,
             size: 18,
-            color: Colors.white.withOpacity(0.88),
+            color: Colors.white.withValues(alpha: 0.88),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -329,7 +195,7 @@ class FullPlayerScreen extends StatelessWidget {
                 Text(
                   label,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.92),
+                    color: Colors.white.withValues(alpha: 0.92),
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -339,7 +205,7 @@ class FullPlayerScreen extends StatelessWidget {
                   Text(
                     detail,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.72),
+                      color: Colors.white.withValues(alpha: 0.72),
                       fontSize: 11,
                       height: 1.3,
                       fontWeight: FontWeight.w500,
@@ -534,6 +400,192 @@ class FullPlayerScreen extends StatelessWidget {
   }
 }
 
+class _HeaderInfo extends StatelessWidget {
+  const _HeaderInfo({
+    required this.label,
+    required this.title,
+    required this.subtitle,
+    required this.meta,
+  });
+
+  final String label;
+  final String title;
+  final String subtitle;
+  final String meta;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.85),
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              height: 0.95,
+              fontWeight: FontWeight.w800,
+            ),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.75),
+              fontSize: 13,
+              height: 1.3,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 11,
+                backgroundColor: Colors.black.withValues(alpha: 0.28),
+                child: const Icon(
+                  Icons.graphic_eq_rounded,
+                  size: 13,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  meta,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.88),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlaybackSlider extends StatelessWidget {
+  const _PlaybackSlider({
+    required this.player,
+    required this.progress,
+    required this.durationMs,
+    required this.sliderEnabled,
+  });
+
+  final PlayerProvider player;
+  final double progress;
+  final int durationMs;
+  final bool sliderEnabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            trackHeight: 3,
+            thumbShape: const RoundSliderThumbShape(
+              enabledThumbRadius: 5,
+            ),
+            overlayShape: SliderComponentShape.noOverlay,
+            activeTrackColor: Colors.white,
+            inactiveTrackColor: Colors.white24,
+            thumbColor: Colors.white,
+          ),
+          child: Slider(
+            value: progress.clamp(0.0, 1.0),
+            onChangeStart:
+                sliderEnabled ? (_) => player.beginSeekPreview() : null,
+            onChanged: sliderEnabled
+                ? (value) {
+                    final duration = Duration(
+                      milliseconds: (value * durationMs).round(),
+                    );
+                    player.updateSeekPreview(duration);
+                  }
+                : null,
+            onChangeEnd: sliderEnabled
+                ? (value) {
+                    final duration = Duration(
+                      milliseconds: (value * durationMs).round(),
+                    );
+                    player.commitSeekPreview(duration);
+                  }
+                : null,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _MetaText(FullPlayerScreen._formatDuration(player.displayPosition)),
+              _MetaText(FullPlayerScreen._formatDuration(player.duration)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QueueColumnHeader extends StatelessWidget {
+  const _QueueColumnHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(
+        children: [
+          Text(
+            '#',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.5),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              'Title',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Icon(
+            Icons.access_time_rounded,
+            size: 18,
+            color: Colors.white.withValues(alpha: 0.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HeaderArtwork extends StatelessWidget {
   const _HeaderArtwork({
     required this.imageUrl,
@@ -552,7 +604,7 @@ class _HeaderArtwork extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.24),
+            color: Colors.black.withValues(alpha: 0.24),
             blurRadius: 24,
             offset: const Offset(0, 14),
           ),
@@ -620,9 +672,9 @@ class _SessionPlanCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
+        color: Colors.white.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -633,7 +685,7 @@ class _SessionPlanCard extends StatelessWidget {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: AppColors.accent.withOpacity(0.18),
+                  color: AppColors.accent.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -659,7 +711,7 @@ class _SessionPlanCard extends StatelessWidget {
                     Text(
                       sessionDescription,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.68),
+                        color: Colors.white.withValues(alpha: 0.68),
                         fontSize: 11,
                         height: 1.35,
                       ),
@@ -687,7 +739,7 @@ class _SessionPlanCard extends StatelessWidget {
                   child: Text(
                     progressLabel,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.78),
+                      color: Colors.white.withValues(alpha: 0.78),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -699,7 +751,7 @@ class _SessionPlanCard extends StatelessWidget {
                         ? 'No more check-ins'
                         : 'Next check-in: song $nextCheckIn',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.62),
+                      color: Colors.white.withValues(alpha: 0.62),
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
                     ),
@@ -717,14 +769,14 @@ class _SessionPlanCard extends StatelessWidget {
                     (chip) => Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.18),
+                        color: Colors.black.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(color: Colors.white10),
                       ),
                       child: Text(
                         chip,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.84),
+                          color: Colors.white.withValues(alpha: 0.84),
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
@@ -806,9 +858,9 @@ class _ControlStrip extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
+            color: Colors.white.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: Colors.white.withOpacity(0.10)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(6),
@@ -881,7 +933,7 @@ class _IconChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? AppColors.accent : Colors.white.withOpacity(0.88);
+    final color = active ? AppColors.accent : Colors.white.withValues(alpha: 0.88);
     return Tooltip(
       message: tooltip ?? '',
       child: InkWell(
@@ -928,7 +980,7 @@ class _QueueRow extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 2),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         decoration: BoxDecoration(
-          color: isCurrent ? Colors.white.withOpacity(0.12) : Colors.transparent,
+          color: isCurrent ? Colors.white.withValues(alpha: 0.12) : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
@@ -940,7 +992,7 @@ class _QueueRow extends StatelessWidget {
                 style: TextStyle(
                   color: isCurrent
                       ? Colors.white
-                      : Colors.white.withOpacity(0.72),
+                      : Colors.white.withValues(alpha: 0.72),
                   fontSize: 14,
                   fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
                 ),
@@ -952,7 +1004,7 @@ class _QueueRow extends StatelessWidget {
               height: 46,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
-                color: Colors.white.withOpacity(0.06),
+                color: Colors.white.withValues(alpha: 0.06),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
@@ -981,7 +1033,7 @@ class _QueueRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: isCurrent ? Colors.white : Colors.white.withOpacity(0.92),
+                      color: isCurrent ? Colors.white : Colors.white.withValues(alpha: 0.92),
                       fontSize: 16,
                       fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
                     ),
@@ -994,7 +1046,7 @@ class _QueueRow extends StatelessWidget {
                     style: TextStyle(
                       color: isCurrent
                           ? AppColors.accent
-                          : Colors.white.withOpacity(0.62),
+                          : Colors.white.withValues(alpha: 0.62),
                       fontSize: 13,
                     ),
                   ),
@@ -1012,7 +1064,7 @@ class _QueueRow extends StatelessWidget {
               Text(
                 duration,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.72),
+                  color: Colors.white.withValues(alpha: 0.72),
                   fontSize: 14,
                 ),
               ),
@@ -1064,9 +1116,9 @@ class _ContextLoadingCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
+        color: Colors.white.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
       ),
       child: Row(
         children: [
@@ -1083,7 +1135,7 @@ class _ContextLoadingCard extends StatelessWidget {
             child: Text(
               'Opening $name. EmoTune is waiting for Spotify to return the $label tracks.',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.86),
+                color: Colors.white.withValues(alpha: 0.86),
                 fontSize: 13,
                 height: 1.35,
                 fontWeight: FontWeight.w600,
@@ -1106,7 +1158,7 @@ class _MetaText extends StatelessWidget {
     return Text(
       label,
       style: TextStyle(
-        color: Colors.white.withOpacity(0.56),
+        color: Colors.white.withValues(alpha: 0.56),
         fontSize: 12,
         fontWeight: FontWeight.w600,
       ),

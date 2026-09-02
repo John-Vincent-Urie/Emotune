@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import os
-import warnings
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -36,7 +36,15 @@ from transformers import (
 
 from data_pipeline import DATASET_PATH, clean_dataset, load_custom_dataset, resolve_dataset_path
 
-warnings.filterwarnings("ignore")
+_BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
+if str(_BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_DIR))
+
+from ml.emotion_labels import (  # noqa: E402
+    GOEMOTIONS_LABEL_MAP,
+    LABEL2ID,
+    call_huggingface_loader as _call_huggingface_loader,
+)
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -66,80 +74,95 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
-MODEL_NAME = os.getenv("EMOTUNE_MODEL_NAME", "bert-base-uncased")
-OUTPUT_DIR = (
-    Path(__file__).resolve().parent.parent
-    / "backend"
-    / "ml"
-    / "models"
-    / "bert_emotion_model"
-)
-NUM_LABELS = 13
-MAX_LENGTH = _env_int("EMOTUNE_MAX_LENGTH", 128)
-BATCH_SIZE = _env_int("EMOTUNE_BATCH_SIZE", 16)
-NUM_EPOCHS = _env_int("EMOTUNE_NUM_EPOCHS", 5)
-LEARNING_RATE = _env_float("EMOTUNE_LEARNING_RATE", 2e-5)
-WARMUP_RATIO = _env_float("EMOTUNE_WARMUP_RATIO", 0.1)
-SEED = _env_int("EMOTUNE_SEED", 42)
-MAX_SAMPLES_PER_CLASS = _env_int("EMOTUNE_MAX_SAMPLES_PER_CLASS", 2000)
-CUSTOM_REPEAT_FACTOR = _env_int("EMOTUNE_CUSTOM_REPEAT_FACTOR", 10)
+@dataclass(frozen=True)
+class TrainingConfig:
+    """All environment-tunable training settings, resolved once at import time.
 
-ENABLE_GOEMOTIONS = _env_bool("EMOTUNE_ENABLE_GOEMOTIONS", True)
-ENABLE_DAIR_EMOTION = _env_bool("EMOTUNE_ENABLE_DAIR_EMOTION", False)
-ENABLE_CUSTOM_FINAL_STAGE = _env_bool("EMOTUNE_ENABLE_CUSTOM_FINAL_STAGE", True)
+    Replaces what used to be ~15 separate `_env_*`-derived module globals. Every
+    field is still re-exposed as a same-named module-level constant below (e.g.
+    `SEED = CONFIG.seed`) so the rest of this script is unchanged and doesn't need
+    to thread a config object through every function.
+    """
 
-GOEMOTIONS_STAGE_EPOCHS = _env_float("EMOTUNE_GOEMOTIONS_EPOCHS", 1.0)
-DAIR_STAGE_EPOCHS = _env_float("EMOTUNE_DAIR_EMOTION_EPOCHS", 1.0)
-CUSTOM_STAGE_EPOCHS = _env_float("EMOTUNE_FINAL_FINETUNE_EPOCHS", float(NUM_EPOCHS))
+    model_name: str
+    output_dir: Path
+    num_labels: int
+    max_length: int
+    batch_size: int
+    gradient_accumulation_steps: int
+    num_epochs: int
+    learning_rate: float
+    warmup_ratio: float
+    seed: int
+    max_samples_per_class: int
+    custom_repeat_factor: int
+    enable_goemotions: bool
+    enable_dair_emotion: bool
+    enable_custom_final_stage: bool
+    goemotions_stage_epochs: float
+    dair_stage_epochs: float
+    custom_stage_epochs: float
 
-LABEL2ID = {
-    "happy": 0,
-    "sad": 1,
-    "angry": 2,
-    "motivational": 3,
-    "fear": 4,
-    "depressing": 5,
-    "surprising": 6,
-    "stressed": 7,
-    "calm": 8,
-    "lonely": 9,
-    "romantic": 10,
-    "nostalgic": 11,
-    "mixed": 12,
-}
+    @classmethod
+    def from_env(cls) -> "TrainingConfig":
+        num_epochs = _env_int("EMOTUNE_NUM_EPOCHS", 5)
+        return cls(
+            model_name=os.getenv("EMOTUNE_MODEL_NAME", "bert-base-uncased"),
+            output_dir=(
+                Path(__file__).resolve().parent.parent
+                / "backend"
+                / "ml"
+                / "models"
+                / "bert_emotion_model"
+            ),
+            num_labels=13,
+            max_length=_env_int("EMOTUNE_MAX_LENGTH", 128),
+            batch_size=_env_int("EMOTUNE_BATCH_SIZE", 16),
+            gradient_accumulation_steps=_env_int("EMOTUNE_GRADIENT_ACCUMULATION_STEPS", 1),
+            num_epochs=num_epochs,
+            learning_rate=_env_float("EMOTUNE_LEARNING_RATE", 2e-5),
+            warmup_ratio=_env_float("EMOTUNE_WARMUP_RATIO", 0.1),
+            seed=_env_int("EMOTUNE_SEED", 42),
+            max_samples_per_class=_env_int("EMOTUNE_MAX_SAMPLES_PER_CLASS", 2000),
+            custom_repeat_factor=_env_int("EMOTUNE_CUSTOM_REPEAT_FACTOR", 10),
+            enable_goemotions=_env_bool("EMOTUNE_ENABLE_GOEMOTIONS", True),
+            enable_dair_emotion=_env_bool("EMOTUNE_ENABLE_DAIR_EMOTION", False),
+            enable_custom_final_stage=_env_bool("EMOTUNE_ENABLE_CUSTOM_FINAL_STAGE", True),
+            goemotions_stage_epochs=_env_float("EMOTUNE_GOEMOTIONS_EPOCHS", 1.0),
+            dair_stage_epochs=_env_float("EMOTUNE_DAIR_EMOTION_EPOCHS", 1.0),
+            custom_stage_epochs=_env_float("EMOTUNE_FINAL_FINETUNE_EPOCHS", float(num_epochs)),
+        )
+
+
+CONFIG = TrainingConfig.from_env()
+
+MODEL_NAME = CONFIG.model_name
+OUTPUT_DIR = CONFIG.output_dir
+NUM_LABELS = CONFIG.num_labels
+MAX_LENGTH = CONFIG.max_length
+BATCH_SIZE = CONFIG.batch_size
+GRADIENT_ACCUMULATION_STEPS = CONFIG.gradient_accumulation_steps
+NUM_EPOCHS = CONFIG.num_epochs
+LEARNING_RATE = CONFIG.learning_rate
+WARMUP_RATIO = CONFIG.warmup_ratio
+SEED = CONFIG.seed
+MAX_SAMPLES_PER_CLASS = CONFIG.max_samples_per_class
+CUSTOM_REPEAT_FACTOR = CONFIG.custom_repeat_factor
+
+ENABLE_GOEMOTIONS = CONFIG.enable_goemotions
+ENABLE_DAIR_EMOTION = CONFIG.enable_dair_emotion
+ENABLE_CUSTOM_FINAL_STAGE = CONFIG.enable_custom_final_stage
+
+GOEMOTIONS_STAGE_EPOCHS = CONFIG.goemotions_stage_epochs
+DAIR_STAGE_EPOCHS = CONFIG.dair_stage_epochs
+CUSTOM_STAGE_EPOCHS = CONFIG.custom_stage_epochs
+
+# LABEL2ID and the GoEmotions mapping are the same schema the runtime classifier
+# (backend/ml/emotion_classifier.py) uses at inference time, so both are imported
+# from the shared backend/ml/emotion_labels.py module above rather than duplicated
+# here. LABEL2ID's key order is baked into any already-saved model checkpoint's
+# id2label config, so it must stay exactly as it was (verified identical).
 ID2LABEL = {value: key for key, value in LABEL2ID.items()}
-
-GOEMOTIONS_MAP = {
-    "admiration": "happy",
-    "amusement": "happy",
-    "approval": "happy",
-    "caring": "romantic",
-    "confusion": "mixed",
-    "curiosity": "surprising",
-    "desire": "romantic",
-    "disappointment": "sad",
-    "disapproval": "angry",
-    "disgust": "angry",
-    "embarrassment": "sad",
-    "excitement": "happy",
-    "fear": "fear",
-    "gratitude": "happy",
-    "grief": "sad",
-    "joy": "happy",
-    "love": "romantic",
-    "neutral": "calm",
-    "nervousness": "fear",
-    "optimism": "motivational",
-    "pride": "motivational",
-    "realization": "surprising",
-    "relief": "calm",
-    "remorse": "sad",
-    "sadness": "sad",
-    "surprise": "surprising",
-    "anger": "angry",
-    "annoyance": "angry",
-    "boredom": "mixed",
-}
 
 DAIR_EMOTION_MAP = {
     "anger": "angry",
@@ -318,445 +341,472 @@ def _to_label_ids(label_names: list[str]) -> list[int]:
     return [LABEL2ID[label_name] for label_name in label_names]
 
 
-def _cap_per_class(df: pd.DataFrame, max_samples_per_class: int) -> pd.DataFrame:
-    if df.empty or max_samples_per_class <= 0:
-        return df.reset_index(drop=True)
+def _stratified_split_with_fallback(
+    df: pd.DataFrame, *, test_size: float, random_state: int
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Stratified split, falling back to a plain split when a class is too small.
 
-    capped = []
-    for label_id in sorted(df["label"].unique()):
-        class_df = df[df["label"] == label_id]
-        if len(class_df) > max_samples_per_class:
-            class_df = class_df.sample(max_samples_per_class, random_state=SEED)
-        capped.append(class_df)
-
-    if not capped:
-        return df.iloc[0:0].copy()
-
-    return pd.concat(capped).sample(frac=1, random_state=SEED).reset_index(drop=True)
+    The EmoTune custom dataset has few unique rows per emotion after
+    deduplication, so a second stratified split on an already-small holdout
+    can leave a class with only 1 member -- which sklearn rejects outright.
+    Preserving class balance on that tiny holdout isn't worth crashing the
+    whole training run over, so fall back to an unstratified split instead.
+    """
+    try:
+        return train_test_split(
+            df,
+            test_size=test_size,
+            random_state=random_state,
+            stratify=df["emotion"],
+        )
+    except ValueError:
+        return train_test_split(df, test_size=test_size, random_state=random_state)
 
 
 def _build_text_label_df(texts: list[str], label_ids: list[int]) -> pd.DataFrame:
     return pd.DataFrame({"text": texts, "label": label_ids})
 
 
-def _split_goemotions_split(split, label_names: list[str]) -> tuple[list[str], list[int]]:
-    texts: list[str] = []
-    labels: list[int] = []
+class StageDataPreparer:
+    """Builds the per-source PreparedStage objects consumed by BertEmotionTrainer."""
 
-    for item in split:
-        mapped_label = None
-        for label_id in item["labels"]:
-            candidate = GOEMOTIONS_MAP.get(label_names[label_id])
-            if candidate:
-                mapped_label = candidate
-                break
+    def __init__(self, config: TrainingConfig = CONFIG):
+        self.config = config
 
-        if not mapped_label:
-            continue
+    def build_stage_sequence(self) -> tuple[list[PreparedStage], pd.DataFrame | None]:
+        stages: list[PreparedStage] = []
+        custom_test_df: pd.DataFrame | None = None
 
-        texts.append(item["text"])
-        labels.append(LABEL2ID[mapped_label])
+        if self.config.enable_goemotions:
+            go_stage = self.prepare_goemotions_stage()
+            if go_stage is not None:
+                stages.append(go_stage)
 
-    return texts, labels
+        if self.config.enable_dair_emotion:
+            dair_stage = self.prepare_dair_stage()
+            if dair_stage is not None:
+                stages.append(dair_stage)
+
+        if self.config.enable_custom_final_stage:
+            custom_stage, custom_test_df = self.prepare_custom_stage()
+            if custom_stage is not None:
+                stages.append(custom_stage)
+
+        return stages, custom_test_df
+
+    def prepare_goemotions_stage(self) -> PreparedStage | None:
+        print("Loading GoEmotions dataset...")
+        try:
+            dataset = load_dataset("go_emotions", "simplified")
+        except Exception as error:
+            print(f"Could not load GoEmotions: {error}")
+            return None
+
+        label_names = dataset["train"].features["labels"].feature.names
+        train_texts, train_labels = self._split_goemotions_split(dataset["train"], label_names)
+        eval_texts, eval_labels = self._split_goemotions_split(dataset["validation"], label_names)
+
+        train_df = self._cap_per_class(_build_text_label_df(train_texts, train_labels), self.config.max_samples_per_class)
+        eval_df = self._cap_per_class(_build_text_label_df(eval_texts, eval_labels), self.config.max_samples_per_class)
+
+        print(f"Loaded {len(train_df)} GoEmotions training samples after mapping/capping")
+        print(f"Loaded {len(eval_df)} GoEmotions validation samples after mapping/capping")
+
+        return PreparedStage(
+            name="goemotions",
+            description="GoEmotions base fine-tune",
+            num_epochs=self.config.goemotions_stage_epochs,
+            train_texts=train_df["text"].tolist(),
+            train_labels=train_df["label"].astype(int).tolist(),
+            eval_texts=eval_df["text"].tolist(),
+            eval_labels=eval_df["label"].astype(int).tolist(),
+            metadata={
+                "source_dataset": "go_emotions/simplified",
+                "train_label_distribution": _label_distribution(train_df["label"].astype(int).tolist()),
+                "eval_label_distribution": _label_distribution(eval_df["label"].astype(int).tolist()),
+            },
+        )
+
+    @staticmethod
+    def _split_goemotions_split(split, label_names: list[str]) -> tuple[list[str], list[int]]:
+        texts: list[str] = []
+        labels: list[int] = []
+
+        for item in split:
+            mapped_label = None
+            for label_id in item["labels"]:
+                candidate = GOEMOTIONS_LABEL_MAP.get(label_names[label_id])
+                if candidate:
+                    mapped_label = candidate
+                    break
+
+            if not mapped_label:
+                continue
+
+            texts.append(item["text"])
+            labels.append(LABEL2ID[mapped_label])
+
+        return texts, labels
+
+    def prepare_dair_stage(self) -> PreparedStage | None:
+        print("Loading dair-ai/emotion dataset...")
+        try:
+            dataset = load_dataset("dair-ai/emotion")
+        except Exception as error:
+            print(f"Could not load dair-ai/emotion: {error}")
+            return None
+
+        label_names = dataset["train"].features["label"].names
+        train_texts, train_labels = self._split_dair_split(dataset["train"], label_names)
+        eval_texts, eval_labels = self._split_dair_split(dataset["validation"], label_names)
+
+        train_df = self._cap_per_class(_build_text_label_df(train_texts, train_labels), self.config.max_samples_per_class)
+        eval_df = self._cap_per_class(_build_text_label_df(eval_texts, eval_labels), self.config.max_samples_per_class)
+
+        print(f"Loaded {len(train_df)} dair-ai/emotion training samples after mapping/capping")
+        print(f"Loaded {len(eval_df)} dair-ai/emotion validation samples after mapping/capping")
+
+        return PreparedStage(
+            name="dair_emotion",
+            description="dair-ai/emotion adaptation",
+            num_epochs=self.config.dair_stage_epochs,
+            train_texts=train_df["text"].tolist(),
+            train_labels=train_df["label"].astype(int).tolist(),
+            eval_texts=eval_df["text"].tolist(),
+            eval_labels=eval_df["label"].astype(int).tolist(),
+            metadata={
+                "source_dataset": "dair-ai/emotion",
+                "train_label_distribution": _label_distribution(train_df["label"].astype(int).tolist()),
+                "eval_label_distribution": _label_distribution(eval_df["label"].astype(int).tolist()),
+            },
+        )
+
+    @staticmethod
+    def _split_dair_split(split, label_names: list[str]) -> tuple[list[str], list[int]]:
+        texts: list[str] = []
+        labels: list[int] = []
+
+        for item in split:
+            mapped = DAIR_EMOTION_MAP.get(label_names[item["label"]])
+            if not mapped:
+                continue
+            texts.append(item["text"])
+            labels.append(LABEL2ID[mapped])
+
+        return texts, labels
+
+    def prepare_custom_stage(self) -> tuple[PreparedStage | None, pd.DataFrame | None]:
+        custom_df, data_report = self._load_clean_custom_dataframe()
+        if custom_df.empty:
+            print("Custom EmoTune dataset is empty. Skipping final fine-tune stage.")
+            return None, None
+
+        train_df, temp_df = _stratified_split_with_fallback(
+            custom_df, test_size=0.15, random_state=self.config.seed
+        )
+        eval_df, test_df = _stratified_split_with_fallback(
+            temp_df, test_size=0.5, random_state=self.config.seed
+        )
+
+        if self.config.custom_repeat_factor > 1:
+            train_df = pd.concat([train_df] * self.config.custom_repeat_factor, ignore_index=True)
+
+        train_label_ids = _to_label_ids(train_df["emotion"].tolist())
+        eval_label_ids = _to_label_ids(eval_df["emotion"].tolist())
+        test_df = test_df.reset_index(drop=True)
+
+        print(
+            "Prepared EmoTune custom split: "
+            f"train={len(train_df)}, validation={len(eval_df)}, test={len(test_df)}"
+        )
+
+        stage = PreparedStage(
+            name="emotune_custom",
+            description="EmoTune final fine-tune",
+            num_epochs=self.config.custom_stage_epochs,
+            train_texts=train_df["text"].tolist(),
+            train_labels=train_label_ids,
+            eval_texts=eval_df["text"].tolist(),
+            eval_labels=eval_label_ids,
+            metadata={
+                "source_dataset": str(resolve_dataset_path(DATASET_PATH).name),
+                "custom_repeat_factor": self.config.custom_repeat_factor,
+                "train_label_distribution": _label_distribution(train_label_ids),
+                "eval_label_distribution": _label_distribution(eval_label_ids),
+                "data_report": data_report,
+            },
+        )
+        return stage, test_df
+
+    def _load_clean_custom_dataframe(self) -> tuple[pd.DataFrame, dict]:
+        dataset_path = resolve_dataset_path(DATASET_PATH)
+        try:
+            custom_df = load_custom_dataset(dataset_path)
+            cleaned_df, data_report = clean_dataset(custom_df)
+            print(f"Loaded {len(cleaned_df)} cleaned custom samples from {dataset_path}")
+            print(f"Removed {data_report['rows_removed']} invalid/duplicate custom rows during cleaning")
+            data_report['dataset_path'] = str(dataset_path)
+            return cleaned_df[["text", "emotion"]].copy(), data_report
+        except Exception as error:
+            print(f"Could not load custom dataset CSV: {error}. Falling back to in-script samples.")
+            fallback_df = pd.DataFrame(CUSTOM_DATASET, columns=["text", "emotion"])
+            return fallback_df, {
+                "source_dataset": "in_script_fallback",
+                "rows_after_cleaning": int(len(fallback_df)),
+                "rows_removed": 0,
+            }
+
+    def _cap_per_class(self, df: pd.DataFrame, max_samples_per_class: int) -> pd.DataFrame:
+        if df.empty or max_samples_per_class <= 0:
+            return df.reset_index(drop=True)
+
+        capped = []
+        for label_id in sorted(df["label"].unique()):
+            class_df = df[df["label"] == label_id]
+            if len(class_df) > max_samples_per_class:
+                class_df = class_df.sample(max_samples_per_class, random_state=self.config.seed)
+            capped.append(class_df)
+
+        if not capped:
+            return df.iloc[0:0].copy()
+
+        return pd.concat(capped).sample(frac=1, random_state=self.config.seed).reset_index(drop=True)
 
 
-def prepare_goemotions_stage() -> PreparedStage | None:
-    print("Loading GoEmotions dataset...")
-    try:
-        dataset = load_dataset("go_emotions", "simplified")
-    except Exception as error:
-        print(f"Could not load GoEmotions: {error}")
-        return None
+class BertEmotionTrainer:
+    """Orchestrates the staged fine-tuning run: load base model, train each stage, evaluate, save."""
 
-    label_names = dataset["train"].features["labels"].feature.names
-    train_texts, train_labels = _split_goemotions_split(dataset["train"], label_names)
-    eval_texts, eval_labels = _split_goemotions_split(dataset["validation"], label_names)
+    def __init__(self, config: TrainingConfig = CONFIG, data_preparer: "StageDataPreparer | None" = None):
+        self.config = config
+        self.data_preparer = data_preparer or StageDataPreparer(config)
 
-    train_df = _cap_per_class(_build_text_label_df(train_texts, train_labels), MAX_SAMPLES_PER_CLASS)
-    eval_df = _cap_per_class(_build_text_label_df(eval_texts, eval_labels), MAX_SAMPLES_PER_CLASS)
+    def run(self):
+        print("=" * 60)
+        print("EmoTune Staged BERT Fine-Tuning")
+        print("=" * 60)
+        print(
+            f"Config: model={self.config.model_name}, batch_size={self.config.batch_size}, "
+            f"max_length={self.config.max_length}, learning_rate={self.config.learning_rate}, "
+            f"max_per_class={self.config.max_samples_per_class}"
+        )
+        print(
+            "Stage toggles: "
+            f"goemotions={self.config.enable_goemotions}, "
+            f"dair_ai_emotion={self.config.enable_dair_emotion}, "
+            f"emotune_final={self.config.enable_custom_final_stage}"
+        )
 
-    print(f"Loaded {len(train_df)} GoEmotions training samples after mapping/capping")
-    print(f"Loaded {len(eval_df)} GoEmotions validation samples after mapping/capping")
+        np.random.seed(self.config.seed)
+        torch.manual_seed(self.config.seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(self.config.seed)
 
-    return PreparedStage(
-        name="goemotions",
-        description="GoEmotions base fine-tune",
-        num_epochs=GOEMOTIONS_STAGE_EPOCHS,
-        train_texts=train_df["text"].tolist(),
-        train_labels=train_df["label"].astype(int).tolist(),
-        eval_texts=eval_df["text"].tolist(),
-        eval_labels=eval_df["label"].astype(int).tolist(),
-        metadata={
-            "source_dataset": "go_emotions/simplified",
-            "train_label_distribution": _label_distribution(train_df["label"].astype(int).tolist()),
-            "eval_label_distribution": _label_distribution(eval_df["label"].astype(int).tolist()),
-        },
-    )
+        stages, custom_test_df = self.data_preparer.build_stage_sequence()
+        if not stages:
+            raise RuntimeError("No training stages were prepared. Check dataset availability and stage toggles.")
 
+        print("\nStage order:")
+        for index, stage in enumerate(stages, start=1):
+            print(f"  {index}. {stage.description} ({stage.num_epochs} epochs)")
 
-def _split_dair_split(split, label_names: list[str]) -> tuple[list[str], list[int]]:
-    texts: list[str] = []
-    labels: list[int] = []
+        print(f"\nLoading base model: {self.config.model_name}")
+        tokenizer = _call_huggingface_loader(AutoTokenizer.from_pretrained, self.config.model_name)
+        model = _call_huggingface_loader(
+            AutoModelForSequenceClassification.from_pretrained,
+            self.config.model_name,
+            num_labels=self.config.num_labels,
+            id2label=ID2LABEL,
+            label2id=LABEL2ID,
+        )
 
-    for item in split:
-        mapped = DAIR_EMOTION_MAP.get(label_names[item["label"]])
-        if not mapped:
-            continue
-        texts.append(item["text"])
-        labels.append(LABEL2ID[mapped])
+        self.config.output_dir.mkdir(parents=True, exist_ok=True)
 
-    return texts, labels
+        stage_summaries = []
+        for index, stage in enumerate(stages):
+            model, stage_summary = self._train_stage(model, tokenizer, stage, index)
+            stage_summaries.append(stage_summary)
 
+        print("\nSaving final model...")
+        model.save_pretrained(str(self.config.output_dir))
+        tokenizer.save_pretrained(str(self.config.output_dir))
 
-def prepare_dair_stage() -> PreparedStage | None:
-    print("Loading dair-ai/emotion dataset...")
-    try:
-        dataset = load_dataset("dair-ai/emotion")
-    except Exception as error:
-        print(f"Could not load dair-ai/emotion: {error}")
-        return None
+        final_results = {}
+        prediction_dump = {}
+        if custom_test_df is not None and not custom_test_df.empty:
+            final_results, prediction_dump = self._evaluate_final_model(model, tokenizer, custom_test_df)
+        else:
+            print("\nSkipping final EmoTune evaluation because no custom test split was available.")
 
-    label_names = dataset["train"].features["label"].names
-    train_texts, train_labels = _split_dair_split(dataset["train"], label_names)
-    eval_texts, eval_labels = _split_dair_split(dataset["validation"], label_names)
-
-    train_df = _cap_per_class(_build_text_label_df(train_texts, train_labels), MAX_SAMPLES_PER_CLASS)
-    eval_df = _cap_per_class(_build_text_label_df(eval_texts, eval_labels), MAX_SAMPLES_PER_CLASS)
-
-    print(f"Loaded {len(train_df)} dair-ai/emotion training samples after mapping/capping")
-    print(f"Loaded {len(eval_df)} dair-ai/emotion validation samples after mapping/capping")
-
-    return PreparedStage(
-        name="dair_emotion",
-        description="dair-ai/emotion adaptation",
-        num_epochs=DAIR_STAGE_EPOCHS,
-        train_texts=train_df["text"].tolist(),
-        train_labels=train_df["label"].astype(int).tolist(),
-        eval_texts=eval_df["text"].tolist(),
-        eval_labels=eval_df["label"].astype(int).tolist(),
-        metadata={
-            "source_dataset": "dair-ai/emotion",
-            "train_label_distribution": _label_distribution(train_df["label"].astype(int).tolist()),
-            "eval_label_distribution": _label_distribution(eval_df["label"].astype(int).tolist()),
-        },
-    )
-
-
-def _load_clean_custom_dataframe() -> tuple[pd.DataFrame, dict]:
-    dataset_path = resolve_dataset_path(DATASET_PATH)
-    try:
-        custom_df = load_custom_dataset(dataset_path)
-        cleaned_df, data_report = clean_dataset(custom_df)
-        print(f"Loaded {len(cleaned_df)} cleaned custom samples from {dataset_path}")
-        print(f"Removed {data_report['rows_removed']} invalid/duplicate custom rows during cleaning")
-        data_report['dataset_path'] = str(dataset_path)
-        return cleaned_df[["text", "emotion"]].copy(), data_report
-    except Exception as error:
-        print(f"Could not load custom dataset CSV: {error}. Falling back to in-script samples.")
-        fallback_df = pd.DataFrame(CUSTOM_DATASET, columns=["text", "emotion"])
-        return fallback_df, {
-            "source_dataset": "in_script_fallback",
-            "rows_after_cleaning": int(len(fallback_df)),
-            "rows_removed": 0,
+        results_payload = {
+            "seed": self.config.seed,
+            "model_name": self.config.model_name,
+            "stage_sequence": [summary["stage"] for summary in stage_summaries],
+            "stage_summaries": stage_summaries,
+            "final_results": final_results,
+            "config": {
+                "batch_size": self.config.batch_size,
+                "max_length": self.config.max_length,
+                "learning_rate": self.config.learning_rate,
+                "warmup_ratio": self.config.warmup_ratio,
+                "max_samples_per_class": self.config.max_samples_per_class,
+                "custom_repeat_factor": self.config.custom_repeat_factor,
+                "enable_goemotions": self.config.enable_goemotions,
+                "enable_dair_emotion": self.config.enable_dair_emotion,
+                "enable_custom_final_stage": self.config.enable_custom_final_stage,
+                "goemotions_stage_epochs": self.config.goemotions_stage_epochs,
+                "dair_stage_epochs": self.config.dair_stage_epochs,
+                "custom_stage_epochs": self.config.custom_stage_epochs,
+            },
         }
 
+        with open(self.config.output_dir / "training_results.json", "w", encoding="utf-8") as handle:
+            json.dump(results_payload, handle, indent=2)
 
-def prepare_custom_stage() -> tuple[PreparedStage | None, pd.DataFrame | None]:
-    custom_df, data_report = _load_clean_custom_dataframe()
-    if custom_df.empty:
-        print("Custom EmoTune dataset is empty. Skipping final fine-tune stage.")
-        return None, None
+        if prediction_dump:
+            with open(self.config.output_dir / "test_predictions.json", "w", encoding="utf-8") as handle:
+                json.dump(prediction_dump, handle, indent=2)
 
-    train_df, temp_df = train_test_split(
-        custom_df,
-        test_size=0.15,
-        random_state=SEED,
-        stratify=custom_df["emotion"],
-    )
-    eval_df, test_df = train_test_split(
-        temp_df,
-        test_size=0.5,
-        random_state=SEED,
-        stratify=temp_df["emotion"],
-    )
+        print(f"\nFinal model saved to: {self.config.output_dir}")
+        if final_results:
+            print(f"EmoTune Test Accuracy: {final_results['test_accuracy']:.4f}")
+            print(f"EmoTune Weighted F1: {final_results['weighted_f1']:.4f}")
+        print("\nTraining complete!")
 
-    if CUSTOM_REPEAT_FACTOR > 1:
-        train_df = pd.concat([train_df] * CUSTOM_REPEAT_FACTOR, ignore_index=True)
+    def _build_class_weights(self, label_ids: list[int]) -> torch.Tensor:
+        weights = np.ones(self.config.num_labels, dtype=np.float32)
+        if not label_ids:
+            return torch.tensor(weights, dtype=torch.float)
 
-    train_label_ids = _to_label_ids(train_df["emotion"].tolist())
-    eval_label_ids = _to_label_ids(eval_df["emotion"].tolist())
-    test_df = test_df.reset_index(drop=True)
-
-    print(
-        "Prepared EmoTune custom split: "
-        f"train={len(train_df)}, validation={len(eval_df)}, test={len(test_df)}"
-    )
-
-    stage = PreparedStage(
-        name="emotune_custom",
-        description="EmoTune final fine-tune",
-        num_epochs=CUSTOM_STAGE_EPOCHS,
-        train_texts=train_df["text"].tolist(),
-        train_labels=train_label_ids,
-        eval_texts=eval_df["text"].tolist(),
-        eval_labels=eval_label_ids,
-        metadata={
-            "source_dataset": str(resolve_dataset_path(DATASET_PATH).name),
-            "custom_repeat_factor": CUSTOM_REPEAT_FACTOR,
-            "train_label_distribution": _label_distribution(train_label_ids),
-            "eval_label_distribution": _label_distribution(eval_label_ids),
-            "data_report": data_report,
-        },
-    )
-    return stage, test_df
-
-
-def _build_class_weights(label_ids: list[int]) -> torch.Tensor:
-    weights = np.ones(NUM_LABELS, dtype=np.float32)
-    if not label_ids:
+        unique_labels = np.array(sorted(set(label_ids)))
+        computed = compute_class_weight(
+            class_weight="balanced",
+            classes=unique_labels,
+            y=np.array(label_ids),
+        )
+        for label_id, weight in zip(unique_labels, computed):
+            weights[int(label_id)] = float(weight)
         return torch.tensor(weights, dtype=torch.float)
 
-    unique_labels = np.array(sorted(set(label_ids)))
-    computed = compute_class_weight(
-        class_weight="balanced",
-        classes=unique_labels,
-        y=np.array(label_ids),
-    )
-    for label_id, weight in zip(unique_labels, computed):
-        weights[int(label_id)] = float(weight)
-    return torch.tensor(weights, dtype=torch.float)
+    def _build_training_args(self, stage: PreparedStage, stage_index: int) -> TrainingArguments:
+        stage_output_dir = self.config.output_dir / f"stage_{stage_index + 1}_{stage.name}"
+        return TrainingArguments(
+            output_dir=str(stage_output_dir),
+            overwrite_output_dir=True,
+            num_train_epochs=stage.num_epochs,
+            per_device_train_batch_size=self.config.batch_size,
+            per_device_eval_batch_size=self.config.batch_size,
+            gradient_accumulation_steps=self.config.gradient_accumulation_steps,
+            learning_rate=self.config.learning_rate,
+            warmup_ratio=self.config.warmup_ratio,
+            weight_decay=0.01,
+            evaluation_strategy="epoch",
+            save_strategy="epoch",
+            save_total_limit=2,
+            load_best_model_at_end=True,
+            metric_for_best_model="f1",
+            logging_dir=str(stage_output_dir / "logs"),
+            logging_steps=50,
+            report_to="none",
+            fp16=torch.cuda.is_available(),
+            seed=self.config.seed,
+        )
 
+    def _train_stage(self, model, tokenizer, stage: PreparedStage, stage_index: int) -> tuple[object, dict]:
+        print("\n" + "=" * 60)
+        print(f"Stage {stage_index + 1}: {stage.description}")
+        print("=" * 60)
+        print(
+            f"Examples: train={len(stage.train_texts)}, "
+            f"validation={len(stage.eval_texts)}, epochs={stage.num_epochs}"
+        )
+        print(f"Train label distribution: {stage.metadata.get('train_label_distribution', {})}")
+        print(f"Validation label distribution: {stage.metadata.get('eval_label_distribution', {})}")
 
-def _build_training_args(stage: PreparedStage, stage_index: int) -> TrainingArguments:
-    stage_output_dir = OUTPUT_DIR / f"stage_{stage_index + 1}_{stage.name}"
-    return TrainingArguments(
-        output_dir=str(stage_output_dir),
-        overwrite_output_dir=True,
-        num_train_epochs=stage.num_epochs,
-        per_device_train_batch_size=BATCH_SIZE,
-        per_device_eval_batch_size=BATCH_SIZE,
-        learning_rate=LEARNING_RATE,
-        warmup_ratio=WARMUP_RATIO,
-        weight_decay=0.01,
-        evaluation_strategy="epoch",
-        save_strategy="epoch",
-        save_total_limit=2,
-        load_best_model_at_end=True,
-        metric_for_best_model="f1",
-        logging_dir=str(stage_output_dir / "logs"),
-        logging_steps=50,
-        report_to="none",
-        fp16=torch.cuda.is_available(),
-        seed=SEED,
-    )
+        train_dataset = EmotionDataset(stage.train_texts, stage.train_labels, tokenizer)
+        eval_dataset = EmotionDataset(stage.eval_texts, stage.eval_labels, tokenizer)
+        class_weights = self._build_class_weights(stage.train_labels)
 
+        trainer = WeightedTrainer(
+            model=model,
+            args=self._build_training_args(stage, stage_index),
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            compute_metrics=compute_metrics,
+            class_weights=class_weights,
+            callbacks=[EarlyStoppingCallback(early_stopping_patience=2)],
+        )
 
-def _train_stage(model, tokenizer, stage: PreparedStage, stage_index: int) -> tuple[object, dict]:
-    print("\n" + "=" * 60)
-    print(f"Stage {stage_index + 1}: {stage.description}")
-    print("=" * 60)
-    print(
-        f"Examples: train={len(stage.train_texts)}, "
-        f"validation={len(stage.eval_texts)}, epochs={stage.num_epochs}"
-    )
-    print(f"Train label distribution: {stage.metadata.get('train_label_distribution', {})}")
-    print(f"Validation label distribution: {stage.metadata.get('eval_label_distribution', {})}")
+        train_output = trainer.train()
+        eval_metrics = trainer.evaluate()
+        stage_summary = {
+            "stage": stage.name,
+            "description": stage.description,
+            "num_epochs": float(stage.num_epochs),
+            "train_examples": len(stage.train_texts),
+            "validation_examples": len(stage.eval_texts),
+            "train_metrics": _normalize_metrics(train_output.metrics),
+            "validation_metrics": _normalize_metrics(eval_metrics),
+            "class_weights": {
+                ID2LABEL[index]: round(float(weight), 6)
+                for index, weight in enumerate(class_weights.tolist())
+            },
+            "metadata": stage.metadata,
+        }
+        return trainer.model, stage_summary
 
-    train_dataset = EmotionDataset(stage.train_texts, stage.train_labels, tokenizer)
-    eval_dataset = EmotionDataset(stage.eval_texts, stage.eval_labels, tokenizer)
-    class_weights = _build_class_weights(stage.train_labels)
+    def _evaluate_final_model(self, model, tokenizer, test_df: pd.DataFrame) -> tuple[dict, dict]:
+        test_label_ids = _to_label_ids(test_df["emotion"].tolist())
+        test_dataset = EmotionDataset(test_df["text"].tolist(), test_label_ids, tokenizer)
 
-    trainer = WeightedTrainer(
-        model=model,
-        args=_build_training_args(stage, stage_index),
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
-        compute_metrics=compute_metrics,
-        class_weights=class_weights,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=2)],
-    )
+        trainer = Trainer(model=model)
+        predictions = trainer.predict(test_dataset)
+        predicted_ids = np.argmax(predictions.predictions, axis=-1)
+        label_order = list(range(self.config.num_labels))
 
-    train_output = trainer.train()
-    eval_metrics = trainer.evaluate()
-    stage_summary = {
-        "stage": stage.name,
-        "description": stage.description,
-        "num_epochs": float(stage.num_epochs),
-        "train_examples": len(stage.train_texts),
-        "validation_examples": len(stage.eval_texts),
-        "train_metrics": _normalize_metrics(train_output.metrics),
-        "validation_metrics": _normalize_metrics(eval_metrics),
-        "class_weights": {
-            ID2LABEL[index]: round(float(weight), 6)
-            for index, weight in enumerate(class_weights.tolist())
-        },
-        "metadata": stage.metadata,
-    }
-    return trainer.model, stage_summary
-
-
-def _evaluate_final_model(model, tokenizer, test_df: pd.DataFrame) -> tuple[dict, dict]:
-    test_label_ids = _to_label_ids(test_df["emotion"].tolist())
-    test_dataset = EmotionDataset(test_df["text"].tolist(), test_label_ids, tokenizer)
-
-    trainer = Trainer(model=model)
-    predictions = trainer.predict(test_dataset)
-    predicted_ids = np.argmax(predictions.predictions, axis=-1)
-    label_order = list(range(NUM_LABELS))
-
-    report_text = classification_report(
-        test_label_ids,
-        predicted_ids,
-        labels=label_order,
-        target_names=[ID2LABEL[index] for index in label_order],
-        zero_division=0,
-    )
-    print("\n" + "=" * 40)
-    print("EMOTUNE TEST SET EVALUATION")
-    print("=" * 40)
-    print(report_text)
-
-    results = {
-        "test_accuracy": float(np.mean(predicted_ids == test_label_ids)),
-        "weighted_f1": float(
-            f1_score(test_label_ids, predicted_ids, average="weighted", zero_division=0)
-        ),
-        "macro_f1": float(
-            f1_score(test_label_ids, predicted_ids, average="macro", zero_division=0)
-        ),
-        "test_label_distribution": _label_distribution(test_label_ids),
-        "confusion_matrix": confusion_matrix(
-            test_label_ids,
-            predicted_ids,
-            labels=label_order,
-        ).tolist(),
-        "confusion_matrix_labels": [ID2LABEL[index] for index in label_order],
-        "classification_report": classification_report(
+        report_text = classification_report(
             test_label_ids,
             predicted_ids,
             labels=label_order,
             target_names=[ID2LABEL[index] for index in label_order],
-            output_dict=True,
             zero_division=0,
-        ),
-    }
-    return results, {
-        "predicted_ids": predicted_ids.tolist(),
-        "target_ids": list(test_label_ids),
-    }
+        )
+        print("\n" + "=" * 40)
+        print("EMOTUNE TEST SET EVALUATION")
+        print("=" * 40)
+        print(report_text)
 
-
-def _build_stage_sequence() -> tuple[list[PreparedStage], pd.DataFrame | None]:
-    stages: list[PreparedStage] = []
-    custom_test_df: pd.DataFrame | None = None
-
-    if ENABLE_GOEMOTIONS:
-        go_stage = prepare_goemotions_stage()
-        if go_stage is not None:
-            stages.append(go_stage)
-
-    if ENABLE_DAIR_EMOTION:
-        dair_stage = prepare_dair_stage()
-        if dair_stage is not None:
-            stages.append(dair_stage)
-
-    if ENABLE_CUSTOM_FINAL_STAGE:
-        custom_stage, custom_test_df = prepare_custom_stage()
-        if custom_stage is not None:
-            stages.append(custom_stage)
-
-    return stages, custom_test_df
+        results = {
+            "test_accuracy": float(np.mean(predicted_ids == test_label_ids)),
+            "weighted_f1": float(
+                f1_score(test_label_ids, predicted_ids, average="weighted", zero_division=0)
+            ),
+            "macro_f1": float(
+                f1_score(test_label_ids, predicted_ids, average="macro", zero_division=0)
+            ),
+            "test_label_distribution": _label_distribution(test_label_ids),
+            "confusion_matrix": confusion_matrix(
+                test_label_ids,
+                predicted_ids,
+                labels=label_order,
+            ).tolist(),
+            "confusion_matrix_labels": [ID2LABEL[index] for index in label_order],
+            "classification_report": classification_report(
+                test_label_ids,
+                predicted_ids,
+                labels=label_order,
+                target_names=[ID2LABEL[index] for index in label_order],
+                output_dict=True,
+                zero_division=0,
+            ),
+        }
+        return results, {
+            "predicted_ids": predicted_ids.tolist(),
+            "target_ids": list(test_label_ids),
+        }
 
 
 def train():
-    print("=" * 60)
-    print("EmoTune Staged BERT Fine-Tuning")
-    print("=" * 60)
-    print(
-        f"Config: model={MODEL_NAME}, batch_size={BATCH_SIZE}, max_length={MAX_LENGTH}, "
-        f"learning_rate={LEARNING_RATE}, max_per_class={MAX_SAMPLES_PER_CLASS}"
-    )
-    print(
-        "Stage toggles: "
-        f"goemotions={ENABLE_GOEMOTIONS}, "
-        f"dair_ai_emotion={ENABLE_DAIR_EMOTION}, "
-        f"emotune_final={ENABLE_CUSTOM_FINAL_STAGE}"
-    )
-
-    np.random.seed(SEED)
-    torch.manual_seed(SEED)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(SEED)
-
-    stages, custom_test_df = _build_stage_sequence()
-    if not stages:
-        raise RuntimeError("No training stages were prepared. Check dataset availability and stage toggles.")
-
-    print("\nStage order:")
-    for index, stage in enumerate(stages, start=1):
-        print(f"  {index}. {stage.description} ({stage.num_epochs} epochs)")
-
-    print(f"\nLoading base model: {MODEL_NAME}")
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    model = AutoModelForSequenceClassification.from_pretrained(
-        MODEL_NAME,
-        num_labels=NUM_LABELS,
-        id2label=ID2LABEL,
-        label2id=LABEL2ID,
-    )
-
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    stage_summaries = []
-    for index, stage in enumerate(stages):
-        model, stage_summary = _train_stage(model, tokenizer, stage, index)
-        stage_summaries.append(stage_summary)
-
-    print("\nSaving final model...")
-    model.save_pretrained(str(OUTPUT_DIR))
-    tokenizer.save_pretrained(str(OUTPUT_DIR))
-
-    final_results = {}
-    prediction_dump = {}
-    if custom_test_df is not None and not custom_test_df.empty:
-        final_results, prediction_dump = _evaluate_final_model(model, tokenizer, custom_test_df)
-    else:
-        print("\nSkipping final EmoTune evaluation because no custom test split was available.")
-
-    results_payload = {
-        "seed": SEED,
-        "model_name": MODEL_NAME,
-        "stage_sequence": [summary["stage"] for summary in stage_summaries],
-        "stage_summaries": stage_summaries,
-        "final_results": final_results,
-        "config": {
-            "batch_size": BATCH_SIZE,
-            "max_length": MAX_LENGTH,
-            "learning_rate": LEARNING_RATE,
-            "warmup_ratio": WARMUP_RATIO,
-            "max_samples_per_class": MAX_SAMPLES_PER_CLASS,
-            "custom_repeat_factor": CUSTOM_REPEAT_FACTOR,
-            "enable_goemotions": ENABLE_GOEMOTIONS,
-            "enable_dair_emotion": ENABLE_DAIR_EMOTION,
-            "enable_custom_final_stage": ENABLE_CUSTOM_FINAL_STAGE,
-            "goemotions_stage_epochs": GOEMOTIONS_STAGE_EPOCHS,
-            "dair_stage_epochs": DAIR_STAGE_EPOCHS,
-            "custom_stage_epochs": CUSTOM_STAGE_EPOCHS,
-        },
-    }
-
-    with open(OUTPUT_DIR / "training_results.json", "w", encoding="utf-8") as handle:
-        json.dump(results_payload, handle, indent=2)
-
-    if prediction_dump:
-        with open(OUTPUT_DIR / "test_predictions.json", "w", encoding="utf-8") as handle:
-            json.dump(prediction_dump, handle, indent=2)
-
-    print(f"\nFinal model saved to: {OUTPUT_DIR}")
-    if final_results:
-        print(f"EmoTune Test Accuracy: {final_results['test_accuracy']:.4f}")
-        print(f"EmoTune Weighted F1: {final_results['weighted_f1']:.4f}")
-    print("\nTraining complete!")
+    BertEmotionTrainer().run()
 
 
 if __name__ == "__main__":

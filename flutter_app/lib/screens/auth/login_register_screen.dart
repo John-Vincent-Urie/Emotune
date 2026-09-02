@@ -48,9 +48,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   padding: const EdgeInsets.all(12),
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                   ),
                   child: Text(auth.error!, style: const TextStyle(color: Colors.red)),
                 ),
@@ -196,7 +196,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 child: Text(
                   'Keep signup light. We only ask for the basics here, and you can tune personalization later.',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.68),
+                    color: Colors.white.withValues(alpha: 0.68),
                     fontSize: 13,
                     height: 1.45,
                   ),
@@ -208,9 +208,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   padding: const EdgeInsets.all(12),
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                   ),
                   child: Text(auth.error!, style: const TextStyle(color: Colors.red)),
                 ),
@@ -374,7 +374,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         subtitle: Text(
           subtitle,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.62),
+            color: Colors.white.withValues(alpha: 0.62),
             fontSize: 12,
             height: 1.35,
           ),

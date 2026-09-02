@@ -5,32 +5,23 @@ The production path uses a fine-tuned BERT classifier when a saved model is
 available. A deterministic keyword-based fallback remains available for local
 development, model failures, and low-confidence predictions.
 """
-import os
 import random
 import re
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from .emotion_labels import (
+    EMOTIONS,
+    GOEMOTIONS_LABEL_MAP,
+    call_huggingface_loader as _call_huggingface_loader,
+)
 from .plutchik_mapper import build_plutchik_profile
 
 logger = logging.getLogger(__name__)
-
-EMOTIONS = [
-    'happy',
-    'sad',
-    'angry',
-    'motivational',
-    'fear',
-    'depressing',
-    'surprising',
-    'stressed',
-    'calm',
-    'lonely',
-    'romantic',
-    'nostalgic',
-    'mixed',
-]
+logging.getLogger(
+    'torch.distributed.elastic.multiprocessing.redirects'
+).setLevel(logging.ERROR)
 
 EMOTION_RESPONSES = {
     'happy': [
@@ -158,37 +149,53 @@ HEARTBREAK_PATTERNS = (
     re.compile(r'\bbreak(?:ing)?\s+my\s+heart\b'),
 )
 
-GOEMOTIONS_LABEL_MAP = {
-    'admiration': 'happy',
-    'amusement': 'happy',
-    'anger': 'angry',
-    'annoyance': 'angry',
-    'approval': 'happy',
-    'boredom': 'mixed',
-    'caring': 'romantic',
-    'confusion': 'mixed',
-    'curiosity': 'surprising',
-    'desire': 'romantic',
-    'disappointment': 'sad',
-    'disapproval': 'angry',
-    'disgust': 'angry',
-    'embarrassment': 'sad',
-    'excitement': 'happy',
-    'fear': 'fear',
-    'gratitude': 'happy',
-    'grief': 'sad',
-    'joy': 'happy',
-    'love': 'romantic',
-    'neutral': 'calm',
-    'nervousness': 'fear',
-    'optimism': 'motivational',
-    'pride': 'motivational',
-    'realization': 'surprising',
-    'relief': 'calm',
-    'remorse': 'sad',
-    'sadness': 'sad',
-    'surprise': 'surprising',
-}
+
+class KeywordEmotionScorer:
+    """Deterministic keyword-match scorer used as the non-ML prediction fallback."""
+
+    def __init__(self, emotions: List[str] = EMOTIONS):
+        self.emotions = emotions
+
+    def score(self, text: str) -> Dict[str, float]:
+        collapsed_text = re.sub(r'\s+', ' ', str(text).lower()).strip()
+        normalized_text = f" {collapsed_text} "
+        scores = {emotion: 0.0 for emotion in self.emotions}
+
+        for emotion, keywords in EMOTION_KEYWORDS.items():
+            score = 0.0
+            for keyword in keywords:
+                normalized_keyword = str(keyword or '').strip().lower()
+                if not normalized_keyword:
+                    continue
+                if ' ' in normalized_keyword:
+                    count = normalized_text.count(f" {normalized_keyword} ")
+                else:
+                    count = len(
+                        re.findall(
+                            rf'\b{re.escape(normalized_keyword)}\b',
+                            normalized_text,
+                        )
+                    )
+                score += float(count)
+            scores[emotion] = score
+        return self._apply_contextual_adjustments(collapsed_text, scores)
+
+    def _apply_contextual_adjustments(
+        self,
+        text: str,
+        scores: Dict[str, float],
+    ) -> Dict[str, float]:
+        adjusted_scores = dict(scores)
+
+        if any(pattern.search(text) for pattern in HEARTBREAK_PATTERNS):
+            adjusted_scores['sad'] += 2.0
+            adjusted_scores['romantic'] = max(
+                0.0,
+                adjusted_scores['romantic'] - 0.75,
+            )
+
+        return adjusted_scores
+
 
 DEFAULT_HIGH_CONFIDENCE_THRESHOLD = 0.68
 DEFAULT_MEDIUM_CONFIDENCE_THRESHOLD = 0.45
@@ -224,6 +231,7 @@ class EmotionClassifier:
         self.goemotions_model = None
         self.goemotions_tokenizer = None
         self.goemotions_model_loaded = False
+        self.goemotions_load_attempted = False
         self.goemotions_label_map = []
         self.goemotions_enabled = False
         self.goemotions_model_id = DEFAULT_GOEMOTIONS_MODEL_ID
@@ -236,9 +244,9 @@ class EmotionClassifier:
         self.medium_confidence_threshold = DEFAULT_MEDIUM_CONFIDENCE_THRESHOLD
         self.min_margin_threshold = DEFAULT_MIN_MARGIN_THRESHOLD
         self.top_emotions_count = DEFAULT_TOP_EMOTIONS
+        self._keyword_scorer = KeywordEmotionScorer(EMOTIONS)
         self._load_runtime_config()
         self._load_model()
-        self._load_goemotions_model()
 
     def _load_runtime_config(self):
         try:
@@ -321,8 +329,14 @@ class EmotionClassifier:
 
             from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-            self.tokenizer = AutoTokenizer.from_pretrained(str(model_source))
-            self.model = AutoModelForSequenceClassification.from_pretrained(str(model_source))
+            self.tokenizer = _call_huggingface_loader(
+                AutoTokenizer.from_pretrained,
+                str(model_source),
+            )
+            self.model = _call_huggingface_loader(
+                AutoModelForSequenceClassification.from_pretrained,
+                str(model_source),
+            )
             label_map = self._resolve_model_label_map(self.model)
             if not label_map:
                 logger.warning(
@@ -341,8 +355,9 @@ class EmotionClassifier:
 
     def _load_goemotions_model(self):
         """Load the GoEmotions model used for semantic fallback decisions."""
-        if not self.goemotions_enabled:
+        if not self.goemotions_enabled or self.goemotions_load_attempted:
             return
+        self.goemotions_load_attempted = True
 
         try:
             from transformers import (
@@ -350,11 +365,13 @@ class EmotionClassifier:
                 AutoTokenizer,
             )
 
-            self.goemotions_tokenizer = AutoTokenizer.from_pretrained(
+            self.goemotions_tokenizer = _call_huggingface_loader(
+                AutoTokenizer.from_pretrained,
                 self.goemotions_model_id,
                 local_files_only=self.goemotions_local_only,
             )
-            self.goemotions_model = AutoModelForSequenceClassification.from_pretrained(
+            self.goemotions_model = _call_huggingface_loader(
+                AutoModelForSequenceClassification.from_pretrained,
                 self.goemotions_model_id,
                 local_files_only=self.goemotions_local_only,
             )
@@ -512,6 +529,20 @@ class EmotionClassifier:
             fallback_reason='model_not_loaded',
         )
 
+    def warm_up(self, *, include_semantic_fallback: bool = True) -> dict:
+        if not self.model_loaded:
+            self._load_model()
+        if (
+            include_semantic_fallback
+            and self.goemotions_enabled
+            and not self.goemotions_model_loaded
+        ):
+            self._load_goemotions_model()
+        return {
+            'model_loaded': bool(self.model_loaded),
+            'goemotions_model_loaded': bool(self.goemotions_model_loaded),
+        }
+
     def _bert_predict(self, text: str, *, keyword_text: Optional[str] = None) -> dict:
         try:
             import torch
@@ -599,6 +630,8 @@ class EmotionClassifier:
         fallback_used: bool = True,
         model_prediction: Optional[dict] = None,
     ) -> Optional[dict]:
+        if self.goemotions_enabled and not self.goemotions_model_loaded:
+            self._load_goemotions_model()
         if not self.goemotions_model_loaded:
             return None
 
@@ -709,7 +742,7 @@ class EmotionClassifier:
         fallback_reason: Optional[str],
         model_prediction: Optional[dict] = None,
     ) -> dict:
-        scores = self._keyword_scores(text)
+        scores = self._keyword_scorer.score(text)
         if not any(score > 0 for score in scores.values()):
             return self._build_uncertain_result(
                 prediction_source='keyword',
@@ -730,46 +763,6 @@ class EmotionClassifier:
         if model_prediction:
             result['model_prediction'] = model_prediction
         return result
-
-    def _keyword_scores(self, text: str) -> Dict[str, float]:
-        collapsed_text = re.sub(r'\s+', ' ', str(text).lower()).strip()
-        normalized_text = f" {collapsed_text} "
-        scores = {emotion: 0.0 for emotion in EMOTIONS}
-
-        for emotion, keywords in EMOTION_KEYWORDS.items():
-            score = 0.0
-            for keyword in keywords:
-                normalized_keyword = str(keyword or '').strip().lower()
-                if not normalized_keyword:
-                    continue
-                if ' ' in normalized_keyword:
-                    count = normalized_text.count(f" {normalized_keyword} ")
-                else:
-                    count = len(
-                        re.findall(
-                            rf'\b{re.escape(normalized_keyword)}\b',
-                            normalized_text,
-                        )
-                    )
-                score += float(count)
-            scores[emotion] = score
-        return self._apply_contextual_keyword_adjustments(collapsed_text, scores)
-
-    def _apply_contextual_keyword_adjustments(
-        self,
-        text: str,
-        scores: Dict[str, float],
-    ) -> Dict[str, float]:
-        adjusted_scores = dict(scores)
-
-        if any(pattern.search(text) for pattern in HEARTBREAK_PATTERNS):
-            adjusted_scores['sad'] += 2.0
-            adjusted_scores['romantic'] = max(
-                0.0,
-                adjusted_scores['romantic'] - 0.75,
-            )
-
-        return adjusted_scores
 
     def _normalize_scores(self, scores: Dict[str, float]) -> Dict[str, float]:
         sanitized = {emotion: max(0.0, float(scores.get(emotion, 0.0))) for emotion in EMOTIONS}
