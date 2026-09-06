@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Export EmoTune music-picker training examples from production-style history.
 
@@ -9,12 +10,15 @@ import os
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _bootstrap import (  # noqa: E402
+    REPO_ROOT,
+    add_backend_to_path,
+    ensure_local_venv,
+)
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-BACKEND_DIR = REPO_ROOT / 'backend'
-
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
+ensure_local_venv('django')
+add_backend_to_path()
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'emotune_project.settings')
 

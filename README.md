@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # EmoTune
 
 EmoTune is an emotion-aware music recommendation system built with Flutter and Django. It helps users describe how they feel, analyzes that emotional signal, and returns Spotify-ready music recommendations that try to match, support, or gently guide the mood.
@@ -10,7 +9,7 @@ EmoTune combines four main parts into one flow:
 - emotion analysis from user text or an explicitly selected mood
 - a BERT-first classifier with keyword fallback when the model is unavailable or uncertain
 - Spotify recommendation search, ranking, and fallback handling
-- a local LightFM personalization layer that re-ranks candidates using user behavior and mood context
+- a local linear ranker that orders candidates by emotion fit, personalization, and availability
 
 In practice, the system works like this:
 
@@ -19,7 +18,7 @@ In practice, the system works like this:
 3. The backend generates a short supportive response for that mood.
 4. Spotify candidates are fetched from personalization signals, catalog search, or curated fallbacks.
 5. The recommendation engine scores tracks by emotional fit, personalization, and availability.
-6. LightFM re-ranks the candidate pool using favorites, listening history, prompt history, and the current emotion context.
+6. The linear picker scores every candidate and orders the playlist.
 7. The app returns playable tracks, stores prompt history, and learns from favorites and listening behavior.
 
 ## Features
@@ -28,7 +27,7 @@ In practice, the system works like this:
 - hybrid Plutchik-ready emotion profile derived from the 13-label classifier for visualization and explainability
 - explicit emotion-tab recommendations for users who already know the mood they want
 - Spotify search, playback preparation, saved-track/top-track personalization, and curated fallbacks
-- local LightFM ranking for personalized playlist ordering
+- a local linear ranker with weights fitted offline from real listening outcomes
 - hybrid scoring that combines emotion alignment, interaction history, and track metadata
 - recommendation history, favorites, listening sessions, and preference learning
 - dataset inspection, baseline experiments, and staged BERT fine-tuning scripts for the ML workflow
@@ -39,7 +38,6 @@ In practice, the system works like this:
 - Django REST Framework
 - Simple JWT
 - Spotify Web API and Spotify App Remote
-- LightFM
 - PyTorch + Transformers
 - scikit-learn for baseline experiments
 
@@ -67,17 +65,25 @@ ml_model/
 
 ## Quick Start
 
-1. Create a local env file from [.env.example](/c:/Users/Urie/Documents/CApstone!/EmoTune-Capstone_project/.env.example).
+1. Create a local env file from [.env.example](.env.example).
 2. Install backend dependencies:
 
 ```bash
 cd backend
-python -m venv venv
-venv\Scripts\activate
+python3 -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py runserver 0.0.0.0:8000
 ```
+
+Activating is a convenience, not a requirement. `backend/manage.py` and every
+`ml_model/` entry point re-launch themselves under `backend/venv` when the
+interpreter running them has no dependencies, so `python3 backend/manage.py
+runserver` works from a plain shell, from any directory. The venv is found
+relative to the script, so this holds for anyone who cloned the repo -- no
+hardcoded path. Create it first: with no `backend/venv` on disk the scripts
+fall through to their normal import error.
 
 3. Install Flutter dependencies and run the app:
 
@@ -94,7 +100,7 @@ For Android:
 
 ## Environment Variables
 
-Use [.env.example](/c:/Users/Urie/Documents/CApstone!/EmoTune-Capstone_project/.env.example) as the template.
+Use [.env.example](.env.example) as the template.
 
 Important variables:
 
@@ -107,12 +113,8 @@ Important variables:
 - `SPOTIFY_APP_REMOTE_REDIRECT_URI`
 - `SPOTIFY_HTTP_TIMEOUT_SECONDS`
 - `SPOTIFY_RECOMMENDATION_BUDGET_SECONDS`
-- `LIGHTFM_RECOMMENDER_ENABLED`
-- `LIGHTFM_RECOMMENDER_ALLOW_WINDOWS`
-- `LIGHTFM_RECOMMENDER_LOSS`
-- `LIGHTFM_RECOMMENDER_COMPONENTS`
-- `LIGHTFM_RECOMMENDER_EPOCHS`
-- `LIGHTFM_RECOMMENDER_MIN_INTERACTIONS`
+- `PICKER_RANKER_ENABLED`
+- `PICKER_RANKER_WEIGHTS_PATH`
 - `EMOTION_HIGH_CONFIDENCE_THRESHOLD`
 - `EMOTION_MEDIUM_CONFIDENCE_THRESHOLD`
 - `EMOTION_MIN_MARGIN_THRESHOLD`
@@ -172,28 +174,35 @@ Outputs:
 - BERT model: `backend/ml/models/bert_emotion_model/`
 - staged training summary: `backend/ml/models/bert_emotion_model/training_results.json`
 
-## LightFM Ranking
+## Ranking
 
-EmoTune now uses LightFM as the personalization and ranking layer after Spotify candidate retrieval.
+After Spotify candidate retrieval, `backend/api/picker_ranker.py` decides the
+order. It scores each candidate as a weighted sum of signals the recommendation
+engine already computed, so ranking a whole candidate set costs one dot product
+per track -- no native extension, no per-request model fitting.
 
-Recommended production pattern:
+Features:
 
-1. Use BERT to detect the current emotion.
-2. Retrieve candidate tracks from Spotify, user history, and curated fallbacks.
-3. Feed the candidate set and stored user interactions into LightFM.
-4. Blend LightFM scores with emotion alignment and availability signals.
-5. Fall back to the heuristic ranking path if LightFM is unavailable or there is not enough interaction data yet.
+```
+emotion_alignment, personalization, popularity, availability,
+is_preferred, familiar_source, discovery_fit, instrumental_fit
+```
 
-This is controlled by:
+The weights are data, not code. With no artifact on disk the built-in defaults
+reproduce the hand-tuned blend the picker shipped with. Fit them from real
+listening outcomes:
 
-- `LIGHTFM_RECOMMENDER_ENABLED`
-- `LIGHTFM_RECOMMENDER_ALLOW_WINDOWS`
-- `LIGHTFM_RECOMMENDER_LOSS`
-- `LIGHTFM_RECOMMENDER_COMPONENTS`
-- `LIGHTFM_RECOMMENDER_EPOCHS`
-- `LIGHTFM_RECOMMENDER_MIN_INTERACTIONS`
+```bash
+backend/venv/bin/python ml_model/train_picker_ranker.py
+```
 
-To export training examples from real EmoTune usage:
+The artifact is written to `ml_model/artifacts/picker_weights.json` only if the
+fitted weights beat the current defaults on held-out prompts, and splitting is
+by prompt so candidates from one prompt never land on both sides.
+
+Controlled by `PICKER_RANKER_ENABLED` and `PICKER_RANKER_WEIGHTS_PATH`.
+
+To export raw training examples from real usage:
 
 ```bash
 cd ml_model
@@ -250,12 +259,6 @@ Response:
 
 - If Spotify search returns a structured `developer_allowlist_required` error, reconnect with an allowlisted Spotify account.
 - If `prediction_strategy` becomes `keyword_fallback`, the model confidence was too low or the BERT model was unavailable.
-- If `lightfm` fails to install on Windows, install Microsoft C++ Build Tools first because LightFM builds a native extension.
-- EmoTune now disables live LightFM ranking on Windows by default because the native runtime can crash the Django process on some setups. Set `LIGHTFM_RECOMMENDER_ALLOW_WINDOWS=true` only if you have verified the local LightFM build is stable.
 - If the Android app cannot reach Django, make sure port `8000` is reachable from the device.
 
-See [SETUP.md](/c:/Users/Urie/Documents/CApstone!/EmoTune-Capstone_project/docs/SETUP.md) for the full developer guide.
-=======
-# Emotune
-EmoTune is an emotion-aware music recommendation application built with Flutter on the client side and Django on the backend.
->>>>>>> fd365ba4ddae5ddfd1d045040b028aabc58e53a4
+See [SETUP.md](docs/SETUP.md) for the full developer guide.

@@ -1,10 +1,17 @@
+#!/usr/bin/env python3
 """Train baseline TF-IDF models for the EmoTune dataset."""
 from __future__ import annotations
 
 from pathlib import Path
 import json
+import sys
 
-from sklearn.feature_extraction.text import TfidfVectorizer
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _bootstrap import ensure_local_venv  # noqa: E402
+
+ensure_local_venv('sklearn')
+
+from sklearn.feature_extraction.text import TfidfVectorizer  # noqa: E402
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
