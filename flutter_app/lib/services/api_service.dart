@@ -14,8 +14,9 @@ class ApiException implements Exception {
 }
 
 class ApiService {
-  static const Duration _requestTimeout = Duration(seconds: 12);
+  static const Duration _requestTimeout = Duration(seconds: 20);
   static const Duration _probeTimeout = Duration(seconds: 2);
+  static const String _resolvedBaseUrlPrefsKey = 'resolved_api_base_url';
   static const String _configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
   static const List<String> _androidBaseUrlCandidates = [
     'http://127.0.0.1:8000/api',
@@ -35,6 +36,12 @@ class ApiService {
     return 'http://127.0.0.1:8000/api';
   }
 
+  static Future<void> warmUp() async {
+    try {
+      await baseUrl;
+    } catch (_) {}
+  }
+
   static Future<String> get baseUrl async {
     if (_configuredBaseUrl.isNotEmpty) {
       return _configuredBaseUrl;
@@ -43,6 +50,12 @@ class ApiService {
     final cached = _resolvedBaseUrl;
     if (cached != null) {
       return cached;
+    }
+
+    final persisted = await _loadPersistedBaseUrl();
+    if (persisted != null) {
+      _resolvedBaseUrl = persisted;
+      return persisted;
     }
 
     final inFlight = _resolvingBaseUrl;
@@ -54,7 +67,7 @@ class ApiService {
     _resolvingBaseUrl = future;
     try {
       final resolved = await future;
-      _resolvedBaseUrl = resolved;
+      await _cacheResolvedBaseUrl(resolved);
       return resolved;
     } finally {
       _resolvingBaseUrl = null;
@@ -73,6 +86,27 @@ class ApiService {
     }
 
     return _defaultBaseUrl();
+  }
+
+  static Future<String?> _loadPersistedBaseUrl() async {
+    if (kIsWeb || _configuredBaseUrl.isNotEmpty) {
+      return null;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getString(_resolvedBaseUrlPrefsKey)?.trim();
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+    return value;
+  }
+
+  static Future<void> _cacheResolvedBaseUrl(String baseUrl) async {
+    _resolvedBaseUrl = baseUrl;
+    if (kIsWeb || _configuredBaseUrl.isNotEmpty) {
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_resolvedBaseUrlPrefsKey, baseUrl);
   }
 
   static Future<bool> _canReachBaseUrl(String candidateBaseUrl) async {
@@ -240,7 +274,7 @@ class ApiService {
       );
       if (fallbackBaseUrl != null) {
         attemptedBaseUrls.add(fallbackBaseUrl);
-        _resolvedBaseUrl = fallbackBaseUrl;
+        await _cacheResolvedBaseUrl(fallbackBaseUrl);
         final fallbackUri = await _buildUri(
           normalizedPath,
           baseUrlOverride: fallbackBaseUrl,
@@ -413,28 +447,26 @@ class ApiService {
     );
   }
 
+  /// Options the app still chooses.
+  ///
+  /// `outcome_mode` and `check_in_frequency_tracks` are deliberately absent:
+  /// the backend routes the mode from the detected emotion (docs/arch) and
+  /// takes the check-in cadence from that mode's default, so sending either
+  /// from here would only let a stale client override the routing.
   static Map<String, dynamic> _recommendationOptionsPayload({
-    String? outcomeMode,
     int? sessionLengthMinutes,
-    int? checkInFrequencyTracks,
     Map<String, dynamic>? tasteProfile,
   }) {
     return {
-      if (outcomeMode != null && outcomeMode.trim().isNotEmpty)
-        'outcome_mode': outcomeMode.trim(),
       if (sessionLengthMinutes != null)
         'session_length_minutes': sessionLengthMinutes,
-      if (checkInFrequencyTracks != null)
-        'check_in_frequency_tracks': checkInFrequencyTracks,
       if (tasteProfile != null) 'taste_profile': tasteProfile,
     };
   }
 
   static Future<Map<String, dynamic>> analyzeEmotion(
     String text, {
-    String? outcomeMode,
     int? sessionLengthMinutes,
-    int? checkInFrequencyTracks,
     Map<String, dynamic>? tasteProfile,
   }) async {
     final headers = await authHeaders();
@@ -447,9 +479,7 @@ class ApiService {
           body: jsonEncode({
             'text': text,
             ..._recommendationOptionsPayload(
-              outcomeMode: outcomeMode,
               sessionLengthMinutes: sessionLengthMinutes,
-              checkInFrequencyTracks: checkInFrequencyTracks,
               tasteProfile: tasteProfile,
             ),
           }),
@@ -461,9 +491,7 @@ class ApiService {
   static Future<Map<String, dynamic>> recommendByEmotion(
     String emotion, {
     String? text,
-    String? outcomeMode,
     int? sessionLengthMinutes,
-    int? checkInFrequencyTracks,
     Map<String, dynamic>? tasteProfile,
   }) async {
     final headers = await authHeaders();
@@ -477,9 +505,7 @@ class ApiService {
             'emotion': emotion,
             if (text != null && text.trim().isNotEmpty) 'text': text.trim(),
             ..._recommendationOptionsPayload(
-              outcomeMode: outcomeMode,
               sessionLengthMinutes: sessionLengthMinutes,
-              checkInFrequencyTracks: checkInFrequencyTracks,
               tasteProfile: tasteProfile,
             ),
           }),
@@ -628,6 +654,12 @@ class ApiService {
     );
   }
 
+  /// Report a finished playback.
+  ///
+  /// [durationMs] is the track's full length, which lets the backend judge a
+  /// listen against the track rather than a flat number of seconds.
+  /// [endedReason] is 'completed' or 'skipped'; skips are what give the music
+  /// picker's ranker something to learn against.
   static Future<void> updateListenTime(
     String trackId,
     String emotion,
@@ -637,6 +669,8 @@ class ApiService {
     String itemType = 'track',
     int? historyId,
     bool trainSession = true,
+    int? durationMs,
+    String endedReason = 'skipped',
   }) async {
     final headers = await authHeaders();
     await _sendAndValidate(
@@ -653,6 +687,8 @@ class ApiService {
           'item_type': itemType,
           if (historyId != null) 'history_id': historyId,
           'train_session': trainSession,
+          if (durationMs != null) 'duration_ms': durationMs,
+          'ended_reason': endedReason,
         }),
       ),
     );
@@ -740,12 +776,29 @@ class ApiService {
     );
   }
 
-  static Future<String> getSpotifyAuthUrl(String userId) async {
+  /// Revokes the refresh token server-side. Clearing tokens on the device only
+  /// hides them; the refresh token stays usable for weeks until it is
+  /// blacklisted, so sign-out has to tell the backend.
+  static Future<void> logout(String refreshToken) async {
+    await _sendRequest(
+      '/users/logout/',
+      (uri) => http.post(
+        uri,
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh': refreshToken}),
+      ),
+    );
+  }
+
+  /// Asks the backend for a Spotify login URL. The account to link comes from
+  /// the access token, so this call has to be authenticated and no longer
+  /// passes a user id the caller could point at somebody else.
+  static Future<String> getSpotifyAuthUrl() async {
+    final headers = await authHeaders();
     final data = await _decodeObjectResponse(
       _sendRequest(
         '/spotify/auth-url/',
-        (uri) => http.get(uri),
-        queryParameters: {'user_id': userId},
+        (uri) => http.get(uri, headers: headers),
       ),
     );
     return data['auth_url'];

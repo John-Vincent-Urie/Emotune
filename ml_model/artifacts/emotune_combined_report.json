@@ -1,0 +1,39 @@
+{
+  "output_rows": 1322,
+  "sources": {
+    "emotune_dataset_1200.csv": {
+      "status": "ok",
+      "rows_read": 1200,
+      "rows_contributed": 1200,
+      "duplicates_dropped": 0
+    },
+    "emotune_custom_dataset.csv": {
+      "status": "ok",
+      "rows_read": 1100,
+      "rows_contributed": 84,
+      "duplicates_dropped": 1016
+    },
+    "surveyed_datasets.csv": {
+      "status": "ok",
+      "rows_read": 39,
+      "rows_contributed": 38,
+      "duplicates_dropped": 1
+    }
+  },
+  "label_distribution": {
+    "happy": 112,
+    "sad": 112,
+    "angry": 109,
+    "surprising": 109,
+    "stressed": 109,
+    "romantic": 109,
+    "motivational": 108,
+    "depressing": 108,
+    "calm": 108,
+    "lonely": 108,
+    "nostalgic": 108,
+    "fear": 107,
+    "mixed": 15
+  },
+  "labels_missing": []
+}

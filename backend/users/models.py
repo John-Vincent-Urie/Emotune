@@ -1,6 +1,14 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-import json
+
+
+EMOTION_CHOICES = [
+    ('happy', 'Happy'), ('sad', 'Sad'), ('angry', 'Angry'),
+    ('motivational', 'Motivational'), ('fear', 'Fear'),
+    ('depressing', 'Depressing'), ('surprising', 'Surprising'),
+    ('stressed', 'Stressed'), ('calm', 'Calm'), ('lonely', 'Lonely'),
+    ('romantic', 'Romantic'), ('nostalgic', 'Nostalgic'), ('mixed', 'Mixed'),
+]
 
 
 class User(AbstractUser):
@@ -60,6 +68,15 @@ class FavoriteTrack(models.Model):
     album_image = models.URLField(blank=True)
     preview_url = models.URLField(blank=True, null=True)
     duration_ms = models.IntegerField(default=0)
+    # The emotion the user was listening under when they hearted this track.
+    # "More familiar" replays these first the next time that emotion comes up.
+    emotion = models.CharField(
+        max_length=50,
+        choices=EMOTION_CHOICES,
+        blank=True,
+        default='',
+        db_index=True,
+    )
     added_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -73,13 +90,7 @@ class FavoriteTrack(models.Model):
 
 class PromptHistory(models.Model):
     """History of user prompts and AI responses"""
-    EMOTIONS = [
-        ('happy', 'Happy'), ('sad', 'Sad'), ('angry', 'Angry'),
-        ('motivational', 'Motivational'), ('fear', 'Fear'),
-        ('depressing', 'Depressing'), ('surprising', 'Surprising'),
-        ('stressed', 'Stressed'), ('calm', 'Calm'), ('lonely', 'Lonely'),
-        ('romantic', 'Romantic'), ('nostalgic', 'Nostalgic'), ('mixed', 'Mixed'),
-    ]
+    EMOTIONS = EMOTION_CHOICES
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='prompt_history')
     prompt_text = models.TextField()

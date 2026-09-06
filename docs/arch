@@ -1,0 +1,15 @@
+                 EMOTUNE
+                    │
+             BERT detects mood
+                    │
+          ┌─────────┴─────────┐
+          │                   │
+          ▼                   ▼
+   MATCH MY MOOD         CALM ME DOWN
+          │                   │
+   ┌──────┴──────┐      ┌─────┴──────┐
+   │             │      │            │
+ happy         calm    sad         angry
+ surprising    romantic stressed    fear
+ motivational  nostalgic depressing lonely
+                mixed      mixed

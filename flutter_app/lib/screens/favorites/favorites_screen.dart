@@ -87,6 +87,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   Future<void> _play(Map<String, dynamic> fav) async {
+    final emotion = _favoriteEmotion(fav);
     final track = {
       'id': fav['spotify_track_id'],
       'name': fav['track_name'],
@@ -101,9 +102,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     };
     final hasPreview =
         track['preview_url']?.toString().trim().isNotEmpty == true;
-    context
-        .read<PlayerProvider>()
-        .loadPlaylist([track], 'happy', autoplay: false);
+    context.read<PlayerProvider>().loadPlaylist(
+          [track],
+          emotion.isEmpty ? 'mixed' : emotion,
+          autoplay: false,
+        );
     await context.read<PlayerProvider>().playTrackAtIndex(
           0,
           preferInstantPreview: hasPreview,
@@ -119,6 +122,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     );
   }
 }
+
+/// The emotion this track was hearted under, or '' when it predates emotion
+/// tagging. "More familiar" only replays favorites that carry one.
+String _favoriteEmotion(dynamic favorite) =>
+    favorite is Map ? (favorite['emotion']?.toString().trim().toLowerCase() ?? '') : '';
 
 class _FavoriteItem extends StatelessWidget {
   final dynamic track;
@@ -155,7 +163,7 @@ class _FavoriteItem extends StatelessWidget {
               child: image != null && image.isNotEmpty
                   ? Image.network(image, fit: BoxFit.cover)
                   : Container(
-                      color: AppColors.accent.withOpacity(0.2),
+                      color: AppColors.accent.withValues(alpha: 0.2),
                       child:
                           const Icon(Icons.music_note, color: AppColors.accent),
                     ),
@@ -182,6 +190,8 @@ class _FavoriteItem extends StatelessWidget {
                       color: isDark ? Colors.white54 : Colors.black54,
                       fontSize: 12),
                 ),
+                const SizedBox(height: 6),
+                _EmotionTag(emotion: _favoriteEmotion(track), isDark: isDark),
               ],
             ),
           ),
@@ -196,6 +206,43 @@ class _FavoriteItem extends StatelessWidget {
             onPressed: onDelete,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Shows which emotion a favorite belongs to, so it is clear which songs
+/// "More familiar" will replay -- and which ones are still untagged because
+/// they were hearted before emotions were recorded.
+class _EmotionTag extends StatelessWidget {
+  const _EmotionTag({required this.emotion, required this.isDark});
+
+  final String emotion;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final tagged = emotion.isNotEmpty;
+    final color = tagged
+        ? (AppColors.emotionColors[emotion] ?? AppColors.accent)
+        : (isDark ? Colors.white38 : Colors.black38);
+    final label = tagged ? emotion.toUpperCase() : 'NO EMOTION YET';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: tagged ? 0.15 : 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: tagged ? 1 : 0.4)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.4,
+        ),
       ),
     );
   }

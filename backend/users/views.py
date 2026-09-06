@@ -1,10 +1,16 @@
-from rest_framework import generics, status, permissions
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework import status, permissions
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model, authenticate
 from django.db.models import Count
-from .models import FavoriteTrack, ListeningSession, PromptHistory, UserPreference
+from .models import (
+    EMOTION_CHOICES, FavoriteTrack, ListeningSession, PromptHistory, UserPreference,
+)
+from .throttles import (
+    LoginEmailThrottle, LoginIPThrottle, PasswordChangeThrottle, RegisterThrottle,
+)
 from .serializers import (
     UserSerializer, RegisterSerializer, ChangePasswordSerializer,
     FavoriteTrackSerializer, PromptHistorySerializer, UserPreferenceSerializer
@@ -12,9 +18,12 @@ from .serializers import (
 
 User = get_user_model()
 
+VALID_EMOTIONS = frozenset(value for value, _label in EMOTION_CHOICES)
+
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([RegisterThrottle])
 def register(request):
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
@@ -30,6 +39,7 @@ def register(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([LoginIPThrottle, LoginEmailThrottle])
 def login(request):
     email = request.data.get('email')
     password = request.data.get('password')
@@ -44,6 +54,38 @@ def login(request):
     return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
 
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def logout(request):
+    """Revoke the refresh token the caller presents.
+
+    Dropping the tokens on the device is not revocation: the refresh token
+    stays valid for its full lifetime, so a copy lifted from a lost phone can
+    still mint access tokens for weeks. Blacklisting it is what ends the
+    session for real.
+
+    Deliberately unauthenticated: the refresh token is itself the credential,
+    and requiring a live access token would leave anyone whose access token had
+    already expired unable to log out.
+    """
+    refresh_token = str(request.data.get('refresh') or '').strip()
+    if not refresh_token:
+        return Response(
+            {'error': 'A refresh token is required to log out.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        RefreshToken(refresh_token).blacklist()
+    except TokenError:
+        # Expired, already blacklisted, or not one of ours. The token cannot be
+        # used either way, so this is still a successful logout; saying which
+        # would only tell an attacker whether a token is live.
+        pass
+
+    return Response(status=status.HTTP_205_RESET_CONTENT)
+
+
 @api_view(['GET', 'PUT', 'PATCH'])
 def profile(request):
     if request.method == 'GET':
@@ -56,6 +98,7 @@ def profile(request):
 
 
 @api_view(['POST'])
+@throttle_classes([PasswordChangeThrottle])
 def change_password(request):
     serializer = ChangePasswordSerializer(data=request.data)
     if serializer.is_valid():
@@ -78,22 +121,38 @@ def update_artists(request):
 
 
 # Favorites
+def _normalized_favorite_emotion(value):
+    """Keep only emotions the recommender knows; anything else is untagged."""
+    emotion = str(value or '').strip().lower()
+    return emotion if emotion in VALID_EMOTIONS else ''
+
+
 @api_view(['GET', 'POST'])
 def favorites(request):
     if request.method == 'GET':
         favs = FavoriteTrack.objects.filter(user=request.user)
+        emotion = _normalized_favorite_emotion(request.query_params.get('emotion'))
+        if emotion:
+            favs = favs.filter(emotion=emotion).order_by('added_at')
         return Response(FavoriteTrackSerializer(favs, many=True).data)
     track_id = str(request.data.get('spotify_track_id') or '').strip()
+    emotion = _normalized_favorite_emotion(request.data.get('emotion'))
     if track_id:
         existing = FavoriteTrack.objects.filter(
             user=request.user,
             spotify_track_id=track_id,
         ).first()
         if existing is not None:
+            # An older favorite predates emotion tagging, or was hearted before
+            # the emotion was known. Keep the original tag once it exists so the
+            # "first favorite for this emotion" order stays stable.
+            if emotion and not existing.emotion:
+                existing.emotion = emotion
+                existing.save(update_fields=['emotion'])
             return Response(FavoriteTrackSerializer(existing).data, status=status.HTTP_200_OK)
     serializer = FavoriteTrackSerializer(data=request.data)
     if serializer.is_valid():
-        serializer.save(user=request.user)
+        serializer.save(user=request.user, emotion=emotion)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -121,9 +180,37 @@ def emotion_stats(request):
     return Response(list(stats))
 
 
+# A listen past this share of a track is the user staying with the pick.
+# Below it, they left -- which is the negative the ranker has to learn from.
+LISTENED_THROUGH_RATIO = 0.6
+# Used when the client cannot tell us how long the track is.
+LISTENED_THROUGH_FALLBACK_SECONDS = 30
+
+
+def _listen_was_meaningful(listen_seconds, track_length_seconds):
+    """Did the user actually stay with this track?
+
+    Judged against the track's own length, because a flat threshold calls 30
+    seconds of a six-minute song a completed listen and 25 seconds of a
+    28-second interlude a skip.
+    """
+    if track_length_seconds > 0:
+        return listen_seconds >= track_length_seconds * LISTENED_THROUGH_RATIO
+    return listen_seconds >= LISTENED_THROUGH_FALLBACK_SECONDS
+
+
 @api_view(['POST'])
 def update_listen_time(request):
-    """Update listening time for adaptive recommendations"""
+    """Record how a playback ended.
+
+    Every playback of a real track is written to ListeningSession, including
+    short ones. That is deliberate: a skip is the only negative example the
+    music picker's ranker ever sees, and dropping short listens here is what
+    left the training set with 12 rows that were all positives.
+
+    Preference counters are a different question and keep their own bar -- a
+    four-second skip must not teach the personalizer that you like a track.
+    """
     track_id = request.data.get('track_id')
     emotion = request.data.get('emotion')
     duration = request.data.get('duration', 0)
@@ -132,6 +219,12 @@ def update_listen_time(request):
     item_type = str(request.data.get('item_type', 'track') or 'track').strip().lower()
     history_id = request.data.get('history_id')
     train_session = request.data.get('train_session', True)
+    ended_reason = str(request.data.get('ended_reason', '') or '').strip().lower()
+
+    try:
+        track_length_seconds = max(int(request.data.get('duration_ms') or 0), 0) / 1000.0
+    except (TypeError, ValueError):
+        track_length_seconds = 0.0
 
     prompt_history = None
     if history_id:
@@ -170,17 +263,30 @@ def update_listen_time(request):
     if str(train_session).strip().lower() in {'false', '0', 'no'}:
         return Response({'status': 'tracking_disabled'})
 
+    listen_seconds = max(int(duration or 0), 0)
+    played_through = (
+        ended_reason == 'completed'
+        or _listen_was_meaningful(listen_seconds, track_length_seconds)
+    )
+
     if prompt_history is not None:
+        # Written for every playback, however short. The candidates that were
+        # offered alongside this one are already on the prompt, so one row here
+        # turns a whole candidate set into a labelled training group.
         ListeningSession.objects.update_or_create(
             user=request.user,
             prompt_history=prompt_history,
             spotify_track_id=track_id,
             defaults={
                 'track_name': track_name,
-                'listen_duration': max(int(duration or 0), 0),
-                'completed': max(int(duration or 0), 0) >= 30,
+                'listen_duration': listen_seconds,
+                'completed': played_through,
             },
         )
+
+    if not played_through:
+        # A skip is recorded above, but it is not evidence of a preference.
+        return Response({'status': 'recorded', 'completed': False})
 
     pref, _created = UserPreference.objects.get_or_create(
         user=request.user,
@@ -189,6 +295,6 @@ def update_listen_time(request):
         defaults={'track_name': track_name, 'artist_name': artist_name}
     )
     pref.play_count += 1
-    pref.total_listen_time += duration
+    pref.total_listen_time += listen_seconds
     pref.save()
-    return Response({'status': 'updated'})
+    return Response({'status': 'updated', 'completed': True})

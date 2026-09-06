@@ -94,7 +94,7 @@ class _HistoryScreenState extends State<HistoryScreen>
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withOpacity(0.3)),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,7 +105,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.15),
+                      color: color.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: color),
                     ),
@@ -140,7 +140,7 @@ class _HistoryScreenState extends State<HistoryScreen>
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.05),
+                  color: color.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(

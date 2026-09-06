@@ -20,6 +20,7 @@ class TrackCard extends StatelessWidget {
     final image = track['image'] as String?;
     final emotionColor = AppColors.emotionColors[emotion] ?? AppColors.accent;
     final subtitle = _subtitleText();
+    final staticPickLabel = _staticPickLabel();
 
     return GestureDetector(
       onTap: onTap,
@@ -32,7 +33,7 @@ class TrackCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: emotionColor.withOpacity(0.1),
+              color: emotionColor.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -54,18 +55,18 @@ class TrackCard extends StatelessWidget {
                               imageUrl: image,
                               fit: BoxFit.cover,
                               placeholder: (_, __) => Container(
-                                color: emotionColor.withOpacity(0.2),
+                                color: emotionColor.withValues(alpha: 0.2),
                                 child: Icon(Icons.music_note,
                                     color: emotionColor, size: 40),
                               ),
                               errorWidget: (_, __, ___) => Container(
-                                color: emotionColor.withOpacity(0.2),
+                                color: emotionColor.withValues(alpha: 0.2),
                                 child: Icon(Icons.music_note,
                                     color: emotionColor, size: 40),
                               ),
                             )
                           : Container(
-                              color: emotionColor.withOpacity(0.2),
+                              color: emotionColor.withValues(alpha: 0.2),
                               child: Center(
                                 child: Icon(Icons.music_note,
                                     color: emotionColor, size: 40),
@@ -87,22 +88,30 @@ class TrackCard extends StatelessWidget {
                             color: Colors.black, size: 20),
                       ),
                     ),
-                    if (track['is_preferred'] == true)
+                    if (staticPickLabel != null ||
+                        track['is_preferred'] == true)
                       Positioned(
                         top: 8,
                         left: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.amber,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text('★ Fav',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.bold)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (staticPickLabel != null)
+                              _CardBadge(
+                                label: staticPickLabel,
+                                background: AppColors.gradientEnd,
+                                foreground: Colors.white,
+                              ),
+                            if (track['is_preferred'] == true) ...[
+                              if (staticPickLabel != null)
+                                const SizedBox(height: 4),
+                              const _CardBadge(
+                                label: '★ Fav',
+                                background: Colors.amber,
+                                foreground: Colors.black,
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                   ],
@@ -145,6 +154,21 @@ class TrackCard extends StatelessWidget {
     );
   }
 
+  /// The picks that are the same for everyone: the docs/music.md list that
+  /// "Balanced" opens with, and the built-in playlists served when Spotify has
+  /// nothing to give.
+  String? _staticPickLabel() {
+    final recommendationSource = track['recommendation_source']?.toString() ?? '';
+    if (track['is_music_doc_pick'] == true ||
+        recommendationSource == 'music_md_playlist') {
+      return 'EmoTune pick';
+    }
+    if (recommendationSource == 'curated_fallback') {
+      return 'Built-in list';
+    }
+    return null;
+  }
+
   String _subtitleText() {
     final itemType = track['item_type']?.toString() ?? 'track';
     final recommendationSource = track['recommendation_source']?.toString() ?? '';
@@ -157,5 +181,36 @@ class TrackCard extends StatelessWidget {
       return 'Tap to play in app';
     }
     return artist.isNotEmpty ? artist : 'Tap to play in app';
+  }
+}
+
+class _CardBadge extends StatelessWidget {
+  const _CardBadge({
+    required this.label,
+    required this.background,
+    required this.foreground,
+  });
+
+  final String label;
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          color: foreground,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
   }
 }

@@ -12,6 +12,14 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoggedIn => _user != null;
   String? get error => _error;
 
+  /// Drop a failed sign-in message once the user starts fixing the form, so a
+  /// stale banner never sits over a field they have already corrected.
+  void clearError() {
+    if (_error == null) return;
+    _error = null;
+    notifyListeners();
+  }
+
   Future<void> loadUser() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
@@ -117,6 +125,15 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
+    final refreshToken = prefs.getString('refresh_token');
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      try {
+        await ApiService.logout(refreshToken);
+      } catch (_) {
+        // A user signing out must not be held up by a network failure. The
+        // local tokens still go, and the refresh token expires on its own.
+      }
+    }
     await prefs.remove('access_token');
     await prefs.remove('refresh_token');
     _user = null;

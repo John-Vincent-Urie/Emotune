@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/recommendation_studio_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/player_provider.dart';
+import 'services/api_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/auth/welcome_screen.dart';
@@ -12,6 +15,7 @@ import 'screens/home/main_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  unawaited(ApiService.warmUp());
   final recommendationStudioProvider = RecommendationStudioProvider();
   await recommendationStudioProvider.load();
 

@@ -2,16 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../controllers/recommendation_session_controller.dart';
 import '../../providers/player_provider.dart';
 import '../../providers/recommendation_studio_provider.dart';
 import '../../services/api_service.dart';
-import '../../services/spotify_remote_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/emotune_logo.dart';
 import '../widgets/track_card.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/feel_better_dialog.dart';
-import 'full_player_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,6 +21,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   static const Duration _progressiveAppendDelay = Duration(milliseconds: 180);
+  static const _session = RecommendationSessionController();
 
   final _promptCtrl = TextEditingController();
   bool _isAnalyzing = false;
@@ -116,7 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     decoration: BoxDecoration(
                                       color: AppColors.emotionColors[
                                               _lastResult!['emotion']]
-                                          ?.withOpacity(0.2),
+                                          ?.withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
                                         color: AppColors.emotionColors[
@@ -184,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         itemBuilder: (ctx, i) => TrackCard(
                           track: _tracks[i],
                           onTap: () => _playTrack(i),
-                          emotion: _playbackEmotionFromResult(_lastResult),
+                          emotion: _session.playbackEmotionFromResult(_lastResult),
                         ),
                       ),
                       const SizedBox(height: 80),
@@ -345,9 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final result = await ApiService.analyzeEmotion(
         text,
-        outcomeMode: studio.selectedOutcomeMode,
         sessionLengthMinutes: studio.sessionLengthMinutes,
-        checkInFrequencyTracks: studio.checkInFrequencyTracks,
         tasteProfile: _currentTasteProfile(),
       );
       if (!mounted || requestId != _requestSequence) {
@@ -415,10 +413,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final player = context.read<PlayerProvider>();
-    _loadPlaylistIntoPlayer(
+    _session.loadPlaylistIntoPlayer(
       player,
       tracks,
       result,
+      _currentTasteProfile(),
       autoplay: false,
     );
     try {
@@ -445,8 +444,8 @@ class _HomeScreenState extends State<HomeScreen> {
       final mergedTracks =
           PlayerProvider.mergeTrackLists(_tracks, incomingTracks);
       final newTracks = mergedTracks.skip(_tracks.length).toList();
-      final historyId = _historyIdFromResult(result);
-      final emotion = _playbackEmotionFromResult(result);
+      final historyId = _session.historyIdFromResult(result);
+      final emotion = _session.playbackEmotionFromResult(result);
       final player = context.read<PlayerProvider>();
       var startedAutoplayFromContinuation = false;
 
@@ -483,18 +482,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     player.playlist.isNotEmpty);
 
         if (!hadTracksBefore && !startedAutoplayFromContinuation) {
-          _loadPlaylistIntoPlayer(
+          _session.loadPlaylistIntoPlayer(
             player,
             nextVisibleTracks,
             result,
+            _currentTasteProfile(),
             autoplay: true,
           );
           startedAutoplayFromContinuation = true;
         } else if (shouldMergeActivePlaylist) {
-          _mergePlaylistIntoPlayer(
+          _session.mergePlaylistIntoPlayer(
             player,
             nextVisibleTracks,
             result,
+            _currentTasteProfile(),
           );
         }
 
@@ -518,180 +519,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  int? _historyIdFromResult(Map<String, dynamic> result) {
-    final historyId = result['history_id'];
-    if (historyId is int) {
-      return historyId;
-    }
-    if (historyId is num) {
-      return historyId.toInt();
-    }
-    return int.tryParse(historyId?.toString() ?? '');
-  }
-
   Map<String, dynamic> _currentTasteProfile() {
     return context.read<RecommendationStudioProvider>().tasteProfile;
-  }
-
-  Map<String, dynamic>? _sessionPlanFromResult(Map<String, dynamic>? result) {
-    final raw = result?['session_plan'];
-    if (raw is! Map) {
-      return null;
-    }
-    return Map<String, dynamic>.from(raw);
-  }
-
-  Map<String, dynamic> _tasteProfileFromResult(Map<String, dynamic>? result) {
-    final raw = result?['taste_profile'];
-    if (raw is! Map) {
-      return _currentTasteProfile();
-    }
-    return Map<String, dynamic>.from(raw);
-  }
-
-  bool _trainOnThisSessionFromResult(Map<String, dynamic>? result) {
-    return _tasteProfileFromResult(result)['train_session'] != false;
-  }
-
-  String _playbackEmotionFromResult(Map<String, dynamic>? result) {
-    final recommendationTarget =
-        result?['recommendation_target_emotion']?.toString().trim() ?? '';
-    if (recommendationTarget.isNotEmpty) {
-      return recommendationTarget;
-    }
-
-    final detectedEmotion = result?['emotion']?.toString().trim() ?? '';
-    if (detectedEmotion.isNotEmpty) {
-      return detectedEmotion;
-    }
-
-    return 'mixed';
-  }
-
-  void _loadPlaylistIntoPlayer(
-    PlayerProvider player,
-    List<Map<String, dynamic>> tracks,
-    Map<String, dynamic>? result, {
-    String? fallbackEmotion,
-    bool autoplay = false,
-  }) {
-    final playbackEmotion = _playbackEmotionFromResult(result);
-    player.loadPlaylist(
-      tracks,
-      playbackEmotion == 'mixed' && fallbackEmotion != null
-          ? fallbackEmotion
-          : playbackEmotion,
-      historyId: _historyIdFromResult(result ?? const <String, dynamic>{}),
-      autoplay: autoplay,
-      sessionPlan: _sessionPlanFromResult(result),
-      tasteProfile: _tasteProfileFromResult(result),
-      outcomeMode: result?['outcome_mode']?.toString(),
-      outcomeLabel: result?['outcome_label']?.toString(),
-      outcomeDescription: result?['outcome_description']?.toString(),
-      trainOnThisSession: _trainOnThisSessionFromResult(result),
-    );
-  }
-
-  void _mergePlaylistIntoPlayer(
-    PlayerProvider player,
-    List<Map<String, dynamic>> tracks,
-    Map<String, dynamic>? result,
-  ) {
-    player.mergePlaylistTracks(
-      tracks,
-      emotion: _playbackEmotionFromResult(result),
-      historyId: _historyIdFromResult(result ?? const <String, dynamic>{}),
-      sessionPlan: _sessionPlanFromResult(result),
-      tasteProfile: _tasteProfileFromResult(result),
-      outcomeMode: result?['outcome_mode']?.toString(),
-      outcomeLabel: result?['outcome_label']?.toString(),
-      outcomeDescription: result?['outcome_description']?.toString(),
-      trainOnThisSession: _trainOnThisSessionFromResult(result),
-    );
   }
 
   Future<void> _playTrack(int index) async {
     final track = PlayerProvider.normalizeTrack(_tracks[index]);
     _tracks[index] = track;
-    final previewUrl = track['preview_url']?.toString().trim() ?? '';
-    final spotifyUri = track['uri']?.toString().trim() ?? '';
-    final spotifyUrl = track['spotify_url']?.toString().trim() ?? '';
-    final trackList = _playlistForSelection(track);
-    final hasSpotifyTarget = spotifyUri.isNotEmpty || spotifyUrl.isNotEmpty;
-    final playbackEmotion = _playbackEmotionFromResult(_lastResult);
-
-    if (SpotifyRemoteService.instance.isSupportedPlatform && hasSpotifyTarget) {
-      _loadPlaylistIntoPlayer(
-        context.read<PlayerProvider>(),
-        trackList,
-        _lastResult,
-        fallbackEmotion: playbackEmotion,
-        autoplay: false,
-      );
-      await context.read<PlayerProvider>().playTrackAtIndex(
-            trackList.length == 1 ? 0 : index,
-            preferInstantPreview: previewUrl.isNotEmpty,
-          );
-      await _openPlayer();
-      return;
-    }
-
-    if (previewUrl.isEmpty && spotifyUrl.isNotEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              (track['item_type']?.toString() ?? 'track') == 'playlist'
-                  ? 'This playlist needs Android Spotify playback in the current app build.'
-                  : 'This recommendation is not directly playable in the current app build.',
-            ),
-          ),
-        );
-      }
-      return;
-    }
-
-    _loadPlaylistIntoPlayer(
-      context.read<PlayerProvider>(),
-      trackList,
-      _lastResult,
-      fallbackEmotion: playbackEmotion,
-      autoplay: false,
-    );
-    await context.read<PlayerProvider>().playTrackAtIndex(
-          trackList.length == 1 ? 0 : index,
-          preferInstantPreview: previewUrl.isNotEmpty,
-        );
-    await _openPlayer();
-  }
-
-  List<Map<String, dynamic>> _playlistForSelection(
-    Map<String, dynamic> selectedTrack,
-  ) {
-    final playlist = PlayerProvider.normalizeTrackList(_tracks);
-    final selectedTrackId = selectedTrack['id']?.toString().trim() ?? '';
-    final selectedTrackUri = selectedTrack['uri']?.toString().trim() ?? '';
-    final containsSelection = playlist.any((track) {
-      final trackId = track['id']?.toString().trim() ?? '';
-      final trackUri = track['uri']?.toString().trim() ?? '';
-      return (selectedTrackId.isNotEmpty && trackId == selectedTrackId) ||
-          (selectedTrackUri.isNotEmpty && trackUri == selectedTrackUri);
-    });
-    if (containsSelection && playlist.isNotEmpty) {
-      return playlist;
-    }
-    return [selectedTrack];
-  }
-
-  Future<void> _openPlayer() async {
-    if (!mounted) {
-      return;
-    }
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const FullPlayerScreen(),
+    await _session.playTrackFromList(
+      context,
+      tracks: _tracks,
+      index: index,
+      selectedTrack: track,
+      lastResult: _lastResult,
+      currentTasteProfile: _currentTasteProfile(),
     );
   }
 

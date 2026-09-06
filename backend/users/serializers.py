@@ -91,7 +91,9 @@ class FavoriteTrackSerializer(serializers.ModelSerializer):
     class Meta:
         model = FavoriteTrack
         fields = '__all__'
-        read_only_fields = ['user', 'added_at']
+        # `emotion` is set by the view from the request, which normalizes an
+        # unknown value to "untagged" instead of rejecting the favorite.
+        read_only_fields = ['user', 'added_at', 'emotion']
 
 
 class PromptHistorySerializer(serializers.ModelSerializer):

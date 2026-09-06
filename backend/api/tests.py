@@ -1,19 +1,36 @@
 import json
 from datetime import timedelta
+from io import StringIO
 from urllib.parse import parse_qs, urlparse
 from unittest.mock import Mock, patch
 
 import numpy as np
+import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from api.lightfm_ranker import LightFMMusicRanker
+from api.models import EmotionTrackPool
+from api.spotify import pool
 from api.llm_music_picker import LLMMusicPicker
+from rest_framework_simplejwt.tokens import AccessToken
+
 from api.recommendation_session import build_session_plan
-from api.spotify_service import EMOTION_QUERY_PROFILES, SpotifyAuthError, spotify_service
+from api.spotify_oauth_state import (
+    issue_state as issue_spotify_oauth_state,
+    read_state as read_spotify_oauth_state,
+)
+from api.spotify_service import (
+    EMOTION_QUERY_PROFILES,
+    MUSIC_PICKER_DOC_EMOTIONS,
+    SpotifyAuthError,
+    SpotifyService,
+    spotify_service,
+)
 from ml.emotion_classifier import EmotionClassifier
 from ml.plutchik_mapper import build_plutchik_profile
 from users.models import FavoriteTrack, ListeningSession, PromptHistory, UserPreference
@@ -23,6 +40,19 @@ User = get_user_model()
 
 
 class SpotifyOAuthTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.auth_user = User.objects.create_user(
+            username='oauth-caller',
+            email='oauth-caller@example.com',
+            password='password123',
+        )
+
+    def authenticated_client(self, user=None):
+        client = APIClient()
+        client.force_authenticate(user=user or self.auth_user)
+        return client
+
     def test_app_remote_config_exposes_public_spotify_values(self):
         response = self.client.get('/api/spotify/app-remote-config/')
 
@@ -34,9 +64,8 @@ class SpotifyOAuthTests(TestCase):
         )
 
     def test_auth_url_uses_configured_redirect_uri_and_encodes_scope(self):
-        response = self.client.get(
+        response = self.authenticated_client().get(
             '/api/spotify/auth-url/',
-            {'user_id': '42'},
             HTTP_HOST='127.0.0.1:8000',
         )
 
@@ -52,7 +81,11 @@ class SpotifyOAuthTests(TestCase):
             params['redirect_uri'][0],
             'http://127.0.0.1:8000/api/spotify/callback/',
         )
-        self.assertEqual(params['state'][0], '42')
+        self.assertNotEqual(params['state'][0], str(self.auth_user.id))
+        self.assertEqual(
+            read_spotify_oauth_state(params['state'][0]),
+            self.auth_user.id,
+        )
         self.assertIn('user-read-private', params['scope'][0])
         self.assertIn('user-read-email', params['scope'][0])
         self.assertIn('streaming', params['scope'][0])
@@ -65,9 +98,8 @@ class SpotifyOAuthTests(TestCase):
 
     @override_settings(SPOTIFY_REDIRECT_URI='')
     def test_auth_url_falls_back_to_request_host_when_redirect_not_configured(self):
-        response = self.client.get(
+        response = self.authenticated_client().get(
             '/api/spotify/auth-url/',
-            {'user_id': '42'},
             HTTP_HOST='127.0.0.1:8000',
         )
 
@@ -80,6 +112,179 @@ class SpotifyOAuthTests(TestCase):
         self.assertEqual(
             params['redirect_uri'][0],
             'http://127.0.0.1:8000/api/spotify/callback/',
+        )
+
+    def test_auth_url_requires_authentication(self):
+        response = self.client.get(
+            '/api/spotify/auth-url/',
+            HTTP_HOST='127.0.0.1:8000',
+        )
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_auth_url_ignores_a_caller_supplied_user_id(self):
+        """The link must belong to whoever holds the token, not to a parameter."""
+        victim = User.objects.create_user(
+            username='victim',
+            email='victim@example.com',
+            password='password123',
+        )
+
+        response = self.authenticated_client().get(
+            '/api/spotify/auth-url/',
+            {'user_id': str(victim.id)},
+            HTTP_HOST='127.0.0.1:8000',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        state = parse_qs(urlparse(response.json()['auth_url']).query)['state'][0]
+        self.assertEqual(read_spotify_oauth_state(state), self.auth_user.id)
+
+    @patch('api.views.spotify_service.exchange_code')
+    def test_callback_refuses_a_guessed_state(self, mock_exchange_code):
+        """A raw user id used to be a valid state, which let anyone link an
+        account they do not own. It must now be rejected outright."""
+        victim = User.objects.create_user(
+            username='guessed-state-victim',
+            email='guessed-state@example.com',
+            password='password123',
+        )
+
+        response = self.client.get(
+            '/api/spotify/callback/',
+            {'code': 'attacker-code', 'state': str(victim.id)},
+            HTTP_HOST='127.0.0.1:8000',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        victim.refresh_from_db()
+        self.assertFalse(victim.is_spotify_connected)
+        # Rejected before the handshake, so no Spotify code is spent on it.
+        mock_exchange_code.assert_not_called()
+
+    @patch('api.views.spotify_service.exchange_code')
+    def test_callback_refuses_a_state_with_a_tampered_signature(self, mock_exchange_code):
+        victim = User.objects.create_user(
+            username='tampered-state-victim',
+            email='tampered-state@example.com',
+            password='password123',
+        )
+        state = issue_spotify_oauth_state(victim)
+
+        response = self.client.get(
+            '/api/spotify/callback/',
+            {'code': 'attacker-code', 'state': state[:-1] + ('A' if state[-1] != 'A' else 'B')},
+            HTTP_HOST='127.0.0.1:8000',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        victim.refresh_from_db()
+        self.assertFalse(victim.is_spotify_connected)
+        mock_exchange_code.assert_not_called()
+
+    @patch('api.spotify_oauth_state.state_max_age_seconds', return_value=0)
+    @patch('api.views.spotify_service.exchange_code')
+    def test_callback_refuses_an_expired_state(self, mock_exchange_code, _max_age):
+        user = User.objects.create_user(
+            username='expired-state',
+            email='expired-state@example.com',
+            password='password123',
+        )
+
+        response = self.client.get(
+            '/api/spotify/callback/',
+            {'code': 'spotify-code', 'state': issue_spotify_oauth_state(user)},
+            HTTP_HOST='127.0.0.1:8000',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        user.refresh_from_db()
+        self.assertFalse(user.is_spotify_connected)
+        mock_exchange_code.assert_not_called()
+
+    def test_callback_refuses_a_missing_state(self):
+        response = self.client.get(
+            '/api/spotify/callback/',
+            {'code': 'spotify-code'},
+            HTTP_HOST='127.0.0.1:8000',
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    @patch('api.views.spotify_service.get_user_profile_result')
+    @patch('api.views.spotify_service.exchange_code')
+    def test_callback_sends_browsers_back_to_the_app(
+        self,
+        mock_exchange_code,
+        mock_get_user_profile_result,
+    ):
+        """A browser finishing OAuth gets a page that deep links into the app.
+
+        API clients still get JSON; only the browser leg needs the return path.
+        """
+        user = User.objects.create_user(
+            username='browser-return',
+            email='browser-return@example.com',
+            password='pw',
+        )
+        mock_exchange_code.return_value = {
+            'access_token': 'spotify-access',
+            'refresh_token': 'spotify-refresh',
+            'expires_in': 3600,
+            'scope': 'streaming',
+        }
+        mock_get_user_profile_result.return_value = {
+            'ok': True,
+            'data': {'id': 'spotify-user-id', 'email': 'spotify-user@example.com'},
+        }
+
+        response = self.client.get(
+            '/api/spotify/callback/',
+            {'code': 'spotify-code', 'state': issue_spotify_oauth_state(user)},
+            HTTP_HOST='127.0.0.1:8000',
+            HTTP_ACCEPT='text/html,application/xhtml+xml',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('text/html', response['Content-Type'])
+        body = response.content.decode()
+        self.assertIn(settings.SPOTIFY_APP_RETURN_URI, body)
+        user.refresh_from_db()
+        self.assertTrue(user.is_spotify_connected)
+
+    @patch('api.views.spotify_service.get_user_profile_result')
+    @patch('api.views.spotify_service.exchange_code')
+    def test_callback_still_returns_json_for_api_clients(
+        self,
+        mock_exchange_code,
+        mock_get_user_profile_result,
+    ):
+        user = User.objects.create_user(
+            username='api-client',
+            email='api-client@example.com',
+            password='pw',
+        )
+        mock_exchange_code.return_value = {
+            'access_token': 'spotify-access',
+            'refresh_token': 'spotify-refresh',
+            'expires_in': 3600,
+            'scope': 'streaming',
+        }
+        mock_get_user_profile_result.return_value = {
+            'ok': True,
+            'data': {'id': 'spotify-user-id', 'email': 'spotify-user@example.com'},
+        }
+
+        response = self.client.get(
+            '/api/spotify/callback/',
+            {'code': 'spotify-code', 'state': issue_spotify_oauth_state(user)},
+            HTTP_HOST='127.0.0.1:8000',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()['message'],
+            'Spotify connected successfully!',
         )
 
     @patch('api.views.spotify_service.get_user_profile_result')
@@ -111,7 +316,7 @@ class SpotifyOAuthTests(TestCase):
         before_request = timezone.now()
         response = self.client.get(
             '/api/spotify/callback/',
-            {'code': 'spotify-code', 'state': str(user.id)},
+            {'code': 'spotify-code', 'state': issue_spotify_oauth_state(user)},
             HTTP_HOST='127.0.0.1:8000',
         )
 
@@ -181,7 +386,7 @@ class SpotifyOAuthTests(TestCase):
 
         response = self.client.get(
             '/api/spotify/callback/',
-            {'code': 'spotify-code', 'state': str(user.id)},
+            {'code': 'spotify-code', 'state': issue_spotify_oauth_state(user)},
             HTTP_HOST='127.0.0.1:8000',
         )
 
@@ -221,7 +426,7 @@ class SpotifyOAuthTests(TestCase):
 
         response = self.client.get(
             '/api/spotify/callback/',
-            {'code': 'spotify-code', 'state': '42'},
+            {'code': 'spotify-code', 'state': issue_spotify_oauth_state(self.auth_user)},
             HTTP_HOST='127.0.0.1:8000',
         )
 
@@ -427,6 +632,56 @@ class SpotifyOAuthTests(TestCase):
         self.assertIsNone(user.spotify_id)
 
 
+class AdminPanelAccessTests(TestCase):
+    """The dashboard page itself must be staff-only, not just its API."""
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='dash-staff',
+            email='dash-staff@example.com',
+            password='password123',
+            is_staff=True,
+        )
+        self.regular = User.objects.create_user(
+            username='dash-regular',
+            email='dash-regular@example.com',
+            password='password123',
+        )
+
+    def test_anonymous_visitor_is_sent_to_the_login_page(self):
+        response = self.client.get('/admin-panel/')
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/django-admin/login/', response['Location'])
+
+    def test_signed_in_non_staff_user_cannot_open_the_dashboard(self):
+        self.client.force_login(self.regular)
+
+        response = self.client.get('/admin-panel/')
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/django-admin/login/', response['Location'])
+
+    def test_staff_user_gets_the_dashboard_with_an_api_token(self):
+        self.client.force_login(self.staff)
+
+        response = self.client.get('/admin-panel/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            AccessToken(response.context['admin_access_token'])['user_id'],
+            self.staff.id,
+        )
+        # The page no longer collects credentials of its own.
+        self.assertNotContains(response, 'id="login-password"')
+
+    def test_root_url_routes_to_the_gated_dashboard(self):
+        response = self.client.get('/')
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], '/admin-panel/')
+
+
 class AnalyzeEmotionTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -532,7 +787,7 @@ class AnalyzeEmotionTests(TestCase):
             '/api/analyze/',
             {
                 'text': 'I need to settle down and focus.',
-                'outcome_mode': 'help_me_focus',
+                'outcome_mode': 'calm_me_down',
                 'session_length_minutes': 45,
                 'check_in_frequency_tracks': 4,
                 'taste_profile': {
@@ -546,13 +801,13 @@ class AnalyzeEmotionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body['outcome_mode'], 'help_me_focus')
+        self.assertEqual(body['outcome_mode'], 'calm_me_down')
         self.assertEqual(body['taste_profile']['familiarity'], 'discovery')
         self.assertTrue(body['taste_profile']['prefer_instrumental'])
         self.assertFalse(body['taste_profile']['train_session'])
         self.assertEqual(body['session_plan']['target_minutes'], 45)
         self.assertEqual(body['session_plan']['check_in_after_tracks'], 4)
-        self.assertEqual(body['session_plan']['mode'], 'help_me_focus')
+        self.assertEqual(body['session_plan']['mode'], 'calm_me_down')
         self.assertEqual(
             mock_get_recommendations_with_details.call_args.kwargs['taste_profile'],
             {
@@ -773,10 +1028,10 @@ class AnalyzeEmotionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['tracks'], [])
 
-    @patch('api.views.lightfm_music_ranker.pick_playlist')
+    @patch('api.views.music_picker.pick_playlist')
     @patch('api.views.spotify_service.get_recommendations_with_details')
     @patch('api.views.get_classifier')
-    def test_analyze_emotion_uses_lightfm_playlist_when_available(
+    def test_analyze_emotion_surfaces_the_picker_playlist(
         self,
         mock_get_classifier,
         mock_get_recommendations_with_details,
@@ -849,7 +1104,7 @@ class AnalyzeEmotionTests(TestCase):
         ]
         mock_pick_playlist.return_value = {
             'ok': True,
-            'strategy': 'lightfm_playlist',
+            'strategy': 'linear_ranker_playlist',
             'tracks': [
                 {
                     'id': 'track-b',
@@ -892,10 +1147,10 @@ class AnalyzeEmotionTests(TestCase):
                 'recommendation_source': 'spotify_saved_tracks',
             },
             'playlist_track_ids': ['track-b', 'track-a'],
-            'reason': 'LightFM prioritized the stronger mood and preference match.',
+            'reason': 'Ranked on emotion fit and listening history.',
             'confidence': 0.81,
-            'provider': 'lightfm',
-            'model': 'warp',
+            'provider': 'picker_ranker',
+            'model': 'picker_linear_default',
             'used_fallback': False,
             'error': None,
             'candidates': [],
@@ -933,10 +1188,10 @@ class AnalyzeEmotionTests(TestCase):
         self.assertEqual(body['selected_track']['id'], 'track-b')
         self.assertEqual(body['tracks'][0]['id'], 'track-b')
         self.assertEqual(body['tracks'][1]['id'], 'track-a')
-        self.assertEqual(body['music_picker_strategy'], 'lightfm_playlist')
+        self.assertEqual(body['music_picker_strategy'], 'linear_ranker_playlist')
         self.assertEqual(
             body['music_picker_reason'],
-            'LightFM prioritized the stronger mood and preference match.',
+            'Ranked on emotion fit and listening history.',
         )
         self.assertEqual(body['music_picker_intent'], 'playlist')
         self.assertEqual(body['music_picker_artist_name'], 'Artist B')
@@ -999,7 +1254,11 @@ class AnalyzeEmotionTests(TestCase):
         }
         response = self.client.post(
             '/api/analyze/',
-            {'text': 'I need help calming down fast'},
+            # Pinned to match_mood so this stays a test about the stats
+            # reaching Spotify unaltered. "stressed" routes to calm_me_down by
+            # default now, which deliberately blends the scores -- that steer
+            # is covered in OutcomeModeRoutingTests.
+            {'text': 'I need help calming down fast', 'outcome_mode': 'match_mood'},
             format='json',
         )
 
@@ -1024,10 +1283,10 @@ class AnalyzeEmotionTests(TestCase):
         self.assertEqual(spotify_lookup_kwargs['time_budget_seconds'], 2.5)
         self.assertEqual(spotify_lookup_kwargs['query_mode'], 'default')
 
-    @patch('api.views.lightfm_music_ranker.pick_playlist')
+    @patch('api.views.music_picker.pick_playlist')
     @patch('api.views.spotify_service.get_recommendations_with_details')
     @patch('api.views.get_classifier')
-    def test_analyze_emotion_falls_back_to_heuristic_when_lightfm_unavailable(
+    def test_analyze_emotion_handles_a_degraded_picker_result(
         self,
         mock_get_classifier,
         mock_get_recommendations_with_details,
@@ -1094,7 +1353,7 @@ class AnalyzeEmotionTests(TestCase):
             'provider': 'disabled',
             'model': None,
             'used_fallback': True,
-            'error': 'lightfm_not_installed',
+            'error': 'no_ranked_candidates',
             'candidates': [],
             'intent': 'track',
             'artist_name': 'Artist Calm',
@@ -1290,7 +1549,7 @@ class ListeningPreferenceOptOutTests(TestCase):
                     'train_session': False,
                 },
                 'session_plan': build_session_plan(
-                    outcome_mode='help_me_focus',
+                    outcome_mode='calm_me_down',
                     session_length_minutes=45,
                     check_in_frequency_tracks=4,
                 ),
@@ -1823,7 +2082,7 @@ class SpotifyRecommendationTests(TestCase):
         self.assertIn('happy nostalgic', queries)
         self.assertTrue(any('artist:"Taylor Swift"' in query for query in queries))
 
-    def test_build_recommendation_queries_uses_curated_sad_seed_tracks(self):
+    def test_build_recommendation_queries_uses_music_doc_sad_seed_tracks(self):
         queries = spotify_service._build_recommendation_queries(
             'sad',
             preferred_artists=[],
@@ -1833,26 +2092,27 @@ class SpotifyRecommendationTests(TestCase):
 
         self.assertEqual(
             queries[0],
-            'track:"Someone You Loved" artist:"Lewis Capaldi"',
+            'track:"The Cure" artist:"Olivia Rodrigo"',
         )
+        self.assertIn('track:"Multo" artist:"Cup of Joe"', queries)
         self.assertIn('sad heartbreak songs', queries)
         self.assertIn('heartbreak ballads', queries)
 
-    def test_build_recommendation_queries_uses_curated_profiles_for_other_emotions(self):
+    def test_build_recommendation_queries_uses_music_doc_profiles_for_other_emotions(self):
         cases = [
             (
                 'angry',
-                'track:"Killing In The Name" artist:"Rage Against The Machine"',
+                'track:"Good Luck, Babe!" artist:"Chappell Roan"',
                 'angry rock songs',
             ),
             (
                 'motivational',
-                'track:"Lose Yourself" artist:"Eminem"',
+                'track:"Unstoppable" artist:"Sia"',
                 'motivational pump up songs',
             ),
             (
                 'fear',
-                'track:"Weightless" artist:"Marconi Union"',
+                'track:"drop dead" artist:"Olivia Rodrigo"',
                 'calming songs for anxiety',
             ),
         ]
@@ -1867,7 +2127,7 @@ class SpotifyRecommendationTests(TestCase):
             self.assertEqual(queries[0], expected_first_query)
             self.assertIn(expected_phrase, queries)
 
-    def test_build_recommendation_queries_continuation_mode_prioritizes_variety(self):
+    def test_build_recommendation_queries_continuation_mode_uses_music_doc_playlist(self):
         queries = spotify_service._build_recommendation_queries(
             'angry',
             preferred_artists=[],
@@ -1876,17 +2136,21 @@ class SpotifyRecommendationTests(TestCase):
             query_mode='continuation',
         )
 
-        self.assertEqual(queries[0], 'angry rock songs')
-        self.assertNotIn(
-            'track:"Killing In The Name" artist:"Rage Against The Machine"',
-            queries[:3],
+        self.assertEqual(
+            queries[0],
+            'track:"Good Luck, Babe!" artist:"Chappell Roan"',
         )
+        self.assertIn('track:"GATILYO" artist:"BLKD"', queries)
+        self.assertIn('angry rock songs', queries)
 
-    def test_emotion_query_profiles_expose_large_seed_catalogs(self):
-        for emotion, profile in EMOTION_QUERY_PROFILES.items():
-            self.assertGreaterEqual(
-                len(profile.get('seed_tracks') or []),
-                50,
+    def test_emotion_query_profiles_use_music_doc_seed_catalogs(self):
+        for emotion in MUSIC_PICKER_DOC_EMOTIONS:
+            profile = EMOTION_QUERY_PROFILES[emotion]
+            seed_tracks = profile.get('seed_tracks') or []
+
+            self.assertEqual(len(seed_tracks), 10, emotion)
+            self.assertTrue(
+                all(seed.get('source') == 'music_doc' for seed in seed_tracks),
                 emotion,
             )
 
@@ -2039,6 +2303,35 @@ class SpotifyRecommendationTests(TestCase):
         )
 
         self.assertEqual([track['id'] for track in filtered], ['track-exact'])
+
+    def test_music_doc_seed_query_is_strict_and_tagged(self):
+        query = 'track:"Espresso" artist:"Sabrina Carpenter"'
+        filtered = spotify_service._filter_tracks_for_query(
+            query,
+            [
+                {
+                    'id': 'track-exact',
+                    'name': 'Espresso',
+                    'artist': 'Sabrina Carpenter',
+                },
+                {
+                    'id': 'track-loose',
+                    'name': 'Espresso Macchiato',
+                    'artist': 'Other Artist',
+                },
+            ],
+            strict=bool(spotify_service._seed_metadata_for_query('happy', query)),
+        )
+        annotated = spotify_service._annotate_tracks_for_query(
+            query,
+            filtered,
+            emotion='happy',
+        )
+
+        self.assertEqual([track['id'] for track in annotated], ['track-exact'])
+        self.assertEqual(annotated[0]['recommendation_source'], 'music_md_playlist')
+        self.assertIn('music_md_playlist_seed', annotated[0]['selection_reasons'])
+        self.assertEqual(annotated[0]['playlist_seed_emotion'], 'happy')
 
     def test_get_recommendations_skips_duplicate_seed_variants_to_keep_diversity(self):
         first_query_tracks = [
@@ -2406,6 +2699,28 @@ class SpotifyRecommendationTests(TestCase):
         self.assertEqual(second_token, 'cached-token')
         mock_post.assert_called_once()
 
+    @override_settings(
+        SPOTIFY_CLIENT_ID='client-id',
+        SPOTIFY_CLIENT_SECRET='client-secret',
+    )
+    def test_client_token_network_error_returns_structured_failure(self):
+        service = SpotifyService()
+
+        with self.assertLogs('api.spotify_service', level='WARNING') as logs:
+            with patch(
+                'api.spotify_service.requests.post',
+                side_effect=requests.ConnectionError('dns lookup failed'),
+            ):
+                result = service.get_client_token_details()
+
+        self.assertFalse(result['ok'])
+        self.assertEqual(result['reason'], 'network_error')
+        self.assertTrue(result['retryable'])
+        self.assertEqual(result['source'], 'client_credentials')
+        self.assertEqual(result['endpoint'], '/api/token')
+        self.assertIn('Spotify could not be reached', result['recommended_action'])
+        self.assertTrue(all(line.startswith('WARNING:') for line in logs.output))
+
     def test_ensure_valid_token_does_not_overwrite_user_when_refresh_fails(self):
         user = User.objects.create_user(
             username='refresh-user',
@@ -2426,6 +2741,42 @@ class SpotifyRecommendationTests(TestCase):
         self.assertEqual(user.spotify_access_token, 'existing-token')
         self.assertEqual(user.spotify_refresh_token, 'refresh-token')
         self.assertLessEqual(user.spotify_token_expires, timezone.now())
+
+    @override_settings(
+        SPOTIFY_CLIENT_ID='client-id',
+        SPOTIFY_CLIENT_SECRET='client-secret',
+    )
+    def test_ensure_valid_token_preserves_network_refresh_failure_reason(self):
+        service = SpotifyService()
+        user = User.objects.create_user(
+            username='refresh-network-user',
+            email='refresh-network@example.com',
+            password='password123',
+        )
+        user.is_spotify_connected = True
+        user.spotify_access_token = 'expired-token'
+        user.spotify_refresh_token = 'refresh-token'
+        user.spotify_token_expires = timezone.now() - timedelta(minutes=5)
+        user.save()
+
+        with patch(
+            'api.spotify_service.requests.post',
+            side_effect=requests.ConnectionError('dns lookup failed'),
+        ):
+            details = service.ensure_valid_token_with_details(user)
+
+        self.assertIsNone(details['access_token'])
+        self.assertTrue(details['refresh_attempted'])
+        self.assertFalse(details['refresh_succeeded'])
+        self.assertEqual(details['refresh_error'], 'network_error')
+        self.assertEqual(details['refresh_failure']['reason'], 'network_error')
+        self.assertIn(
+            'Spotify could not be reached',
+            details['refresh_failure']['recommended_action'],
+        )
+
+        user.refresh_from_db()
+        self.assertEqual(user.spotify_access_token, 'expired-token')
 
     def test_get_recommendations_returns_playable_fallback_tracks_when_spotify_rejects_all_tokens(self):
         with patch.object(
@@ -2536,6 +2887,59 @@ class SpotifyRecommendationTests(TestCase):
         self.assertIsNone(diagnostics['account']['has_premium'])
         self.assertEqual(diagnostics['account']['error_reason'], 'developer_allowlist_required')
         self.assertIn('Development Mode', diagnostics['recommended_action'])
+
+    def test_debug_status_uses_refresh_failure_action_when_refresh_hits_network(self):
+        user = User.objects.create_user(
+            username='debug-refresh-network-user',
+            email='debug-refresh-network@example.com',
+            password='password123',
+        )
+        user.is_spotify_connected = True
+        user.spotify_access_token = 'expired-token'
+        user.spotify_refresh_token = 'refresh-token'
+        user.spotify_token_expires = timezone.now() - timedelta(minutes=5)
+        user.spotify_granted_scopes = [
+            'streaming',
+            'user-modify-playback-state',
+            'user-read-playback-state',
+            'user-read-currently-playing',
+            'app-remote-control',
+        ]
+        user.save()
+
+        refresh_failure = {
+            'source': 'refresh_token',
+            'status_code': None,
+            'reason': 'network_error',
+            'error': 'dns lookup failed',
+            'error_code': None,
+            'recommended_action': (
+                'Spotify could not be reached from the backend. Check internet access, '
+                'firewall settings, and Spotify API availability.'
+            ),
+        }
+
+        with patch.object(
+            spotify_service,
+            'ensure_valid_token_with_details',
+            return_value={
+                'access_token': None,
+                'refresh_attempted': True,
+                'refresh_succeeded': False,
+                'refresh_error': 'network_error',
+                'refresh_failure': refresh_failure,
+                'granted_scopes': user.spotify_granted_scopes,
+            },
+        ):
+            diagnostics = spotify_service.get_playback_debug_status(user)
+
+        self.assertFalse(diagnostics['token']['is_valid'])
+        self.assertEqual(diagnostics['token']['refresh_error'], 'network_error')
+        self.assertEqual(diagnostics['token']['refresh_failure'], refresh_failure)
+        self.assertEqual(
+            diagnostics['recommended_action'],
+            refresh_failure['recommended_action'],
+        )
 
     def test_prepare_playback_returns_allowlist_block_when_devices_endpoint_is_rejected(self):
         user = User.objects.create_user(
@@ -3226,292 +3630,6 @@ class EmotionClassifierTests(TestCase):
         self.assertEqual(len(profile['plutchik_top_emotions']), 3)
 
 
-class LightFMMusicRankerTests(TestCase):
-    @override_settings(
-        LIGHTFM_RECOMMENDER_ENABLED=True,
-        LIGHTFM_RECOMMENDER_ALLOW_WINDOWS=False,
-    )
-    def test_pick_playlist_disables_lightfm_on_windows_by_default(self):
-        with patch('api.lightfm_ranker.platform.system', return_value='Windows'):
-            ranker = LightFMMusicRanker()
-
-        result = ranker.pick_playlist(
-            prompt_text='Play something sad.',
-            emotion='sad',
-            top_emotions=[{'emotion': 'sad', 'confidence': 1.0}],
-            all_scores={'sad': 1.0},
-            confidence_band='high',
-            confidence_margin=1.0,
-            candidates=[
-                {
-                    'id': 'track-a',
-                    'name': 'Quiet Song',
-                    'artist': 'Artist A',
-                    'spotify_url': 'https://open.spotify.com/track/track-a',
-                    'emotion_alignment_score': 0.8,
-                },
-            ],
-            preferred_artists=[],
-            user=None,
-            playlist_size=1,
-        )
-
-        self.assertTrue(result['used_fallback'])
-        self.assertEqual(result['strategy'], 'heuristic_playlist')
-        self.assertEqual(result['error'], 'lightfm_windows_disabled')
-
-    def test_pick_playlist_falls_back_when_lightfm_package_is_missing(self):
-        ranker = LightFMMusicRanker()
-        ranker.enabled = True
-        ranker.min_interactions = 1
-
-        with patch.object(
-            ranker,
-            '_get_lightfm_classes',
-            side_effect=ImportError('lightfm missing'),
-        ):
-            result = ranker.pick_playlist(
-                prompt_text='Play something sad.',
-                emotion='sad',
-                top_emotions=[{'emotion': 'sad', 'confidence': 1.0}],
-                all_scores={'sad': 1.0},
-                confidence_band='high',
-                confidence_margin=1.0,
-                candidates=[
-                    {
-                        'id': 'track-a',
-                        'name': 'Quiet Song',
-                        'artist': 'Artist A',
-                        'spotify_url': 'https://open.spotify.com/track/track-a',
-                        'emotion_alignment_score': 0.8,
-                    },
-                ],
-                preferred_artists=[],
-                user=None,
-                playlist_size=1,
-            )
-
-        self.assertTrue(result['used_fallback'])
-        self.assertEqual(result['strategy'], 'heuristic_playlist')
-        self.assertEqual(result['error'], 'lightfm_not_installed')
-
-    def test_pick_playlist_uses_lightfm_scores_to_reorder_candidates(self):
-        class FakeInteractions:
-            def __init__(self, nnz):
-                self.nnz = nnz
-
-        class FakeDataset:
-            def fit(self, users, items, user_features=None, item_features=None):
-                self.user_ids = list(users)
-                self.item_ids = list(items)
-                self.user_id_map = {
-                    value: index for index, value in enumerate(self.user_ids)
-                }
-                self.item_id_map = {
-                    value: index for index, value in enumerate(self.item_ids)
-                }
-
-            def build_interactions(self, rows):
-                collected = list(rows)
-                return FakeInteractions(len(collected)), np.array(
-                    [row[2] for row in collected],
-                    dtype=np.float32,
-                )
-
-            def build_user_features(self, rows):
-                return list(rows)
-
-            def build_item_features(self, rows):
-                return list(rows)
-
-            def mapping(self):
-                return self.user_id_map, {}, self.item_id_map, {}
-
-        class FakeLightFM:
-            def __init__(self, **kwargs):
-                self.kwargs = kwargs
-
-            def fit(
-                self,
-                interactions,
-                sample_weight=None,
-                user_features=None,
-                item_features=None,
-                epochs=None,
-                num_threads=None,
-            ):
-                return self
-
-            def predict(
-                self,
-                user_ids,
-                item_ids,
-                user_features=None,
-                item_features=None,
-                num_threads=None,
-            ):
-                return np.array(
-                    [0.2 if int(item_id) == 0 else 0.9 for item_id in item_ids],
-                    dtype=np.float32,
-                )
-
-        user = User.objects.create_user(
-            username='lightfm-user',
-            email='lightfm@example.com',
-            password='password123',
-        )
-        UserPreference.objects.create(
-            user=user,
-            emotion='sad',
-            spotify_track_id='track-a',
-            track_name='Quiet Song',
-            artist_name='Artist A',
-            play_count=4,
-            total_listen_time=800,
-        )
-        FavoriteTrack.objects.create(
-            user=user,
-            spotify_track_id='track-b',
-            track_name='Comfort Song',
-            artist_name='Artist B',
-            album_name='Album B',
-        )
-        history = PromptHistory.objects.create(
-            user=user,
-            prompt_text='I feel sad',
-            detected_emotion='sad',
-            emotion_confidence=0.91,
-            emotion_scores={'sad': 0.91},
-            ai_response='response',
-            playlist_data=[
-                {
-                    'id': 'track-c',
-                    'name': 'Memory Song',
-                    'artist': 'Artist C',
-                    'recommendation_source': 'spotify_catalog',
-                },
-            ],
-            music_picker_data={'selected_track_id': 'track-c'},
-            session_duration=420,
-            felt_better_response=True,
-        )
-        ListeningSession.objects.create(
-            user=user,
-            prompt_history=history,
-            spotify_track_id='track-c',
-            track_name='Memory Song',
-            listen_duration=240,
-            completed=True,
-        )
-
-        ranker = LightFMMusicRanker()
-        ranker.enabled = True
-
-        with patch.object(
-            ranker,
-            '_get_lightfm_classes',
-            return_value=(FakeLightFM, FakeDataset),
-        ):
-            result = ranker.pick_playlist(
-                prompt_text='Play something sad.',
-                emotion='sad',
-                top_emotions=[{'emotion': 'sad', 'confidence': 1.0}],
-                all_scores={'sad': 1.0},
-                confidence_band='high',
-                confidence_margin=1.0,
-                candidates=[
-                    {
-                        'id': 'track-a',
-                        'name': 'Quiet Song',
-                        'artist': 'Artist A',
-                        'spotify_url': 'https://open.spotify.com/track/track-a',
-                        'emotion_alignment_score': 0.8,
-                        'personalization_score': 0.2,
-                        'popularity': 20,
-                    },
-                    {
-                        'id': 'track-b',
-                        'name': 'Comfort Song',
-                        'artist': 'Artist B',
-                        'spotify_url': 'https://open.spotify.com/track/track-b',
-                        'emotion_alignment_score': 0.6,
-                        'personalization_score': 0.9,
-                        'popularity': 55,
-                    },
-                ],
-                preferred_artists=['Artist B'],
-                user=user,
-                playlist_size=2,
-            )
-
-        self.assertTrue(result['ok'])
-        self.assertEqual(result['strategy'], 'lightfm_playlist')
-        self.assertEqual(result['provider'], 'lightfm')
-        self.assertEqual(result['tracks'][0]['id'], 'track-b')
-        self.assertEqual(result['selected_track']['id'], 'track-b')
-
-    def test_build_training_corpus_includes_history_only_feature_users(self):
-        active_user = User.objects.create_user(
-            username='active-lightfm-user',
-            email='active-lightfm@example.com',
-            password='password123',
-        )
-        feature_only_user = User.objects.create_user(
-            username='feature-only-user',
-            email='feature-only@example.com',
-            password='password123',
-        )
-
-        FavoriteTrack.objects.create(
-            user=active_user,
-            spotify_track_id='track-a',
-            track_name='Quiet Song',
-            artist_name='Artist A',
-            album_name='Album A',
-        )
-        PromptHistory.objects.create(
-            user=feature_only_user,
-            prompt_text='I still feel sad.',
-            detected_emotion='sad',
-            emotion_confidence=0.93,
-            emotion_scores={'sad': 0.93},
-            ai_response='response',
-            playlist_data=[],
-            music_picker_data={},
-            session_duration=0,
-            felt_better_response=None,
-        )
-
-        ranker = LightFMMusicRanker()
-        corpus = ranker._build_training_corpus(
-            user=active_user,
-            emotion='sad',
-            top_emotions=[{'emotion': 'sad', 'confidence': 1.0}],
-            confidence_band='high',
-            candidates=[
-                {
-                    'id': 'track-a',
-                    'name': 'Quiet Song',
-                    'artist': 'Artist A',
-                    'spotify_url': 'https://open.spotify.com/track/track-a',
-                    'emotion_alignment_score': 0.8,
-                },
-                {
-                    'id': 'track-b',
-                    'name': 'Comfort Song',
-                    'artist': 'Artist B',
-                    'spotify_url': 'https://open.spotify.com/track/track-b',
-                    'emotion_alignment_score': 0.7,
-                },
-            ],
-            preferred_artists=[],
-        )
-
-        feature_only_user_id = f'user:{feature_only_user.id}'
-        self.assertIn(feature_only_user_id, corpus['user_ids'])
-        self.assertIn(feature_only_user_id, corpus['user_feature_map'])
-
-
 class FeelBetterRecoveryTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -3602,7 +3720,7 @@ class FeelBetterRecoveryTests(TestCase):
             emotion_scores={'calm': 0.62, 'mixed': 0.38},
             music_picker_data={
                 'session_plan': build_session_plan(
-                    outcome_mode='help_me_focus',
+                    outcome_mode='calm_me_down',
                     session_length_minutes=45,
                     check_in_frequency_tracks=4,
                 ),
@@ -3630,7 +3748,7 @@ class FeelBetterRecoveryTests(TestCase):
         self.assertTrue(history.felt_better_response)
         self.assertTrue(history.music_picker_data['session_plan']['completed'])
 
-    @patch('api.views.lightfm_music_ranker.pick_playlist')
+    @patch('api.views.music_picker.pick_playlist')
     @patch('api.views.spotify_service.select_primary_track')
     @patch('api.views.spotify_service.rank_tracks_for_emotion')
     @patch('api.views.spotify_service.sanitize_recommendations')
@@ -3667,11 +3785,11 @@ class FeelBetterRecoveryTests(TestCase):
             'tracks': [transition_track],
             'selected_track': transition_track,
             'playlist_track_ids': ['calm-track-1'],
-            'strategy': 'lightfm_playlist',
+            'strategy': 'linear_ranker_playlist',
             'reason': 'Transitioned into a lighter recovery mix.',
             'used_fallback': False,
-            'provider': 'lightfm',
-            'model': 'lightfm',
+            'provider': 'picker_ranker',
+            'model': 'picker_linear_default',
             'error': None,
             'confidence': 0.88,
             'intent': 'playlist',
@@ -3705,3 +3823,322 @@ class FeelBetterRecoveryTests(TestCase):
         self.assertTrue(
             history.music_picker_data['recovery_plan']['transition_applied'],
         )
+
+
+class EmotionTrackPoolTests(TestCase):
+    """The shared per-emotion candidate pool ("waiting room").
+
+    A pool hit must keep the recommendation off Spotify's search API without
+    flattening the per-user half of the pipeline or serving stale rows
+    forever.
+    """
+
+    def _pool_tracks(self, count, *, prefix='pooled'):
+        return [
+            {
+                'id': f'{prefix}-{index}',
+                'item_type': 'track',
+                'name': f'Sunshine Anthem {index}',
+                'artist': f'Bright Band {index}',
+                'album': 'Feel Good Album',
+                'spotify_url': f'https://open.spotify.com/track/{prefix}-{index}',
+                'uri': f'spotify:track:{prefix}-{index}',
+                'recommendation_source': 'spotify_catalog',
+            }
+            for index in range(count)
+        ]
+
+    def _create_pool(self, emotion, tracks, *, age_seconds=0):
+        return EmotionTrackPool.objects.create(
+            emotion=emotion,
+            tracks=tracks,
+            queries_used=['happy upbeat songs'],
+            refreshed_at=timezone.now() - timedelta(seconds=age_seconds),
+        )
+
+    def _recommend(self, emotion='happy', *, search_mock=None, **kwargs):
+        """Run a recommendation with catalog tokens available and search mocked."""
+        search_mock = search_mock or Mock(return_value={'ok': True, 'items': []})
+        with patch.object(
+            spotify_service,
+            '_get_catalog_token_candidates',
+            return_value=([('client', 'client-token')], []),
+        ):
+            with patch.object(spotify_service, 'search_tracks_detailed', search_mock):
+                result = spotify_service.get_recommendations_with_details(
+                    emotion,
+                    include_personalization=False,
+                    **kwargs,
+                )
+        return result, search_mock
+
+    def test_fresh_pool_serves_recommendations_without_any_spotify_search(self):
+        self._create_pool('happy', self._pool_tracks(25))
+
+        result, search_mock = self._recommend('happy', limit=5)
+
+        search_mock.assert_not_called()
+        self.assertTrue(result['ok'])
+        self.assertTrue(result['pool_used'])
+        self.assertEqual(result['pool_state'], 'fresh')
+        self.assertEqual(len(result['tracks']), 5)
+        self.assertTrue(all(track['pool_cached'] for track in result['tracks']))
+
+    def test_pool_hit_still_runs_the_queries_specific_to_this_request(self):
+        self._create_pool('happy', self._pool_tracks(25))
+        artist_track = {
+            'id': 'artist-track-1',
+            'item_type': 'track',
+            'name': 'Preferred Artist Anthem',
+            'artist': 'Favorite Artist',
+            'album': 'Album',
+            'spotify_url': 'https://open.spotify.com/track/artist-track-1',
+            'uri': 'spotify:track:artist-track-1',
+            'recommendation_source': 'spotify_catalog',
+        }
+        search_mock = Mock(return_value={'ok': True, 'items': [artist_track]})
+
+        result, search_mock = self._recommend(
+            'happy',
+            search_mock=search_mock,
+            preferred_artists=['Favorite Artist'],
+            limit=10,
+        )
+
+        self.assertTrue(result['pool_used'])
+        # Only the preferred-artist queries reach Spotify; the emotion-baseline
+        # ones are what the pool already answered.
+        self.assertTrue(result['queries_tried'])
+        self.assertTrue(all(
+            'Favorite Artist' in query for query in result['queries_tried']
+        ))
+        track_ids = {track['id'] for track in result['tracks']}
+        self.assertIn('artist-track-1', track_ids)
+        self.assertTrue(any(track_id.startswith('pooled-') for track_id in track_ids))
+
+    def test_stale_pool_is_still_served_rather_than_making_the_user_wait(self):
+        self._create_pool('happy', self._pool_tracks(25), age_seconds=12 * 60 * 60)
+
+        result, search_mock = self._recommend('happy', limit=5)
+
+        search_mock.assert_not_called()
+        self.assertTrue(result['pool_used'])
+        self.assertEqual(result['pool_state'], 'stale')
+
+    def test_expired_pool_is_ignored_so_the_cache_self_heals(self):
+        self._create_pool('happy', self._pool_tracks(25), age_seconds=48 * 60 * 60)
+        search_mock = Mock(return_value={
+            'ok': True,
+            'items': self._pool_tracks(5, prefix='live'),
+        })
+
+        result, search_mock = self._recommend('happy', search_mock=search_mock, limit=5)
+
+        search_mock.assert_called()
+        self.assertFalse(result['pool_used'])
+        self.assertTrue(all(
+            track['id'].startswith('live-') for track in result['tracks']
+        ))
+
+    def test_thin_pool_falls_back_to_live_search_for_the_rest(self):
+        self._create_pool('happy', self._pool_tracks(1))
+        search_mock = Mock(return_value={
+            'ok': True,
+            'items': self._pool_tracks(6, prefix='live'),
+        })
+
+        result, search_mock = self._recommend('happy', search_mock=search_mock, limit=5)
+
+        search_mock.assert_called()
+        self.assertTrue(result['pool_used'])
+        self.assertEqual(result['pool_tracks_used'], 1)
+        self.assertGreaterEqual(len(result['tracks']), 5)
+
+    def test_seed_track_requests_bypass_the_pool(self):
+        self._create_pool('happy', self._pool_tracks(25))
+        search_mock = Mock(return_value={
+            'ok': True,
+            'items': self._pool_tracks(5, prefix='live'),
+        })
+
+        result, search_mock = self._recommend(
+            'happy',
+            search_mock=search_mock,
+            seed_track_name='Specific Song',
+            seed_artist_name='Specific Artist',
+            limit=5,
+        )
+
+        search_mock.assert_called()
+        self.assertFalse(result['pool_used'])
+
+    def test_emotion_only_request_warms_the_pool(self):
+        search_mock = Mock(return_value={
+            'ok': True,
+            'items': self._pool_tracks(5, prefix='live'),
+        })
+
+        self._recommend('happy', search_mock=search_mock, limit=5)
+
+        warmed_pool = EmotionTrackPool.objects.get(emotion='happy')
+        self.assertTrue(warmed_pool.tracks)
+        self.assertNotIn('pool_cached', warmed_pool.tracks[0])
+
+    def test_personalized_request_does_not_warm_the_shared_pool(self):
+        search_mock = Mock(return_value={
+            'ok': True,
+            'items': self._pool_tracks(5, prefix='live'),
+        })
+
+        self._recommend(
+            'happy',
+            search_mock=search_mock,
+            preferred_artists=['Favorite Artist'],
+            limit=5,
+        )
+
+        self.assertFalse(EmotionTrackPool.objects.filter(emotion='happy').exists())
+
+    def test_store_pool_does_not_shrink_a_bigger_fresh_pool(self):
+        self._create_pool('happy', self._pool_tracks(40))
+
+        stored_count = pool.store_pool('happy', self._pool_tracks(5, prefix='thin'))
+
+        self.assertEqual(stored_count, 0)
+        self.assertEqual(len(EmotionTrackPool.objects.get(emotion='happy').tracks), 40)
+
+    def test_store_pool_replaces_a_bigger_pool_when_forced(self):
+        self._create_pool('happy', self._pool_tracks(40))
+
+        stored_count = pool.store_pool(
+            'happy',
+            self._pool_tracks(5, prefix='forced'),
+            force=True,
+        )
+
+        self.assertEqual(stored_count, 5)
+        self.assertEqual(len(EmotionTrackPool.objects.get(emotion='happy').tracks), 5)
+
+    def test_sample_tracks_skips_tracks_the_request_already_has(self):
+        pool_tracks = self._pool_tracks(4)
+
+        sampled_tracks = pool.sample_tracks(
+            pool_tracks,
+            limit=4,
+            seen_track_ids={'pooled-0'},
+            seen_track_match_keys=set(),
+        )
+
+        self.assertEqual(len(sampled_tracks), 3)
+        self.assertNotIn('pooled-0', {track['id'] for track in sampled_tracks})
+
+    @override_settings(SPOTIFY_TRACK_POOL_ENABLED=False)
+    def test_disabled_pool_is_never_read(self):
+        self._create_pool('happy', self._pool_tracks(25))
+        search_mock = Mock(return_value={
+            'ok': True,
+            'items': self._pool_tracks(5, prefix='live'),
+        })
+
+        result, search_mock = self._recommend('happy', search_mock=search_mock, limit=5)
+
+        search_mock.assert_called()
+        self.assertFalse(result['pool_used'])
+
+    def test_refresh_emotion_pool_stores_baseline_candidates(self):
+        search_mock = Mock(return_value={
+            'ok': True,
+            'items': self._pool_tracks(10, prefix='refreshed'),
+        })
+
+        with patch.object(
+            spotify_service,
+            '_get_catalog_token_candidates',
+            return_value=([('client', 'client-token')], []),
+        ):
+            with patch.object(spotify_service, 'search_tracks_detailed', search_mock):
+                refresh_result = spotify_service.refresh_emotion_pool(
+                    'calm',
+                    target_size=10,
+                )
+
+        self.assertTrue(refresh_result['ok'])
+        self.assertEqual(refresh_result['stored'], 10)
+        self.assertEqual(len(EmotionTrackPool.objects.get(emotion='calm').tracks), 10)
+
+    def test_refresh_emotion_pool_reports_missing_tokens_without_storing(self):
+        with patch.object(
+            spotify_service,
+            '_get_catalog_token_candidates',
+            return_value=([], [{'reason': 'token_unavailable'}]),
+        ):
+            refresh_result = spotify_service.refresh_emotion_pool('calm')
+
+        self.assertFalse(refresh_result['ok'])
+        self.assertEqual(refresh_result['reason'], 'token_unavailable')
+        self.assertEqual(refresh_result['stored'], 0)
+        self.assertFalse(EmotionTrackPool.objects.exists())
+
+    def test_refresh_command_skips_fresh_pools_unless_forced(self):
+        self._create_pool('calm', self._pool_tracks(30))
+        refresh_mock = Mock(return_value={
+            'ok': True,
+            'emotion': 'calm',
+            'tracks': [],
+            'queries_tried': [],
+            'reason': None,
+            'stored': 30,
+        })
+
+        with patch.object(spotify_service, 'refresh_emotion_pool', refresh_mock):
+            call_command('refresh_emotion_pools', '--emotions', 'calm', stdout=StringIO())
+            refresh_mock.assert_not_called()
+
+            call_command(
+                'refresh_emotion_pools',
+                '--emotions',
+                'calm',
+                '--force',
+                stdout=StringIO(),
+            )
+            refresh_mock.assert_called_once()
+
+    def test_refresh_command_rejects_unknown_emotions(self):
+        with self.assertRaises(CommandError):
+            call_command('refresh_emotion_pools', '--emotions', 'sleepy', stdout=StringIO())
+
+    def test_pool_serves_recommendations_when_spotify_tokens_are_unavailable(self):
+        self._create_pool('happy', self._pool_tracks(25))
+
+        with patch.object(
+            spotify_service,
+            '_get_catalog_token_candidates',
+            return_value=([], [{'reason': 'token_unavailable'}]),
+        ):
+            result = spotify_service.get_recommendations_with_details(
+                'happy',
+                include_personalization=False,
+                limit=5,
+            )
+
+        self.assertTrue(result['ok'])
+        self.assertTrue(result['pool_used'])
+        self.assertFalse(result['used_fallback'])
+        self.assertEqual(result['fallback_reason'], 'token_unavailable')
+        self.assertEqual(len(result['tracks']), 5)
+
+    def test_curated_fallback_still_answers_when_there_is_no_pool_either(self):
+        with patch.object(
+            spotify_service,
+            '_get_catalog_token_candidates',
+            return_value=([], [{'reason': 'token_unavailable'}]),
+        ):
+            result = spotify_service.get_recommendations_with_details(
+                'happy',
+                include_personalization=False,
+                limit=5,
+            )
+
+        self.assertFalse(result['pool_used'])
+        self.assertTrue(result['used_fallback'])
+        self.assertEqual(result['source'], 'fallback')

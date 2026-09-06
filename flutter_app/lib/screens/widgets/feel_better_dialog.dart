@@ -53,7 +53,7 @@ class _FeelBetterDialogState extends State<FeelBetterDialog> {
               subtitle,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.68),
+                color: Colors.white.withValues(alpha: 0.68),
                 fontSize: 13,
                 height: 1.4,
               ),

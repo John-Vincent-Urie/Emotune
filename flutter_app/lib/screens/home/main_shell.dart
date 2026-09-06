@@ -92,7 +92,7 @@ class _MainShellState extends State<MainShell> {
           ),
           decoration: BoxDecoration(
             color: isActive
-                ? AppColors.accent.withOpacity(0.1)
+                ? AppColors.accent.withValues(alpha: 0.1)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
