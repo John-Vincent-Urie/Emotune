@@ -1,10 +1,16 @@
+#!/usr/bin/env python3
 """
 EmoTune staged BERT fine-tuning pipeline.
 
 Default sequence:
 1. GoEmotions base fine-tune
 2. Optional dair-ai/emotion adaptation
-3. EmoTune final fine-tune
+3. Text Emotion Classification 150k pre-training
+4. EmoTune final fine-tune
+
+Stages 1-3 are pre-training on outside corpora: they buy the model real-world
+language, but none of them covers EmoTune's full 13-label schema. Stage 4 is
+what makes every label reachable, which is why it always runs last.
 
 The final evaluation is always reported on an EmoTune-only holdout split so the
 metrics reflect the app's label schema and tone.
@@ -12,13 +18,19 @@ metrics reflect the app's label schema and tone.
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import numpy as np
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _bootstrap import ensure_local_venv  # noqa: E402
+
+ensure_local_venv('torch')
+
+import numpy as np  # noqa: E402
 import pandas as pd
 import torch
 from datasets import load_dataset
@@ -33,6 +45,7 @@ from transformers import (
     Trainer,
     TrainingArguments,
 )
+from transformers.trainer_utils import get_last_checkpoint
 
 from data_pipeline import DATASET_PATH, clean_dataset, load_custom_dataset, resolve_dataset_path
 
@@ -98,10 +111,13 @@ class TrainingConfig:
     custom_repeat_factor: int
     enable_goemotions: bool
     enable_dair_emotion: bool
+    enable_text_emotion: bool
     enable_custom_final_stage: bool
     goemotions_stage_epochs: float
     dair_stage_epochs: float
+    text_emotion_stage_epochs: float
     custom_stage_epochs: float
+    resume: bool
 
     @classmethod
     def from_env(cls) -> "TrainingConfig":
@@ -127,10 +143,13 @@ class TrainingConfig:
             custom_repeat_factor=_env_int("EMOTUNE_CUSTOM_REPEAT_FACTOR", 10),
             enable_goemotions=_env_bool("EMOTUNE_ENABLE_GOEMOTIONS", True),
             enable_dair_emotion=_env_bool("EMOTUNE_ENABLE_DAIR_EMOTION", False),
+            enable_text_emotion=_env_bool("EMOTUNE_ENABLE_TEXT_EMOTION", True),
             enable_custom_final_stage=_env_bool("EMOTUNE_ENABLE_CUSTOM_FINAL_STAGE", True),
             goemotions_stage_epochs=_env_float("EMOTUNE_GOEMOTIONS_EPOCHS", 1.0),
             dair_stage_epochs=_env_float("EMOTUNE_DAIR_EMOTION_EPOCHS", 1.0),
+            text_emotion_stage_epochs=_env_float("EMOTUNE_TEXT_EMOTION_EPOCHS", 1.0),
             custom_stage_epochs=_env_float("EMOTUNE_FINAL_FINETUNE_EPOCHS", float(num_epochs)),
+            resume=_env_bool("EMOTUNE_RESUME", False),
         )
 
 
@@ -151,11 +170,24 @@ CUSTOM_REPEAT_FACTOR = CONFIG.custom_repeat_factor
 
 ENABLE_GOEMOTIONS = CONFIG.enable_goemotions
 ENABLE_DAIR_EMOTION = CONFIG.enable_dair_emotion
+ENABLE_TEXT_EMOTION = CONFIG.enable_text_emotion
 ENABLE_CUSTOM_FINAL_STAGE = CONFIG.enable_custom_final_stage
 
 GOEMOTIONS_STAGE_EPOCHS = CONFIG.goemotions_stage_epochs
 DAIR_STAGE_EPOCHS = CONFIG.dair_stage_epochs
+TEXT_EMOTION_STAGE_EPOCHS = CONFIG.text_emotion_stage_epochs
 CUSTOM_STAGE_EPOCHS = CONFIG.custom_stage_epochs
+
+RESUME = CONFIG.resume
+
+# Produced by ml_model/clean_text_emotion_dataset.py from the raw
+# "Text Emotion Classification 150k" CSV. It is a pre-training stage, never the
+# final one: it can only teach 7 of the 13 labels (it has no sad, stressed,
+# lonely, depressing, nostalgic or mixed data at all), so the balanced EmoTune
+# custom stage has to run after it to restore the full schema.
+TEXT_EMOTION_DATASET_PATH = (
+    Path(__file__).resolve().parent.parent / "dataset" / "text_emotion_classification.cleaned.csv"
+)
 
 # LABEL2ID and the GoEmotions mapping are the same schema the runtime classifier
 # (backend/ml/emotion_classifier.py) uses at inference time, so both are imported
@@ -342,7 +374,7 @@ def _to_label_ids(label_names: list[str]) -> list[int]:
 
 
 def _stratified_split_with_fallback(
-    df: pd.DataFrame, *, test_size: float, random_state: int
+    df: pd.DataFrame, *, test_size: float, random_state: int, stratify_column: str = "emotion"
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Stratified split, falling back to a plain split when a class is too small.
 
@@ -351,13 +383,16 @@ def _stratified_split_with_fallback(
     can leave a class with only 1 member -- which sklearn rejects outright.
     Preserving class balance on that tiny holdout isn't worth crashing the
     whole training run over, so fall back to an unstratified split instead.
+
+    `stratify_column` exists because the pre-training stages carry integer
+    `label` ids rather than the custom stage's `emotion` names.
     """
     try:
         return train_test_split(
             df,
             test_size=test_size,
             random_state=random_state,
-            stratify=df["emotion"],
+            stratify=df[stratify_column],
         )
     except ValueError:
         return train_test_split(df, test_size=test_size, random_state=random_state)
@@ -386,6 +421,11 @@ class StageDataPreparer:
             dair_stage = self.prepare_dair_stage()
             if dair_stage is not None:
                 stages.append(dair_stage)
+
+        if self.config.enable_text_emotion:
+            text_emotion_stage = self.prepare_text_emotion_stage()
+            if text_emotion_stage is not None:
+                stages.append(text_emotion_stage)
 
         if self.config.enable_custom_final_stage:
             custom_stage, custom_test_df = self.prepare_custom_stage()
@@ -495,6 +535,71 @@ class StageDataPreparer:
 
         return texts, labels
 
+    def prepare_text_emotion_stage(self) -> PreparedStage | None:
+        """Pre-train on the cleaned Text Emotion Classification 150k corpus.
+
+        The cleaner leaves ~92.5k rows but they are wildly unbalanced (43.9k
+        happy against 66 surprising), so `_cap_per_class` does real work here --
+        without it the stage would simply teach the model to answer "happy".
+        Capping at the default 2,000 turns it into a roughly even 7-label
+        pre-training set of real human sentences, which is exactly what the
+        current undertrained model is short of.
+        """
+        dataset_path = TEXT_EMOTION_DATASET_PATH
+        if not dataset_path.exists():
+            print(
+                f"Cleaned text-emotion dataset not found at {dataset_path}. "
+                "Run ml_model/clean_text_emotion_dataset.py first. Skipping stage."
+            )
+            return None
+
+        print(f"Loading cleaned text-emotion dataset from {dataset_path.name}...")
+        try:
+            raw_df = pd.read_csv(dataset_path)
+        except Exception as error:
+            print(f"Could not read {dataset_path.name}: {error}")
+            return None
+
+        if "text" not in raw_df.columns or "emotion" not in raw_df.columns:
+            print(f"{dataset_path.name} must have 'text' and 'emotion' columns. Skipping stage.")
+            return None
+
+        raw_df = raw_df.dropna(subset=["text", "emotion"])
+        raw_df = raw_df[raw_df["emotion"].isin(LABEL2ID)]
+        if raw_df.empty:
+            print("Cleaned text-emotion dataset has no usable rows. Skipping stage.")
+            return None
+
+        frame = _build_text_label_df(
+            raw_df["text"].astype(str).tolist(),
+            _to_label_ids(raw_df["emotion"].astype(str).tolist()),
+        )
+        train_df, eval_df = _stratified_split_with_fallback(
+            frame, test_size=0.1, random_state=self.config.seed, stratify_column="label"
+        )
+        train_df = self._cap_per_class(train_df, self.config.max_samples_per_class)
+        eval_df = self._cap_per_class(eval_df, max(self.config.max_samples_per_class // 10, 1))
+
+        print(f"Loaded {len(train_df)} text-emotion training samples after capping")
+        print(f"Loaded {len(eval_df)} text-emotion validation samples after capping")
+
+        return PreparedStage(
+            name="text_emotion_150k",
+            description="Text Emotion Classification 150k pre-training",
+            num_epochs=self.config.text_emotion_stage_epochs,
+            train_texts=train_df["text"].tolist(),
+            train_labels=train_df["label"].astype(int).tolist(),
+            eval_texts=eval_df["text"].tolist(),
+            eval_labels=eval_df["label"].astype(int).tolist(),
+            metadata={
+                "source_dataset": dataset_path.name,
+                "rows_before_capping": int(len(frame)),
+                "max_samples_per_class": self.config.max_samples_per_class,
+                "train_label_distribution": _label_distribution(train_df["label"].astype(int).tolist()),
+                "eval_label_distribution": _label_distribution(eval_df["label"].astype(int).tolist()),
+            },
+        )
+
     def prepare_custom_stage(self) -> tuple[PreparedStage | None, pd.DataFrame | None]:
         custom_df, data_report = self._load_clean_custom_dataframe()
         if custom_df.empty:
@@ -593,6 +698,7 @@ class BertEmotionTrainer:
             "Stage toggles: "
             f"goemotions={self.config.enable_goemotions}, "
             f"dair_ai_emotion={self.config.enable_dair_emotion}, "
+            f"text_emotion_150k={self.config.enable_text_emotion}, "
             f"emotune_final={self.config.enable_custom_final_stage}"
         )
 
@@ -652,9 +758,11 @@ class BertEmotionTrainer:
                 "custom_repeat_factor": self.config.custom_repeat_factor,
                 "enable_goemotions": self.config.enable_goemotions,
                 "enable_dair_emotion": self.config.enable_dair_emotion,
+                "enable_text_emotion": self.config.enable_text_emotion,
                 "enable_custom_final_stage": self.config.enable_custom_final_stage,
                 "goemotions_stage_epochs": self.config.goemotions_stage_epochs,
                 "dair_stage_epochs": self.config.dair_stage_epochs,
+                "text_emotion_stage_epochs": self.config.text_emotion_stage_epochs,
                 "custom_stage_epochs": self.config.custom_stage_epochs,
             },
         }
@@ -687,11 +795,16 @@ class BertEmotionTrainer:
             weights[int(label_id)] = float(weight)
         return torch.tensor(weights, dtype=torch.float)
 
+    def _stage_output_dir(self, stage: PreparedStage, stage_index: int) -> Path:
+        return self.config.output_dir / f"stage_{stage_index + 1}_{stage.name}"
+
     def _build_training_args(self, stage: PreparedStage, stage_index: int) -> TrainingArguments:
-        stage_output_dir = self.config.output_dir / f"stage_{stage_index + 1}_{stage.name}"
+        stage_output_dir = self._stage_output_dir(stage, stage_index)
         return TrainingArguments(
             output_dir=str(stage_output_dir),
-            overwrite_output_dir=True,
+            # Wiping the stage directory is the right default, but it would also
+            # delete the checkpoint an EMOTUNE_RESUME run is about to pick up.
+            overwrite_output_dir=not self.config.resume,
             num_train_epochs=stage.num_epochs,
             per_device_train_batch_size=self.config.batch_size,
             per_device_eval_batch_size=self.config.batch_size,
@@ -736,7 +849,14 @@ class BertEmotionTrainer:
             callbacks=[EarlyStoppingCallback(early_stopping_patience=2)],
         )
 
-        train_output = trainer.train()
+        # Checkpoints land once per epoch (save_strategy="epoch"), so a run
+        # killed mid-stage restarts from the last completed epoch rather than
+        # from the base model -- hours of CPU training, on this project.
+        resume_checkpoint = self._find_resume_checkpoint(stage, stage_index)
+        if resume_checkpoint:
+            print(f"Resuming from checkpoint: {resume_checkpoint}")
+
+        train_output = trainer.train(resume_from_checkpoint=resume_checkpoint)
         eval_metrics = trainer.evaluate()
         stage_summary = {
             "stage": stage.name,
@@ -753,6 +873,21 @@ class BertEmotionTrainer:
             "metadata": stage.metadata,
         }
         return trainer.model, stage_summary
+
+    def _find_resume_checkpoint(self, stage: PreparedStage, stage_index: int) -> str | None:
+        """Latest checkpoint for this stage, when EMOTUNE_RESUME asks for one.
+
+        Opt-in rather than automatic: a stale directory from an earlier run with
+        different data or hyper-parameters would otherwise be resumed silently,
+        and the resulting model would not match the config it reports.
+        """
+        if not self.config.resume:
+            return None
+
+        stage_output_dir = self._stage_output_dir(stage, stage_index)
+        if not stage_output_dir.is_dir():
+            return None
+        return get_last_checkpoint(str(stage_output_dir))
 
     def _evaluate_final_model(self, model, tokenizer, test_df: pd.DataFrame) -> tuple[dict, dict]:
         test_label_ids = _to_label_ids(test_df["emotion"].tolist())
@@ -809,5 +944,46 @@ def train():
     BertEmotionTrainer().run()
 
 
+def _parse_args(argv=None):
+    """Accept --help without training.
+
+    Every knob here is an environment variable, so this parser takes no
+    options -- but it still has to exist. Without it an unrecognised argument
+    was silently ignored and the script fell straight through to a multi-hour
+    training run, so `train_bert.py --help` started training instead of
+    printing help. Anything that probes scripts for a usage string (a smoke
+    check, a person guessing) would set a full run going by accident.
+    """
+    parser = argparse.ArgumentParser(
+        prog="train_bert.py",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Configuration is by environment variable, not flags:\n"
+            "  EMOTUNE_DATASET_PATH             final-stage CSV "
+            "(default dataset/emotune_custom_dataset.csv)\n"
+            "  EMOTUNE_MODEL_NAME               base checkpoint "
+            "(default bert-base-uncased)\n"
+            "  EMOTUNE_NUM_EPOCHS               final-stage epochs (default 5)\n"
+            "  EMOTUNE_BATCH_SIZE               default 16\n"
+            "  EMOTUNE_MAX_LENGTH               default 128\n"
+            "  EMOTUNE_LEARNING_RATE            default 2e-5\n"
+            "  EMOTUNE_MAX_SAMPLES_PER_CLASS    per-class cap on pre-training "
+            "stages (default 2000)\n"
+            "  EMOTUNE_CUSTOM_REPEAT_FACTOR     repeats the final train split "
+            "(default 10)\n"
+            "  EMOTUNE_ENABLE_GOEMOTIONS        default true\n"
+            "  EMOTUNE_ENABLE_DAIR_EMOTION      default false\n"
+            "  EMOTUNE_ENABLE_TEXT_EMOTION      default true\n"
+            "  EMOTUNE_ENABLE_CUSTOM_FINAL_STAGE  default true\n"
+            "  EMOTUNE_RESUME                   restart each stage from its "
+            "last epoch checkpoint (default false)\n"
+            "\nRunning it trains: on CPU that is hours, not seconds."
+        ),
+    )
+    return parser.parse_args(argv)
+
+
 if __name__ == "__main__":
+    _parse_args()
     train()

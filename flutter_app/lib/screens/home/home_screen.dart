@@ -345,9 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final result = await ApiService.analyzeEmotion(
         text,
-        outcomeMode: studio.selectedOutcomeMode,
         sessionLengthMinutes: studio.sessionLengthMinutes,
-        checkInFrequencyTracks: studio.checkInFrequencyTracks,
         tasteProfile: _currentTasteProfile(),
       );
       if (!mounted || requestId != _requestSequence) {

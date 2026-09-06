@@ -108,9 +108,6 @@ Map<String, dynamic>? normalizeObjectMap(dynamic value) {
 String normalizeOutcomeMode(String? value) {
   switch (value?.trim().toLowerCase()) {
     case 'calm_me_down':
-    case 'help_me_focus':
-    case 'lift_me_up':
-    case 'sleep':
       return value!.trim().toLowerCase();
     default:
       return 'match_mood';

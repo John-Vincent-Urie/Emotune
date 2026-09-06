@@ -309,8 +309,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             RecommendationSessionControls(
               sessionLengthMinutes: studio.sessionLengthMinutes,
               onSessionLengthChanged: studio.setSessionLengthMinutes,
-              checkInFrequencyTracks: studio.checkInFrequencyTracks,
-              onCheckInFrequencyChanged: studio.setCheckInFrequencyTracks,
               familiarity: studio.familiarity,
               onFamiliarityChanged: studio.setFamiliarity,
               preferInstrumental: studio.preferInstrumental,

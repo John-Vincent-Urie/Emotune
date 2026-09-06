@@ -72,8 +72,6 @@ void main() {
             child: RecommendationSessionControls(
               sessionLengthMinutes: sessionLengthMinutes,
               onSessionLengthChanged: onSessionLengthChanged,
-              checkInFrequencyTracks: null,
-              onCheckInFrequencyChanged: (_) {},
               familiarity: 'balanced',
               onFamiliarityChanged: (_) {},
               preferInstrumental: false,
@@ -86,8 +84,8 @@ void main() {
       );
     }
 
-    // 'Auto' labels both the Session Length and Check-In Rhythm rows, so chip
-    // lookups are scoped to the first Wrap, which is the session length row.
+    // Session Length is the first Wrap in the card. Chip lookups stay scoped
+    // to it so adding another chip row later cannot quietly match the wrong one.
     Finder lengthChip(String label) => find.descendant(
           of: find.byType(Wrap).first,
           matching: find.text(label),
@@ -133,8 +131,10 @@ void main() {
       expect(chipFor('45 min').selected, isFalse);
     });
 
-    testWidgets('outcome mode section stays hidden in the profile config',
-        (tester) async {
+    testWidgets('outcome mode and check-in rhythm are gone', (tester) async {
+      // Both were removed from the app: the backend routes the outcome mode
+      // from the detected emotion, and the check-in cadence comes from that
+      // mode's default. Neither is the user's to set any more.
       await tester.pumpWidget(wrap(
         sessionLengthMinutes: 15,
         onSessionLengthChanged: (_) {},
@@ -142,7 +142,11 @@ void main() {
 
       expect(find.text('Outcome Mode'), findsNothing);
       expect(find.text('Match My Mood'), findsNothing);
+      expect(find.text('Calm Me Down'), findsNothing);
+      expect(find.text('Check-In Rhythm'), findsNothing);
+      expect(find.text('Every 3'), findsNothing);
       expect(find.text('Session Length'), findsOneWidget);
+      expect(find.text('Taste Control'), findsOneWidget);
     });
   });
 }

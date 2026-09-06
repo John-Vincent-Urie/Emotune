@@ -602,9 +602,9 @@ _VOCAL_PATTERN = _term_pattern(VOCAL_TERMS)
 def _taste_instrumental_signal(text_blob, taste_profile):
     """How instrumental a track reads: ``1``, ``-1``, or ``0`` when unknown.
 
-    Returns ``(signal, reason)``. The signal is unscaled on purpose -- the
-    candidate ranker and the LightFM blender score on different ranges, and
-    both need the same reading of the track, not the same number.
+    Returns ``(signal, reason)``. The signal is unscaled on purpose -- callers
+    score on different ranges and need the same reading of the track, not the
+    same number.
     """
     if not taste_profile.get('prefer_instrumental'):
         return 0, None

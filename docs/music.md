@@ -155,3 +155,16 @@ Nostalgic
 4.	"Harana" – Parokya Ni Edgar
 5.	"Munting Heredera" – Orange and Lemons
 
+Mixed
+•	English:
+1.	"Kyoto" – Phoebe Bridgers
+2.	"The Less I Know The Better" – Tame Impala
+3.	"Sofia" – Clairo
+4.	"Heat Waves" – Glass Animals
+5.	"Ribs" – Lorde
+•	Filipino:
+1.	"Pasilyo" – SunKissed Lola
+2.	"Pagsamo" – Arthur Nery
+3.	"Sa Susunod na Habang Buhay" – Ben&Ben
+4.	"Uhaw" – Dilaw
+5.	"With A Smile" – Eraserheads

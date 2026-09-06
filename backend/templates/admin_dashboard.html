@@ -12,29 +12,9 @@
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="login-page">
-  <div class="login-card">
-    <div class="login-logo">
-      <div class="logo-circle">
-        <div class="login-logo-wave">
-          <span></span>
-          <span></span>
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
-      </div>
-      <div><div class="login-title">EmoTune</div><div class="login-subtitle">Admin Dashboard</div></div>
-    </div>
-    <div class="login-error" id="login-error">Invalid credentials. Please try again.</div>
-    <label class="form-label">Email</label>
-    <input class="form-input" id="login-email" type="email" placeholder="admin@emotune.com">
-    <label class="form-label">Password</label>
-    <input class="form-input" id="login-password" type="password" placeholder="••••••••">
-    <button class="login-btn" onclick="doLogin()">Sign In →</button>
-  </div>
-</div>
+{# The page is already staff-gated by admin_panel, so the dashboard reads its
+   API token from here instead of asking for credentials a second time. #}
+{{ admin_access_token|json_script:"admin-access-token" }}
 
 <!-- APP -->
 <div id="app" class="app-shell">
@@ -57,8 +37,8 @@
     <div class="sidebar-footer">
       <div class="admin-badge">
         <div class="admin-avatar">A</div>
-        <div class="admin-info"><div class="admin-name" id="admin-username">Admin</div><div class="admin-role">Super Admin</div></div>
-        <span class="logout-icon" onclick="doLogout()" title="Logout">⏻</span>
+        <div class="admin-info"><div class="admin-name" id="admin-username">{{ request.user.username }}</div><div class="admin-role">Super Admin</div></div>
+        <form method="post" action="{% url 'admin:logout' %}" class="logout-form">{% csrf_token %}<button type="submit" class="logout-icon" title="Logout">⏻</button></form>
       </div>
     </div>
   </aside>

@@ -313,6 +313,12 @@ class SpotifyService:
     def get_recommendations(self, *args, **kwargs):
         return self.recommendations.get_recommendations(*args, **kwargs)
 
+    def build_emotion_pool(self, *args, **kwargs):
+        return self.recommendations.build_emotion_pool(*args, **kwargs)
+
+    def refresh_emotion_pool(self, *args, **kwargs):
+        return self.recommendations.refresh_emotion_pool(*args, **kwargs)
+
     def get_user_profile_result(self, *args, **kwargs):
         return self.recommendations.get_user_profile_result(*args, **kwargs)
 

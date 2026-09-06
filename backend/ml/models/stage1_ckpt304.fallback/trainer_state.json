@@ -1,0 +1,76 @@
+{
+  "best_metric": 0.7429577778393185,
+  "best_model_checkpoint": "/home/uriediska/Documents/Capstone/EmoTune-Capstone_project/backend/ml/models/bert_emotion_model/stage_1_text_emotion_150k/checkpoint-304",
+  "epoch": 1.0,
+  "eval_steps": 500,
+  "global_step": 304,
+  "is_hyper_param_search": false,
+  "is_local_process_zero": true,
+  "is_world_process_zero": true,
+  "log_history": [
+    {
+      "epoch": 0.16447368421052633,
+      "grad_norm": 6.275297164916992,
+      "learning_rate": 1.860805860805861e-05,
+      "loss": 2.3936,
+      "step": 50
+    },
+    {
+      "epoch": 0.32894736842105265,
+      "grad_norm": 7.028100490570068,
+      "learning_rate": 1.4945054945054947e-05,
+      "loss": 1.7556,
+      "step": 100
+    },
+    {
+      "epoch": 0.4934210526315789,
+      "grad_norm": 8.872994422912598,
+      "learning_rate": 1.1282051282051283e-05,
+      "loss": 1.308,
+      "step": 150
+    },
+    {
+      "epoch": 0.6578947368421053,
+      "grad_norm": 12.787903785705566,
+      "learning_rate": 7.61904761904762e-06,
+      "loss": 1.0938,
+      "step": 200
+    },
+    {
+      "epoch": 0.8223684210526315,
+      "grad_norm": 8.721705436706543,
+      "learning_rate": 3.9560439560439565e-06,
+      "loss": 0.9511,
+      "step": 250
+    },
+    {
+      "epoch": 0.9868421052631579,
+      "grad_norm": 7.709815502166748,
+      "learning_rate": 2.930402930402931e-07,
+      "loss": 0.9769,
+      "step": 300
+    },
+    {
+      "epoch": 1.0,
+      "eval_accuracy": 0.7515400410677618,
+      "eval_f1": 0.7429577778393185,
+      "eval_loss": 0.8852306008338928,
+      "eval_macro_f1": 0.646107924656693,
+      "eval_precision": 0.7404738756587055,
+      "eval_recall": 0.7515400410677618,
+      "eval_runtime": 97.459,
+      "eval_samples_per_second": 4.997,
+      "eval_steps_per_second": 0.318,
+      "step": 304
+    }
+  ],
+  "logging_steps": 50,
+  "max_steps": 304,
+  "num_input_tokens_seen": 0,
+  "num_train_epochs": 1,
+  "save_steps": 500,
+  "total_flos": 159822860525184.0,
+  "train_batch_size": 16,
+  "trial_name": null,
+  "trial_params": null
+}

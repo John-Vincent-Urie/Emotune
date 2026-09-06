@@ -57,6 +57,7 @@ STATIC_TRACK_SOURCES = frozenset({'curated_fallback'})
 
 # What a track resolved from the docs/music.md list is tagged with.
 MUSIC_DOC_TRACK_SOURCE = 'music_md_playlist'
+MUSIC_DOC_SEED_REASON = 'music_md_playlist_seed'
 
 
 def _without_static_tracks(tracks):
@@ -144,6 +145,19 @@ def music_doc_tracks(tracks, emotion, limit=None):
     matched.sort(key=lambda item: (item[0], item[1]))
     ordered = [{**track, 'is_music_doc_pick': True} for _, _, track in matched]
     return ordered[:limit] if limit else ordered
+
+
+def familiar_favorite_quota(limit):
+    """How many hearted favorites "More familiar" may take of one playlist.
+
+    The favorites still open the session -- the first song hearted for an
+    emotion is the first one heard when that emotion comes back -- but they
+    never fill it. Half the slots stay reserved for songs the user has not
+    heard yet, so the lane keeps recommending new music as the favorites for
+    an emotion pile up.
+    """
+    slots = max(_safe_int(limit, 0), 0) or 20
+    return max(slots // 2, 1)
 
 
 def _pool_candidates(
@@ -746,6 +760,22 @@ class SpotifyRecommendationEngine:
             if str(artist or '').strip()
         }
         normalized_taste_profile = _normalize_taste_profile(taste_profile)
+
+        # The docs/music.md lane is boosted twice: once as a source weight
+        # (3.4, against 1.2 for the catalog) and again as a selection reason
+        # (3.0). That is right for the default lane, but two taste settings
+        # explicitly opt out of it, and both boosts have to go with it or the
+        # setting is only half honoured.
+        #
+        #   instrumental -- the document list is vocal pop.
+        #   discovery    -- a static list outranking real catalog finds is the
+        #                   opposite of the request. Blending already drops the
+        #                   document lane here, but these tracks also arrive
+        #                   through the cached pool, where nothing demotes them.
+        opted_out_of_document_lane = bool(
+            normalized_taste_profile.get('prefer_instrumental')
+            or normalized_taste_profile.get('familiarity') == 'discovery'
+        )
         emotion_weights = self.service._emotion_candidate_weight_map(
             emotion,
             top_emotions=top_emotions,
@@ -768,14 +798,8 @@ class SpotifyRecommendationEngine:
 
             base_source = str(track.get('recommendation_source') or '').strip()
             source_weight = EMOTION_SOURCE_WEIGHTS.get(base_source, 1.0)
-            if (
-                normalized_taste_profile.get('prefer_instrumental')
-                and base_source.lower() == MUSIC_DOC_TRACK_SOURCE
-            ):
-                # The document list carries the heaviest source weight in the
-                # table because it is the lane every request defaults to. A
-                # listener who asked for instrumental music opted out of that
-                # default, so its songs rank as ordinary catalog tracks here.
+            if opted_out_of_document_lane and base_source.lower() == MUSIC_DOC_TRACK_SOURCE:
+                # Rank as an ordinary catalog track instead.
                 source_weight = EMOTION_SOURCE_WEIGHTS['spotify_catalog']
             if source_weight:
                 score += source_weight
@@ -792,6 +816,13 @@ class SpotifyRecommendationEngine:
                 if str(reason or '').strip()
             ]
             for selection_reason in selection_reasons:
+                if (
+                    opted_out_of_document_lane
+                    and selection_reason == MUSIC_DOC_SEED_REASON
+                ):
+                    # The other half of the document-lane boost. Dropping the
+                    # source weight alone still left this one standing.
+                    continue
                 weight = EMOTION_SELECTION_REASON_WEIGHTS.get(selection_reason)
                 if weight:
                     score += weight
@@ -986,17 +1017,24 @@ class SpotifyRecommendationEngine:
 
         if familiarity == 'familiar':
             # Open with what the user already hearted under this emotion,
-            # oldest favorite first, then fill the rest normally.
+            # oldest favorite first, then fill the rest normally. The quota
+            # keeps the favorites from swallowing the playlist once there are
+            # more of them than there are slots.
+            favorite_quota = familiar_favorite_quota(limit)
             favorite_leads = self.service.rank_tracks_for_emotion(
-                self._build_emotion_favorite_tracks(emotion, user=user, limit=limit),
+                self._build_emotion_favorite_tracks(
+                    emotion,
+                    user=user,
+                    limit=favorite_quota,
+                ),
                 emotion=emotion,
                 preferred_artists=preferred_artists,
                 confidence_band='medium',
-                limit=limit,
+                limit=favorite_quota,
                 taste_profile=taste_profile,
                 preserve_order=True,
             )
-            append_from(favorite_leads, len(favorite_leads))
+            append_from(favorite_leads, favorite_quota)
 
             search_quota = min(len(search_ranked), max(1 if non_mixed_emotion else 0, limit // 3))
             fallback_quota = min(len(fallback_ranked), max(1, limit // 5)) if fallback_ranked and not search_ranked else 0

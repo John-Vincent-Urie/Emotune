@@ -32,7 +32,7 @@ User text
 | 8. Outcome-mode adjustment | The base emotion profile can be shifted by modes like `match_mood`, `calm_me_down`, `lift_me_up`, `help_me_focus`, or `sleep`. | `recommendation_target_emotion` | Lets the app recommend for the user's desired direction, not only current mood |
 | 9. Spotify query building | The recommendation service uses the target emotion, top emotions, and score map to build layered search queries. | Search phrases such as emotion phrases, genre phrases, fallback phrases, and artist-biased phrases | Produces track candidates from Spotify |
 | 10. Candidate ranking | Tracks are merged, sanitized, and scored for emotional fit, personalization, source quality, keywords, genres, and preferred artists. | Ranked track list | Picks the best track first and orders the playlist |
-| 11. Final selection | Initial requests return a quick primary track; full requests can be re-ranked by LightFM. | `selected_track` and `tracks` | Final music returned to the user |
+| 11. Final selection | Initial requests return a quick primary track; full requests are ordered by the linear picker. | `selected_track` and `tracks` | Final music returned to the user |
 
 ## 3. What BERT Is Actually Predicting
 
@@ -237,7 +237,7 @@ After candidate tracks are fetched, the system scores them using things like:
 - taste profile
 
 For the first response, the app quickly returns a primary track.  
-For fuller playlist generation, the app can also use the local **LightFM** ranker to reorder candidates based on listening history and interaction data.
+For fuller playlist generation, the local **linear picker** scores every candidate on emotion fit, personalization, popularity, availability, and the taste profile, then orders the playlist.
 
 ## 6. The Most Important Concept
 
@@ -263,4 +263,5 @@ So the path is:
 - `backend/ml/plutchik_mapper.py`
 - `backend/api/recommendation_session.py`
 - `backend/api/spotify_service.py`
-- `backend/api/lightfm_ranker.py`
+- `backend/api/music_picker.py`
+- `backend/api/picker_ranker.py`

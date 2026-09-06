@@ -411,11 +411,22 @@ class SpotifyAuthClient:
 
         payload = _parse_response_json(response)
         response_text = response.text or ''
+        # A successful search body is multiple KB of JSON, and one pool refresh
+        # makes ~500 of these calls, so the body would bury every other line in
+        # the log. Keep it at DEBUG for when someone is actually debugging a
+        # response; the failure branch below still reports the parsed error at
+        # WARNING.
         logger.info(
-            "Spotify %s %s status=%s body=%s",
+            "Spotify %s %s status=%s bytes=%s",
             method,
             path,
             response.status_code,
+            len(response_text),
+        )
+        logger.debug(
+            "Spotify %s %s body=%s",
+            method,
+            path,
             response_text[:1500],
         )
 

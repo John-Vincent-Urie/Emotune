@@ -11,7 +11,6 @@ torch
 transformers==4.40.0
 numpy==1.26.4
 scikit-learn==1.4.2
-lightfm==1.17
 pandas==2.2.2
 datasets==2.19.1
 accelerate==0.30.0

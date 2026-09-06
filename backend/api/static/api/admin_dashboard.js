@@ -1,5 +1,8 @@
-﻿const API='http://127.0.0.1:8000/api';
-let token=localStorage.getItem('emotune_admin_token')||'';
+﻿// Same origin as the page Django rendered, so this works wherever it is served.
+const API='/api';
+// Minted server-side for the staff user who is already signed in; never stored,
+// so it dies with the tab instead of lingering in localStorage.
+const token=JSON.parse(document.getElementById('admin-access-token').textContent||'""');
 let allUsers=[],deleteUserId=null,monthlyData=[],moodData=[];
 let mC,mPC,mBC,mDC,tC;
 const EC={happy:'#ffd166',sad:'#4da6ff',angry:'#ff4d6d',motivational:'#ff9a3c',fear:'#b06aff',depressing:'#6b7d8e',surprising:'#ff69b4',stressed:'#ff6b6b',calm:'#4dffd2',lonely:'#778899',romantic:'#ff85c8',nostalgic:'#deb887',mixed:'#9370db'};
@@ -8,32 +11,6 @@ function normalizeMoodKey(mood){return String(mood||'').trim().toLowerCase();}
 function accentClass(index){return `accent-${index%7}`;}
 function moodFillClass(emotion){const key=normalizeMoodKey(emotion);return EC[key]?`mood-fill-${key}`:'mood-fill-default';}
 function applyMoodFillWidths(scope=document){scope.querySelectorAll('.mood-bar-fill[data-width]').forEach(bar=>requestAnimationFrame(()=>{bar.style.width=`${bar.dataset.width}%`;}));}
-
-async function doLogin(){
-  const email=document.getElementById('login-email').value.trim();
-  const pass=document.getElementById('login-password').value;
-  document.getElementById('login-error').style.display='none';
-  if(!email||!pass){document.getElementById('login-error').textContent='Please enter email and password.';document.getElementById('login-error').style.display='block';return;}
-  try{
-    const r=await fetch(`${API}/users/login/`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass})});
-    const d=await r.json();
-    if(d.access){
-      if(!d.user?.is_staff&&!d.user?.is_superuser){document.getElementById('login-error').textContent='Access denied. Admin accounts only.';document.getElementById('login-error').style.display='block';return;}
-      token=d.access;localStorage.setItem('emotune_admin_token',token);
-      document.getElementById('admin-username').textContent=d.user.username||'Admin';
-      showApp();loadDashboard();
-    } else {
-      document.getElementById('login-error').textContent=d.error||'Invalid credentials.';
-      document.getElementById('login-error').style.display='block';
-    }
-  }catch(e){
-    document.getElementById('login-error').textContent='Cannot connect to server at '+API+'. Make sure Django is running.';
-    document.getElementById('login-error').style.display='block';
-  }
-}
-
-function showApp(){document.getElementById('login-page').style.display='none';document.getElementById('app').style.display='flex';}
-function doLogout(){localStorage.removeItem('emotune_admin_token');token='';location.reload();}
 
 function showPage(name,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -46,22 +23,23 @@ function showPage(name,el){
   if(name==='playlists')renderPlaylists();
 }
 
+function describeFailure(status){
+  if(status===401||status===403)return 'Your admin session has expired. Reload the page to sign in again.';
+  return 'Could not load dashboard data from the server.';
+}
+
 async function loadDashboard(){
   try{
     const h={'Authorization':`Bearer ${token}`};
     const[dR,uR]=await Promise.all([fetch(`${API}/admin/dashboard/`,{headers:h}),fetch(`${API}/admin/users/`,{headers:h})]);
-    if(!dR.ok)throw new Error('Auth failed');
+    // Showing invented numbers when the server refuses is worse than showing
+    // nothing: an admin cannot tell a real figure from a placeholder.
+    if(!dR.ok)throw new Error(describeFailure(dR.status));
+    if(!uR.ok)throw new Error(describeFailure(uR.status));
     const dash=await dR.json();const users=await uR.json();
     allUsers=users;monthlyData=dash.monthly_playlists||[];moodData=dash.mood_distribution||[];
     renderStats(users);renderMonthlyChart();renderMoodPie();renderMoodBars();renderActivity(users);
-  }catch(e){console.warn('Using demo data:',e.message);loadDemo();}
-}
-
-function loadDemo(){
-  allUsers=genUsers();
-  monthlyData=[{month:'2024-10-01',count:45},{month:'2024-11-01',count:62},{month:'2024-12-01',count:88},{month:'2025-01-01',count:71},{month:'2025-02-01',count:95},{month:'2025-03-01',count:112}];
-  moodData=[{detected_emotion:'sad',count:234},{detected_emotion:'happy',count:198},{detected_emotion:'stressed',count:167},{detected_emotion:'lonely',count:143},{detected_emotion:'motivational',count:121},{detected_emotion:'calm',count:98},{detected_emotion:'angry',count:87},{detected_emotion:'romantic',count:76},{detected_emotion:'nostalgic',count:65},{detected_emotion:'fear',count:54},{detected_emotion:'depressing',count:43},{detected_emotion:'surprising',count:38},{detected_emotion:'mixed',count:29}];
-  renderStats(allUsers);renderMonthlyChart();renderMoodPie();renderMoodBars();renderActivity(allUsers);
+  }catch(e){showToast('⚠ '+e.message,'error');}
 }
 
 function renderStats(users){
@@ -101,7 +79,13 @@ function renderActivity(users){
 let curPage=1;const PER=10;
 
 async function loadUsers(){
-  if(!allUsers.length){try{const r=await fetch(`${API}/admin/users/`,{headers:{'Authorization':`Bearer ${token}`}});if(r.ok)allUsers=await r.json();else throw new Error();}catch(e){if(!allUsers.length)allUsers=genUsers();}}
+  if(!allUsers.length){
+    try{
+      const r=await fetch(`${API}/admin/users/`,{headers:{'Authorization':`Bearer ${token}`}});
+      if(!r.ok)throw new Error(describeFailure(r.status));
+      allUsers=await r.json();
+    }catch(e){showToast('⚠ '+e.message,'error');}
+  }
   renderUsersTable(allUsers);
 }
 
@@ -123,7 +107,12 @@ function closeModal(){document.getElementById('delete-modal').classList.remove('
 
 async function confirmDelete(){
   if(!deleteUserId)return;
-  try{await fetch(`${API}/admin/users/${deleteUserId}/`,{method:'DELETE',headers:{'Authorization':`Bearer ${token}`}});}catch(e){}
+  try{
+    const r=await fetch(`${API}/admin/users/${deleteUserId}/`,{method:'DELETE',headers:{'Authorization':`Bearer ${token}`}});
+    // The row used to disappear and report success even on a 403, which hid
+    // both permission problems and users that were still there.
+    if(!r.ok)throw new Error(describeFailure(r.status));
+  }catch(e){showToast('⚠ '+e.message,'error');closeModal();return;}
   allUsers=allUsers.filter(u=>u.id!==deleteUserId);
   showToast('✅ User deleted successfully','success');closeModal();renderUsersTable(allUsers);
 }
@@ -152,12 +141,5 @@ function renderPlaylists(){
 function fmtDate(s){if(!s)return'—';try{return new Date(s).toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'});}catch(e){return'—';}}
 function showToast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),3000);}
 
-function genUsers(){
-  const ns=['maria_santos','juan_dela_cruz','ana_reyes','carlos_garcia','lea_mendoza','miguel_torres','grace_lim','ryan_uy','jasmine_go','kevin_tan','patricia_cruz','mark_ramos','claire_dg','jerome_sy','kate_villanueva'];
-  return ns.map((n,i)=>({id:i+1,username:n,email:`${n}@gmail.com`,is_spotify_connected:Math.random()>.4,created_at:new Date(Date.now()-Math.random()*90*86400000).toISOString(),prompt_count:Math.floor(Math.random()*80)+1}));
-}
-
-document.getElementById('login-password').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-// Auto-login if token saved
-if(token){showApp();loadDashboard();}
+loadDashboard();
 

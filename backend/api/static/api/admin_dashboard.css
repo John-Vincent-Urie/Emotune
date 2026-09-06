@@ -681,104 +681,6 @@ td {
   font-weight:700
 }
 
-#login-page {
-  position:fixed;
-  inset:0;
-  background:var(--bg);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  z-index:1000
-}
-
-.login-card {
-  width:400px;
-  background:var(--card);
-  border:1px solid var(--border);
-  border-radius:24px;
-  padding:40px
-}
-
-.login-logo {
-  display:flex;
-  align-items:center;
-  gap:14px;
-  margin-bottom:32px
-}
-
-.login-title {
-  font-family:'Space Mono',monospace;
-  font-size:22px;
-  font-style:italic;
-  background:linear-gradient(135deg,var(--lime),var(--teal));
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
-  background-clip:text
-}
-
-.login-subtitle {
-  font-size:11px;
-  color:var(--muted);
-  letter-spacing:.08em;
-  text-transform:uppercase
-}
-
-.form-label {
-  font-size:12px;
-  color:var(--muted);
-  margin-bottom:6px;
-  display:block;
-  font-family:'Space Mono',monospace
-}
-
-.form-input {
-  width:100%;
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:10px;
-  padding:11px 14px;
-  color:var(--text);
-  font-size:14px;
-  font-family:'DM Sans',sans-serif;
-  outline:none;
-  transition:border-color .15s;
-  margin-bottom:16px
-}
-
-.form-input:focus {
-  border-color:var(--lime)
-}
-
-.login-btn {
-  width:100%;
-  padding:12px;
-  background:linear-gradient(135deg,var(--lime),var(--lime2));
-  border:none;
-  border-radius:10px;
-  color:#000;
-  font-weight:700;
-  font-size:15px;
-  cursor:pointer;
-  font-family:'DM Sans',sans-serif;
-  transition:opacity .15s;
-  margin-top:4px
-}
-
-.login-btn:hover {
-  opacity:.9
-}
-
-.login-error {
-  font-size:13px;
-  color:var(--red);
-  background:rgba(255,77,109,.08);
-  border:1px solid rgba(255,77,109,.2);
-  border-radius:8px;
-  padding:10px 14px;
-  margin-bottom:16px;
-  display:none
-}
-
 .modal-overlay {
   position:fixed;
   inset:0;
@@ -906,7 +808,9 @@ td {
 }
 
 .app-shell {
-  display:none;
+  /* The page is only served to signed-in staff now, so the shell is what you
+     see on load; it used to start hidden behind the in-page login screen. */
+  display:flex;
   width:100%
 }
 
@@ -914,11 +818,22 @@ td {
   margin-top:8px
 }
 
+.logout-form {
+  display:flex
+}
+
+/* A real form button now, so logging out goes through Django's POST-only
+   admin logout instead of just dropping a token in the browser. */
 .logout-icon {
   cursor:pointer;
   color:var(--muted);
   font-size:14px;
-  transition:color .15s
+  transition:color .15s;
+  background:none;
+  border:0;
+  padding:0;
+  line-height:1;
+  font-family:inherit
 }
 
 .logout-icon:hover {

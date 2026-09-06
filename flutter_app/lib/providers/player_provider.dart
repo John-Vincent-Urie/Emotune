@@ -1032,7 +1032,7 @@ class PlayerProvider extends ChangeNotifier {
         await playTrackAtIndex(_currentIndex, preferInstantPreview: true);
         return;
       }
-      _trackListened();
+      _trackListened(endedReason: 'completed');
       final nextIndex = _computeNextLocalIndex();
       if (nextIndex != null) {
         await playTrackAtIndex(nextIndex, preferInstantPreview: true);
@@ -1044,40 +1044,63 @@ class PlayerProvider extends ChangeNotifier {
     }
   }
 
-  void _trackListened() {
+  /// Report how this playback ended.
+  ///
+  /// [endedReason] is 'completed' when the track played out on its own and
+  /// 'skipped' when the user moved on. Both are sent to the backend: a skip is
+  /// the only negative signal the music picker's ranker gets, and the previous
+  /// version returned early on short listens, so every skip was thrown away and
+  /// the training set ended up as positives only.
+  ///
+  /// The in-app counters below keep their original bar. A three-second skip is
+  /// worth recording, but it is not a track the user listened to, so it must
+  /// not advance the session plan or trigger the "feel better" check-in.
+  void _trackListened({String endedReason = 'skipped'}) {
     final track = _currentTrack;
-    if (track != null && _currentEmotion != null) {
-      final itemType =
-          track['item_type']?.toString().trim().toLowerCase() ?? 'track';
-      final artistName = track['artist']?.toString().trim() ?? '';
-      final listenSecs = _position.inSeconds;
-      final durationSeconds = _duration.inSeconds > 0
-          ? _duration.inSeconds
-          : Duration(milliseconds: _durationFromTrack(track)).inSeconds;
-      final minimumTrackedListenSeconds =
-          durationSeconds > 0 && durationSeconds <= 35
-              ? math.max(durationSeconds - 2, 20)
-              : 30;
-      _totalListenTime += listenSecs;
+    if (track == null || _currentEmotion == null) {
+      return;
+    }
 
-      if (listenSecs >= minimumTrackedListenSeconds &&
-          itemType == 'track' &&
-          artistName.toLowerCase() != 'open in spotify') {
-        _completedTrackCount += 1;
-        _updateLocalSessionPlanProgress();
-        unawaited(ApiService.updateListenTime(
-          track['id'] ?? '',
-          _currentEmotion!,
-          listenSecs,
-          track['name'] ?? '',
-          track['artist'] ?? '',
-          itemType: itemType,
-          historyId: _historyId,
-          trainSession: _trainOnThisSession,
-        ));
-        notifyListeners();
-        unawaited(_maybeTriggerFeelBetterCheckin());
-      }
+    final itemType =
+        track['item_type']?.toString().trim().toLowerCase() ?? 'track';
+    final artistName = track['artist']?.toString().trim() ?? '';
+    final trackId = track['id']?.toString().trim() ?? '';
+    final listenSecs = _position.inSeconds;
+    final durationMs = _duration.inMilliseconds > 0
+        ? _duration.inMilliseconds
+        : _durationFromTrack(track);
+    final durationSeconds = Duration(milliseconds: durationMs).inSeconds;
+    final minimumTrackedListenSeconds =
+        durationSeconds > 0 && durationSeconds <= 35
+            ? math.max(durationSeconds - 2, 20)
+            : 30;
+    _totalListenTime += listenSecs;
+
+    final isReportableTrack = itemType == 'track' &&
+        trackId.isNotEmpty &&
+        artistName.toLowerCase() != 'open in spotify';
+    if (!isReportableTrack || listenSecs <= 0) {
+      return;
+    }
+
+    unawaited(ApiService.updateListenTime(
+      trackId,
+      _currentEmotion!,
+      listenSecs,
+      track['name'] ?? '',
+      track['artist'] ?? '',
+      itemType: itemType,
+      historyId: _historyId,
+      trainSession: _trainOnThisSession,
+      durationMs: durationMs > 0 ? durationMs : null,
+      endedReason: endedReason,
+    ));
+
+    if (listenSecs >= minimumTrackedListenSeconds) {
+      _completedTrackCount += 1;
+      _updateLocalSessionPlanProgress();
+      notifyListeners();
+      unawaited(_maybeTriggerFeelBetterCheckin());
     }
   }
 

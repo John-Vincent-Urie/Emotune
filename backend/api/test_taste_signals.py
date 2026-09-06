@@ -1,15 +1,9 @@
-"""Taste control: what "prefer instrumental" changes, and when LightFM is
-allowed to rank at all."""
+"""Taste control: what "prefer instrumental" changes about ranking."""
 
-from unittest.mock import MagicMock, patch
+from django.test import TestCase
 
-from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
-
-from api.lightfm_ranker import LightFMMusicRanker
 from api.spotify.utils import _taste_instrumental_signal
 from api.spotify_service import spotify_service
-from users.models import FavoriteTrack
 
 
 def _track(track_id, name, artist, album='Album', source='spotify_catalog'):
@@ -139,97 +133,3 @@ class InstrumentalRankingTests(TestCase):
                 query_mode,
             )
 
-
-@override_settings(
-    LIGHTFM_RECOMMENDER_ENABLED=True,
-    LIGHTFM_RECOMMENDER_MIN_INTERACTIONS=200,
-    LIGHTFM_RECOMMENDER_MIN_USER_INTERACTIONS=20,
-)
-class LightFMDataFloorTests(TestCase):
-    """LightFM gets 40% of the blend, so it has to earn it first."""
-
-    def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            username='floor', email='floor@example.com', password='pw12345!',
-        )
-        self.ranker = LightFMMusicRanker()
-        self.candidates = [
-            _track('track-a', 'Quiet Song', 'Artist A'),
-            _track('track-b', 'Louder Song', 'Artist B'),
-        ]
-
-    def _favorites(self, count, user=None):
-        for index in range(count):
-            FavoriteTrack.objects.create(
-                user=user or self.user,
-                spotify_track_id=f'fav-{id(user)}-{index}',
-                track_name=f'Song {index}',
-                artist_name='Artist',
-            )
-
-    def _pick(self):
-        """Rank with a model that would explode if it were ever built."""
-        dataset_class = MagicMock(name='Dataset')
-        with patch.object(
-            self.ranker,
-            '_get_lightfm_classes',
-            return_value=(MagicMock(name='LightFM'), dataset_class),
-        ):
-            result = self.ranker.pick_playlist(
-                prompt_text='winding down',
-                emotion='calm',
-                top_emotions=[{'emotion': 'calm', 'confidence': 1.0}],
-                candidates=list(self.candidates),
-                user=self.user,
-                playlist_size=2,
-            )
-        return result, dataset_class
-
-    def test_a_thin_corpus_never_reaches_the_model(self):
-        self._favorites(5)
-        result, dataset_class = self._pick()
-        self.assertEqual(result['strategy'], 'heuristic_playlist')
-        self.assertEqual(result['error'], 'lightfm_insufficient_interactions')
-        dataset_class.assert_not_called()
-
-    def test_a_stranger_is_not_ranked_off_other_peoples_listening(self):
-        crowd = get_user_model().objects.create_user(
-            username='crowd', email='crowd@example.com', password='pw12345!',
-        )
-        self._favorites(220, user=crowd)
-        self._favorites(2)
-
-        result, dataset_class = self._pick()
-        self.assertEqual(result['strategy'], 'heuristic_playlist')
-        self.assertEqual(result['error'], 'lightfm_insufficient_user_interactions')
-        dataset_class.assert_not_called()
-
-
-class LightFMBlendWeightTests(TestCase):
-    """An undecided model must not arrive looking as opinionated as the
-    emotion ranking, which min-max normalization would otherwise make it."""
-
-    def setUp(self):
-        self.ranker = LightFMMusicRanker()
-        # Close on emotion, so the model's opinion is what decides the top.
-        self.candidates = [
-            {**_track('a', 'A', 'Artist'), 'emotion_alignment_score': 5.0},
-            {**_track('b', 'B', 'Artist'), 'emotion_alignment_score': 4.9},
-            {**_track('c', 'C', 'Artist'), 'emotion_alignment_score': 1.0},
-        ]
-        self.scores = {'a': 4.0, 'b': 9.0, 'c': 0.0}
-
-    def _order(self, confidence):
-        ranked = self.ranker._blend_scores(
-            self.candidates, self.scores, confidence=confidence,
-        )
-        return [track['id'] for track in ranked]
-
-    def test_a_confident_model_can_overturn_the_emotion_order(self):
-        self.assertEqual(self._order(1.0)[0], 'b')
-
-    def test_an_undecided_model_leaves_the_emotion_order_alone(self):
-        self.assertEqual(self._order(0.0), ['a', 'b', 'c'])
-
-    def test_a_missing_confidence_is_treated_as_no_confidence(self):
-        self.assertEqual(self._order(None), ['a', 'b', 'c'])

@@ -5,6 +5,11 @@ from __future__ import annotations
 from typing import Mapping
 
 
+# Only two modes ship. "Match My Mood" mirrors the detected emotion;
+# "Calm Me Down" steers it toward something steadier. The focus, lift and
+# sleep modes were cut -- they were never reachable from the app, and a
+# therapy tool is easier to defend with one clearly-stated regulating
+# direction than with five that were each only half-tuned.
 OUTCOME_MODE_CONFIG = {
     "match_mood": {
         "label": "Match My Mood",
@@ -32,52 +37,60 @@ OUTCOME_MODE_CONFIG = {
         "check_in_prompt": "Has this session helped you settle down a little?",
         "completion_message": "Nice. I will keep the session calm and steady from here.",
     },
-    "help_me_focus": {
-        "label": "Help Me Focus",
-        "description": "Balance calm and momentum so the playlist supports concentration.",
-        "target_weights": {
-            "calm": 0.4,
-            "motivational": 0.35,
-            "happy": 0.15,
-            "mixed": 0.1,
-        },
-        "target_weight": 0.55,
-        "default_session_minutes": 45,
-        "default_check_in_tracks": 4,
-        "check_in_prompt": "Is this session helping you focus better?",
-        "completion_message": "Great. I will keep the focus lane stable and out of the way.",
-    },
-    "lift_me_up": {
-        "label": "Lift Me Up",
-        "description": "Nudge the energy upward without losing emotional fit.",
-        "target_weights": {
-            "happy": 0.42,
-            "motivational": 0.33,
-            "calm": 0.15,
-            "mixed": 0.1,
-        },
-        "target_weight": 0.52,
-        "default_session_minutes": 20,
-        "default_check_in_tracks": 4,
-        "check_in_prompt": "Is this session starting to lift your mood?",
-        "completion_message": "Good. I will keep the energy brighter without overdoing it.",
-    },
-    "sleep": {
-        "label": "Help Me Sleep",
-        "description": "Bias toward softer, slower, less jarring recommendations.",
-        "target_weights": {
-            "calm": 0.62,
-            "nostalgic": 0.14,
-            "sad": 0.04,
-            "mixed": 0.2,
-        },
-        "target_weight": 0.68,
-        "default_session_minutes": 45,
-        "default_check_in_tracks": 3,
-        "check_in_prompt": "Is this session helping you wind down for sleep?",
-        "completion_message": "I will keep things gentle and low-stimulation from here.",
-    },
 }
+
+# Which of the two modes an emotion routes to (docs/arch).
+#
+# The classifier picks the mode; there is no user-facing switch. Emotions the
+# listener has no reason to be moved out of are mirrored, and the distressing
+# ones are steered toward something steadier rather than deepened -- playing
+# heartbreak songs at someone who just said they feel hopeless is the failure
+# mode a therapy tool has to avoid.
+#
+# "mixed" is mirrored: it means the classifier could not commit, and steering
+# someone toward calm when there is no evidence they are distressed presumes
+# more than the signal supports.
+EMOTION_OUTCOME_MODES = {
+    # Match My Mood
+    "happy": "match_mood",
+    "surprising": "match_mood",
+    "motivational": "match_mood",
+    "calm": "match_mood",
+    "romantic": "match_mood",
+    "nostalgic": "match_mood",
+    "mixed": "match_mood",
+    # Calm Me Down
+    "sad": "calm_me_down",
+    "stressed": "calm_me_down",
+    "depressing": "calm_me_down",
+    "angry": "calm_me_down",
+    "fear": "calm_me_down",
+    "lonely": "calm_me_down",
+}
+
+
+def outcome_mode_for_emotion(emotion) -> str:
+    """The mode this emotion routes to, per docs/arch."""
+    normalized = str(emotion or "").strip().lower()
+    return EMOTION_OUTCOME_MODES.get(normalized, "match_mood")
+
+
+def normalize_requested_outcome_mode(value) -> str | None:
+    """A caller's explicit mode, or None to let the emotion decide.
+
+    Distinct from `normalize_outcome_mode`, which collapses anything unknown to
+    "match_mood". Here an absent or retired mode has to stay None, or a stage-2
+    continuation carrying a mode that no longer exists would silently pin the
+    session to Match My Mood instead of routing on the emotion.
+    """
+    candidate = str(value or "").strip().lower()
+    return candidate if candidate in OUTCOME_MODE_CONFIG else None
+
+
+def resolve_outcome_mode(emotion, requested=None) -> str:
+    """An explicit request wins; otherwise the detected emotion decides."""
+    return normalize_requested_outcome_mode(requested) or outcome_mode_for_emotion(emotion)
+
 
 TASTE_FAMILIARITY_OPTIONS = {"balanced", "familiar", "discovery"}
 

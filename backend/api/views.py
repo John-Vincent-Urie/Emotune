@@ -21,17 +21,23 @@ from datetime import timedelta
 from django.contrib.admin.views.decorators import staff_member_required
 from rest_framework_simplejwt.tokens import AccessToken
 
-from .spotify.recommendations import STATIC_TRACK_SOURCES, music_doc_tracks
+from .spotify.recommendations import (
+    STATIC_TRACK_SOURCES,
+    familiar_favorite_quota,
+    music_doc_tracks,
+)
 from .spotify_service import spotify_service
 from .spotify_oauth_state import (
     issue_state as issue_spotify_oauth_state,
     read_state as read_spotify_oauth_state,
 )
-from .lightfm_ranker import lightfm_music_ranker
+from .music_picker import music_picker
 from .recommendation_session import (
     apply_outcome_mode,
     build_session_plan,
     normalize_outcome_mode,
+    normalize_requested_outcome_mode,
+    outcome_mode_for_emotion,
     normalize_taste_profile,
     outcome_mode_config,
     should_persist_recommendation_context,
@@ -58,9 +64,6 @@ RECOVERY_TRIGGER_CONFIDENCE = 0.90
 RECOVERY_CHECK_INTERVAL_TRACKS = 5
 OUTCOME_SUPPORT_MESSAGES = {
     'calm_me_down': "Let's bring the energy down gently.",
-    'help_me_focus': "Let's build a steadier lane for focus.",
-    'lift_me_up': "Let's nudge the mood upward a little.",
-    'sleep': "Let's keep things softer and more sleep-friendly.",
 }
 
 
@@ -132,7 +135,13 @@ def _history_allows_personalization_learning(history):
 
 
 def _request_outcome_mode(request):
-    return normalize_outcome_mode(request.data.get('outcome_mode'))
+    """The mode the caller asked for, unresolved.
+
+    Returned raw because the fallback is no longer a constant: with no explicit
+    mode the detected emotion picks one, and that emotion is not known until
+    after classification.
+    """
+    return request.data.get('outcome_mode')
 
 
 def _request_session_length_minutes(request):
@@ -434,7 +443,7 @@ class EmotionResponseBuilder:
         history_id=None,
         recommendation_profile=None,
         recovery_plan=None,
-        outcome_mode='match_mood',
+        outcome_mode=None,
         session_length_minutes=None,
         check_in_frequency_tracks=None,
         taste_profile=None,
@@ -463,15 +472,24 @@ class EmotionResponseBuilder:
         normalized_recommendation_stage = (
             str(self.recommendation_stage or 'full').strip().lower() or 'full'
         )
-        normalized_outcome_mode = normalize_outcome_mode(self.outcome_mode)
+        requested_outcome_mode = normalize_requested_outcome_mode(self.outcome_mode)
         normalized_taste_profile = normalize_taste_profile(self.taste_profile)
+        # A session plan is still something the user asks for. Routing picking
+        # Calm Me Down for a sad prompt must not start scheduling check-ins for
+        # everyone who was simply feeling low.
         has_custom_session_request = (
             self.session_length_minutes is not None
-            or normalized_outcome_mode != 'match_mood'
+            or (requested_outcome_mode or 'match_mood') != 'match_mood'
         )
         is_initial_stage = normalized_recommendation_stage == 'initial'
         is_continuation_stage = normalized_recommendation_stage == 'continuation'
         emotion = self.result.get('emotion', 'mixed')
+        # docs/arch: the classifier picks the mode. An explicit request still
+        # wins, which is what keeps a stage-2 continuation on the mode stage 1
+        # already committed to.
+        normalized_outcome_mode = (
+            requested_outcome_mode or outcome_mode_for_emotion(emotion)
+        )
         confidence = self.result.get('confidence', 1.0)
         all_scores = self.result.get('all_scores', _fallback_analysis()['all_scores'])
         top_emotions = self.result.get('top_emotions', [])
@@ -701,7 +719,7 @@ class EmotionResponseBuilder:
                 'confirmation': music_picker_confirmation,
             }
         else:
-            playlist_result = lightfm_music_ranker.pick_playlist(
+            playlist_result = music_picker.pick_playlist(
                 prompt_text=self.text,
                 emotion=recommendation_emotion,
                 top_emotions=recommendation_top_emotions,
@@ -1020,17 +1038,24 @@ def _apply_taste_control(
     working = [track for track in (tracks or []) if isinstance(track, dict)]
 
     if familiarity == 'familiar':
-        leads = _emotion_favorite_leads(emotions, user, limit=limit or 20)
+        # The favorites lead, but only up to their quota: the rest of the
+        # playlist stays available for songs the user has not heard yet.
+        leads = _emotion_favorite_leads(
+            emotions,
+            user,
+            limit=familiar_favorite_quota(limit),
+        )
         if leads:
             lead_ids = {
                 str(track.get('id') or '').strip()
                 for track in leads
                 if str(track.get('id') or '').strip()
             }
-            working = leads + [
+            fresh = [
                 track for track in working
                 if str(track.get('id') or '').strip() not in lead_ids
             ]
+            working = leads + fresh
             selected_track = leads[0]
     elif familiarity == 'discovery':
         # Discovery must not serve the static curated list, but an empty
@@ -1087,7 +1112,7 @@ def _build_emotion_response_payload(
     history_id=None,
     recommendation_profile=None,
     recovery_plan=None,
-    outcome_mode='match_mood',
+    outcome_mode=None,
     session_length_minutes=None,
     check_in_frequency_tracks=None,
     taste_profile=None,

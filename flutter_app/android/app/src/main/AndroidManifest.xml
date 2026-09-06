@@ -35,6 +35,17 @@
                     android:scheme="emotune"
                     android:host="spotify-auth-callback" />
             </intent-filter>
+            <!-- Return path from the backend's Spotify OAuth callback page,
+                 so finishing login in the browser reopens EmoTune. Separate
+                 host from spotify-auth-callback, which the Spotify SDK owns. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="emotune"
+                    android:host="spotify-connected" />
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

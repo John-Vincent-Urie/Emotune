@@ -23,6 +23,7 @@ class SpotifyAvailabilityTracker {
   static const Duration _recheckInterval = Duration(minutes: 5);
 
   bool _isBlocked = false;
+  bool _authorizationBlocked = false;
   String? _blockedReason;
   DateTime? _checkedAt;
   Future<void>? _inFlightCheck;
@@ -32,7 +33,13 @@ class SpotifyAvailabilityTracker {
 
   /// Force a fresh availability check now, bypassing the cache interval.
   /// Call this after the user reconnects Spotify or fixes an account issue.
-  Future<void> retry() => ensureChecked(force: true);
+  /// Also lifts an on-device authorization block, since that is the only way
+  /// out of one short of restarting the app.
+  Future<void> retry() {
+    _authorizationBlocked = false;
+    _spotifyRemote.resetInteractiveAuthCooldown();
+    return ensureChecked(force: true);
+  }
 
   Future<void> ensureChecked({bool force = false}) async {
     if (!_spotifyRemote.isSupportedPlatform) {
@@ -111,6 +118,16 @@ class SpotifyAvailabilityTracker {
     _clearBlocked();
   }
 
+  /// Records that Spotify's own approval screen rejected playback on this
+  /// device. Unlike [markBlocked], this survives a backend status refresh:
+  /// the backend cannot see on-device authorization, so [_applyStatus] would
+  /// otherwise clear the block and let the doomed attempt — and the approval
+  /// screen it launches — fire again on the next track.
+  void markAuthorizationBlocked(String reason) {
+    _authorizationBlocked = true;
+    markBlocked(reason);
+  }
+
   void markBlocked(String reason) {
     final trimmedReason = reason.trim().isNotEmpty
         ? reason.trim()
@@ -124,7 +141,7 @@ class SpotifyAvailabilityTracker {
   }
 
   void _clearBlocked() {
-    if (!_isBlocked) {
+    if (_authorizationBlocked || !_isBlocked) {
       return;
     }
     _isBlocked = false;

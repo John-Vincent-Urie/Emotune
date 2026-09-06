@@ -84,6 +84,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'channels',
     'api',
@@ -160,16 +161,104 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    # Credential endpoints are the ones worth rate limiting: without this a
+    # client can guess passwords against /api/users/login/ as fast as the
+    # network allows. Scopes are applied by the throttles in users/throttles.py.
+    'DEFAULT_THROTTLE_RATES': {
+        'login_ip': os.getenv('THROTTLE_LOGIN_IP', '20/min'),
+        'login_email': os.getenv('THROTTLE_LOGIN_EMAIL', '10/min'),
+        'register': os.getenv('THROTTLE_REGISTER', '10/hour'),
+        'password_change': os.getenv('THROTTLE_PASSWORD_CHANGE', '10/hour'),
+    },
 }
+
+def _access_token_lifetime():
+    """Short-lived access tokens, with the old day-based setting still honoured.
+
+    A stolen access token cannot be revoked, so it should live minutes rather
+    than a day; the refresh token (which can be blacklisted) carries the
+    session. JWT_ACCESS_TOKEN_DAYS still wins when explicitly set so existing
+    deployments keep their configured value.
+    """
+    configured_days = os.getenv('JWT_ACCESS_TOKEN_DAYS')
+    if configured_days:
+        return timedelta(days=env_int('JWT_ACCESS_TOKEN_DAYS', 1))
+    return timedelta(minutes=env_int('JWT_ACCESS_TOKEN_MINUTES', 60))
+
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=env_int('JWT_ACCESS_TOKEN_DAYS', 1)),
+    'ACCESS_TOKEN_LIFETIME': _access_token_lifetime(),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=env_int('JWT_REFRESH_TOKEN_DAYS', 30)),
     'ROTATE_REFRESH_TOKENS': True,
+    # Without this, a refresh token that has already been rotated away stays
+    # valid for its full lifetime, so a leaked one is usable for 30 days and
+    # logging out cannot revoke anything.
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
 }
 
-CORS_ALLOW_ALL_ORIGINS = env_bool('DJANGO_CORS_ALLOW_ALL_ORIGINS', True)
-CORS_ALLOW_CREDENTIALS = env_bool('DJANGO_CORS_ALLOW_CREDENTIALS', True)
+# Wide-open CORS is a development convenience, so it follows DEBUG rather than
+# staying on by default: a deployed backend that echoes any origin lets any
+# site on the internet script calls against it from a visitor's browser.
+CORS_ALLOW_ALL_ORIGINS = env_bool('DJANGO_CORS_ALLOW_ALL_ORIGINS', DEBUG)
+CORS_ALLOWED_ORIGINS = env_list('DJANGO_CORS_ALLOWED_ORIGINS', [])
+# The API authenticates with an Authorization header, never a cookie, so it has
+# no reason to accept credentialed cross-origin requests -- and pairing that
+# with allow-all origins is the combination browsers specifically forbid.
+CORS_ALLOW_CREDENTIALS = env_bool('DJANGO_CORS_ALLOW_CREDENTIALS', False)
+
+# django-cors-headers answers allow-all by echoing the caller's own Origin, so
+# pairing it with credentials does not hit the browser's "* plus credentials"
+# ban -- it just works, and hands every site on the internet authenticated
+# access. An .env carried over from development can set both without anyone
+# noticing, so refuse to start rather than serve that.
+if not DEBUG and CORS_ALLOW_ALL_ORIGINS and CORS_ALLOW_CREDENTIALS:
+    raise ImproperlyConfigured(
+        'DJANGO_CORS_ALLOW_ALL_ORIGINS and DJANGO_CORS_ALLOW_CREDENTIALS must not '
+        'both be enabled when DEBUG is false. List the origins that may call the '
+        'API in DJANGO_CORS_ALLOWED_ORIGINS instead.'
+    )
+# Needed once the admin panel is served over HTTPS behind a proxy, because
+# Django checks the Origin of the admin's POST forms against this list.
+CSRF_TRUSTED_ORIGINS = env_list('DJANGO_CSRF_TRUSTED_ORIGINS', [])
+
+# --- Transport and cookie hardening -----------------------------------------
+# Everything here keys off DEBUG so local HTTP development is untouched while a
+# DEBUG=False deployment is hardened by default. Each one is still overridable
+# for the odd environment that needs it.
+
+# Only trust X-Forwarded-Proto when a proxy in front of Django actually sets it.
+# Turning this on without one lets a client claim its plain HTTP request was
+# secure just by sending the header.
+if env_bool('DJANGO_TRUST_PROXY_SSL_HEADER', False):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+SECURE_SSL_REDIRECT = env_bool('DJANGO_SECURE_SSL_REDIRECT', not DEBUG)
+SESSION_COOKIE_SECURE = env_bool('DJANGO_SESSION_COOKIE_SECURE', not DEBUG)
+CSRF_COOKIE_SECURE = env_bool('DJANGO_CSRF_COOKIE_SECURE', not DEBUG)
+
+# The admin session cookie is the key to the dashboard, and nothing in the
+# project reads either cookie from JavaScript, so keep both away from scripts.
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+
+# A year, so the browser refuses to downgrade to HTTP after the first visit.
+# Preload is left off by default: submitting a domain to the browser preload
+# list is slow to undo, and that should be a deliberate choice.
+SECURE_HSTS_SECONDS = env_int('DJANGO_SECURE_HSTS_SECONDS', 0 if DEBUG else 31536000)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool(
+    'DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS',
+    not DEBUG,
+)
+SECURE_HSTS_PRELOAD = env_bool('DJANGO_SECURE_HSTS_PRELOAD', False)
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'same-origin'
+# Nothing in EmoTune is meant to be framed, and the admin dashboard is exactly
+# the kind of page clickjacking targets.
+X_FRAME_OPTIONS = 'DENY'
 
 # Spotify API
 SPOTIFY_CLIENT_ID = os.getenv(
@@ -187,6 +276,19 @@ SPOTIFY_REDIRECT_URI = os.getenv(
 SPOTIFY_APP_REMOTE_REDIRECT_URI = os.getenv(
     'SPOTIFY_APP_REMOTE_REDIRECT_URI',
     'emotune://spotify-auth-callback',
+)
+# Deep link the OAuth callback page sends the browser back to so the phone
+# returns to EmoTune once Spotify login finishes. Deliberately a different
+# host from SPOTIFY_APP_REMOTE_REDIRECT_URI, which the Spotify SDK owns.
+SPOTIFY_APP_RETURN_URI = os.getenv(
+    'SPOTIFY_APP_RETURN_URI',
+    'emotune://spotify-connected',
+)
+# How long a Spotify OAuth `state` stays valid. Long enough to log in and pick
+# an account, short enough that a leaked callback URL goes stale quickly.
+SPOTIFY_OAUTH_STATE_MAX_AGE_SECONDS = env_int(
+    'SPOTIFY_OAUTH_STATE_MAX_AGE_SECONDS',
+    600,
 )
 SPOTIFY_SCOPE = (
     'user-read-private user-read-email playlist-read-private '
@@ -226,60 +328,60 @@ SPOTIFY_PROGRESSIVE_CONTINUATION_CANDIDATE_LIMIT = env_int(
     'SPOTIFY_PROGRESSIVE_CONTINUATION_CANDIDATE_LIMIT',
     20,
 )
+# Shared per-emotion candidate pool ("waiting room"). Pre-fetched Spotify
+# candidates are served straight from the database so a recommendation no
+# longer waits on a chain of live catalog searches. Keep the ages short: this
+# is a cache, not a local copy of the Spotify catalog.
+SPOTIFY_TRACK_POOL_ENABLED = env_bool('SPOTIFY_TRACK_POOL_ENABLED', True)
+SPOTIFY_TRACK_POOL_TARGET_SIZE = env_int('SPOTIFY_TRACK_POOL_TARGET_SIZE', 100)
+SPOTIFY_TRACK_POOL_FRESH_SECONDS = env_int(
+    'SPOTIFY_TRACK_POOL_FRESH_SECONDS',
+    6 * 60 * 60,
+)
+SPOTIFY_TRACK_POOL_MAX_AGE_SECONDS = env_int(
+    'SPOTIFY_TRACK_POOL_MAX_AGE_SECONDS',
+    24 * 60 * 60,
+)
+# What a pool hit may still spend on the queries that are specific to this
+# request (preferred artists, LLM picks, playlist category).
+SPOTIFY_TRACK_POOL_LIVE_QUERY_BUDGET_SECONDS = env_float(
+    'SPOTIFY_TRACK_POOL_LIVE_QUERY_BUDGET_SECONDS',
+    1.5,
+)
+SPOTIFY_TRACK_POOL_LIVE_QUERY_SHARE = env_float(
+    'SPOTIFY_TRACK_POOL_LIVE_QUERY_SHARE',
+    0.4,
+)
+SPOTIFY_TRACK_POOL_REFRESH_BUDGET_SECONDS = env_float(
+    'SPOTIFY_TRACK_POOL_REFRESH_BUDGET_SECONDS',
+    25.0,
+)
+MUSIC_PICKER_PLAYLIST_DOC = os.getenv(
+    'MUSIC_PICKER_PLAYLIST_DOC',
+    str(PROJECT_ROOT / 'docs' / 'music.md'),
+)
+MUSIC_PICKER_EMOTION_SEED_TRACK_LIMIT = env_int(
+    'MUSIC_PICKER_EMOTION_SEED_TRACK_LIMIT',
+    10,
+)
 RECOMMENDATION_CONTINUATION_MAX_AGE_SECONDS = env_int(
     'RECOMMENDATION_CONTINUATION_MAX_AGE_SECONDS',
     900,
 )
-LIGHTFM_RECOMMENDER_ENABLED = env_bool(
-    'LIGHTFM_RECOMMENDER_ENABLED',
+# The music picker's model: a linear ranker whose weights are fitted offline by
+# ml_model/train_picker_ranker.py. Serving it costs one dot product per
+# candidate -- no native build, no per-request model fitting, so it runs
+# anywhere the backend runs. With no artifact on disk the built-in defaults
+# reproduce the hand-tuned blend the picker shipped with.
+PICKER_RANKER_ENABLED = env_bool(
+    'PICKER_RANKER_ENABLED',
     True,
 )
-LIGHTFM_RECOMMENDER_ALLOW_WINDOWS = env_bool(
-    'LIGHTFM_RECOMMENDER_ALLOW_WINDOWS',
-    False,
+PICKER_RANKER_WEIGHTS_PATH = os.getenv(
+    'PICKER_RANKER_WEIGHTS_PATH',
+    str(BASE_DIR.parent / 'ml_model' / 'artifacts' / 'picker_weights.json'),
 )
-LIGHTFM_RECOMMENDER_LOSS = os.getenv(
-    'LIGHTFM_RECOMMENDER_LOSS',
-    'warp',
-)
-LIGHTFM_RECOMMENDER_COMPONENTS = env_int(
-    'LIGHTFM_RECOMMENDER_COMPONENTS',
-    16,
-)
-LIGHTFM_RECOMMENDER_EPOCHS = env_int(
-    'LIGHTFM_RECOMMENDER_EPOCHS',
-    20,
-)
-LIGHTFM_RECOMMENDER_ITEM_ALPHA = env_float(
-    'LIGHTFM_RECOMMENDER_ITEM_ALPHA',
-    0.000001,
-)
-LIGHTFM_RECOMMENDER_USER_ALPHA = env_float(
-    'LIGHTFM_RECOMMENDER_USER_ALPHA',
-    0.000001,
-)
-# LightFM only earns its 40% share of the ranking once there is enough
-# behaviour to learn from. Below these floors a fresh model is fitting noise,
-# so the deterministic emotion ranking is the better answer and the ranker
-# hands back its heuristic result instead.
-LIGHTFM_RECOMMENDER_MIN_INTERACTIONS = env_int(
-    'LIGHTFM_RECOMMENDER_MIN_INTERACTIONS',
-    200,
-)
-LIGHTFM_RECOMMENDER_MIN_USER_INTERACTIONS = env_int(
-    'LIGHTFM_RECOMMENDER_MIN_USER_INTERACTIONS',
-    20,
-)
-# The corpus is rebuilt on every request, so the history scans are bounded by
-# age and row count instead of growing with the whole database.
-LIGHTFM_RECOMMENDER_HISTORY_DAYS = env_int(
-    'LIGHTFM_RECOMMENDER_HISTORY_DAYS',
-    120,
-)
-LIGHTFM_RECOMMENDER_MAX_HISTORY_ROWS = env_int(
-    'LIGHTFM_RECOMMENDER_MAX_HISTORY_ROWS',
-    2000,
-)
+
 LLM_MUSIC_PICKER_ENABLED = env_bool(
     'LLM_MUSIC_PICKER_ENABLED',
     False,

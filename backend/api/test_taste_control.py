@@ -219,6 +219,31 @@ class TasteControlPlaylistTests(APITestCase):
         self.assertTrue(body['tracks'])
         self.assertNotEqual(body['tracks'][0]['id'], 'fav-angry')
 
+    def test_familiar_playlist_still_recommends_new_songs(self):
+        # More favorites than the playlist has room for: the lane must still
+        # hand back music the user has not heard, or it stops recommending.
+        for index in range(1, 8):
+            self._favorite(f'fav-{index}', 'calm')
+
+        track_ids = [
+            track['id'] for track in self._full_playlist('familiar')['tracks']
+        ]
+        favorites = [track_id for track_id in track_ids if track_id.startswith('fav-')]
+        new_songs = [
+            track_id for track_id in track_ids if not track_id.startswith('fav-')
+        ]
+
+        self.assertTrue(new_songs)
+        self.assertLessEqual(len(favorites), max(len(track_ids) // 2, 1))
+
+    def test_familiar_playlist_still_opens_with_the_first_favorite(self):
+        for index in range(1, 8):
+            self._favorite(f'fav-{index}', 'calm')
+
+        body = self._full_playlist('familiar')
+        self.assertEqual(body['tracks'][0]['id'], 'fav-1')
+        self.assertEqual(body['selected_track']['id'], 'fav-1')
+
     def test_balanced_plays_the_music_doc_song_first(self):
         # The first stage only asks Spotify for a handful of candidates, so the
         # fixture stays inside that window.
@@ -387,3 +412,116 @@ class BlendTasteControlTests(APITestCase):
             'curated_fallback',
             {track.get('recommendation_source') for track in tracks},
         )
+
+    def test_familiar_blend_caps_the_favorites_at_half_the_playlist(self):
+        user = get_user_model().objects.create_user(
+            username='blendfam', email='blendfam@example.com', password='pw12345!',
+        )
+        for index in range(1, 9):
+            FavoriteTrack.objects.create(
+                user=user,
+                spotify_track_id=f'fav-{index}',
+                track_name=f'Loved {index}',
+                artist_name='Artist',
+                emotion='calm',
+            )
+
+        blended = spotify_service.blend_recommendation_groups(
+            emotion='calm',
+            search_tracks=list(CATALOG_TRACKS),
+            limit=6,
+            taste_profile={'familiarity': 'familiar'},
+            user=user,
+        )
+        track_ids = [str(track.get('id') or '') for track in blended]
+        favorites = [track_id for track_id in track_ids if track_id.startswith('fav-')]
+
+        self.assertLessEqual(len(favorites), 3)
+        self.assertTrue(
+            [track_id for track_id in track_ids if not track_id.startswith('fav-')],
+        )
+
+
+class DocumentLaneWeightTests(APITestCase):
+    """The docs/music.md lane is boosted twice -- a 3.4 source weight (against
+    1.2 for the catalog) and a 3.0 selection reason, so 5.2 in total. Taste
+    settings that opt out of the lane have to shed both, or a static list keeps
+    outranking the catalog music the setting asked for.
+    """
+
+    # The document lane leading by roughly this much is the default, and the
+    # point of the opt-outs is to remove it.
+    LANE_ADVANTAGE = 5.2
+
+    def _gap(self, taste_profile=None):
+        """Rank one music.md track against one catalog track; return the gap.
+
+        Positive means the document track outranks the catalog track.
+        """
+        doc_track = {
+            **_track('doc-1', 'Golden Hour', source='music_md_playlist', artist='JVKE'),
+            'selection_reasons': ['music_md_playlist_seed'],
+        }
+        catalog_track = _track('catalog-1', 'Some Other Song')
+
+        ranked = spotify_service.rank_tracks_for_emotion(
+            [doc_track, catalog_track],
+            emotion='calm',
+            limit=10,
+            taste_profile=taste_profile,
+        )
+        by_id = {track['id']: track for track in ranked}
+        return (
+            by_id['doc-1']['emotion_alignment_score']
+            - by_id['catalog-1']['emotion_alignment_score']
+        )
+
+    def test_the_document_lane_leads_by_default(self):
+        self.assertGreaterEqual(self._gap(), self.LANE_ADVANTAGE)
+
+    def test_discovery_strips_the_document_lane_advantage(self):
+        """A cached music.md track used to arrive 5.2 ahead of the catalog even
+        under discovery, which is the opposite of what the setting asked for."""
+        default_gap = self._gap()
+        discovery_gap = self._gap({'familiarity': 'discovery'})
+
+        self.assertGreaterEqual(default_gap - discovery_gap, self.LANE_ADVANTAGE)
+        self.assertLessEqual(discovery_gap, 0.0)
+
+    def test_instrumental_strips_it_too(self):
+        """This opt-out already existed, but shed only the source weight."""
+        gap = self._gap({'prefer_instrumental': True})
+
+        self.assertGreaterEqual(self._gap() - gap, self.LANE_ADVANTAGE)
+        self.assertLessEqual(gap, 0.1)
+
+    def test_balanced_is_unchanged(self):
+        self.assertAlmostEqual(
+            self._gap({'familiarity': 'balanced'}), self._gap(), places=3,
+        )
+
+    def test_familiar_still_keeps_the_document_lane(self):
+        """Only discovery and instrumental opt out; familiar must not regress."""
+        self.assertGreaterEqual(
+            self._gap({'familiarity': 'familiar'}), self.LANE_ADVANTAGE,
+        )
+
+    def test_discovery_ranks_a_document_track_below_the_catalog(self):
+        """Two tracks the emotion scoring cannot separate on their own -- same
+        keyword, different titles so neither is deduplicated. Under discovery
+        the catalog track has to come first."""
+        doc_track = {
+            **_track(
+                'doc-1', 'Calm Song One', source='music_md_playlist', artist='Artist One',
+            ),
+            'selection_reasons': ['music_md_playlist_seed'],
+        }
+        catalog_track = _track('catalog-1', 'Calm Song Two', artist='Artist Two')
+
+        ranked = spotify_service.rank_tracks_for_emotion(
+            [doc_track, catalog_track],
+            emotion='calm',
+            limit=10,
+            taste_profile={'familiarity': 'discovery'},
+        )
+        self.assertEqual(ranked[0]['id'], 'catalog-1')

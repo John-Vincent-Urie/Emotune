@@ -38,6 +38,7 @@ MUSIC_PICKER_DOC_EMOTIONS = {
     'lonely',
     'romantic',
     'nostalgic',
+    'mixed',
 }
 MUSIC_PICKER_DOC_SEED_SOURCE = 'music_doc'
 
@@ -201,9 +202,13 @@ EMOTION_SEARCH_PARAMS = {
         'genres': ['oldies', '80s', '90s', 'retro', 'classic'],
     },
     'mixed': {
-        'keywords': ['diverse', 'variety', 'mix', 'playlist', 'popular'],
-        'audio_features': {},
-        'genres': ['pop', 'indie', 'hip-hop', 'rock'],
+        # "Mixed" means genuinely ambivalent, not "we could not decide". The
+        # target is bittersweet music -- conflicting affective cues, e.g. a
+        # minor key over an upbeat tempo -- rather than a shuffle of happy
+        # and sad tracks, which just reads as an incoherent queue.
+        'keywords': ['bittersweet', 'wistful', 'melancholy indie', 'longing'],
+        'audio_features': {'target_valence': 0.5, 'target_energy': 0.5, 'target_mode': 0},
+        'genres': ['indie', 'indie-pop', 'folk', 'opm', 'alternative'],
     },
 }
 
@@ -638,6 +643,59 @@ NOSTALGIC_SEED_TRACKS = _seed_tracks(
     ("Somewhere Out There", "Our Lady Peace"),
 )
 
+MIXED_SEED_TRACKS = _seed_tracks(
+    ("Kyoto", "Phoebe Bridgers"),
+    ("The Less I Know The Better", "Tame Impala"),
+    ("Sofia", "Clairo"),
+    ("Heat Waves", "Glass Animals"),
+    ("Ribs", "Lorde"),
+    ("Self Control", "Frank Ocean"),
+    ("Nights", "Frank Ocean"),
+    ("Dreams Tonite", "Alvvays"),
+    ("Sweet Disposition", "The Temper Trap"),
+    ("Somebody That I Used To Know", "Gotye"),
+    ("Bittersweet Symphony", "The Verve"),
+    ("august", "Taylor Swift"),
+    ("Cornelia Street", "Taylor Swift"),
+    ("Space Song", "Beach House"),
+    ("Robbers", "The 1975"),
+    ("Somewhere Only We Know", "Keane"),
+    ("Bags", "Clairo"),
+    ("Silver Springs", "Fleetwood Mac"),
+    ("Chamber Of Reflection", "Mac DeMarco"),
+    ("New Person, Same Old Mistakes", "Tame Impala"),
+    ("Two Slow Dancers", "Mitski"),
+    ("Francis Forever", "Mitski"),
+    ("Stick Season", "Noah Kahan"),
+    ("Cigarette Daydreams", "Cage The Elephant"),
+    ("Slow Dancing In The Dark", "Joji"),
+    ("Motion Sickness", "Phoebe Bridgers"),
+    ("Scott Street", "Phoebe Bridgers"),
+    ("Coffee", "beabadoobee"),
+    ("From The Start", "Laufey"),
+    ("Feels Like Summer", "Childish Gambino"),
+    ("Pasilyo", "SunKissed Lola"),
+    ("Pagsamo", "Arthur Nery"),
+    ("Sa Susunod na Habang Buhay", "Ben&Ben"),
+    ("Kathang Isip", "Ben&Ben"),
+    ("Pagtingin", "Ben&Ben"),
+    ("Uhaw", "Dilaw"),
+    ("With A Smile", "Eraserheads"),
+    ("Ligaya", "Eraserheads"),
+    ("Palagi", "TJ Monterde"),
+    ("Alas Dose", "Cup of Joe"),
+    ("Tingin", "Cup of Joe"),
+    ("Estranghero", "Cup of Joe"),
+    ("Sining", "Dionela"),
+    ("Dilaw", "Maki"),
+    ("Tahanan", "Adie"),
+    ("Paraluman", "Adie"),
+    ("Nangangamba", "Zack Tabudlo"),
+    ("Binibini", "Zack Tabudlo"),
+    ("Ere", "Juan Karlos"),
+    ("Tadhana", "Up Dharma Down"),
+)
+
 MUSIC_PICKER_DOC_SEED_TRACKS = _load_music_picker_doc_seed_tracks()
 
 
@@ -672,6 +730,7 @@ LONELY_SEED_TRACKS = _music_picker_seed_tracks(
 )
 ROMANTIC_SEED_TRACKS = _music_picker_seed_tracks('romantic', ROMANTIC_SEED_TRACKS)
 NOSTALGIC_SEED_TRACKS = _music_picker_seed_tracks('nostalgic', NOSTALGIC_SEED_TRACKS)
+MIXED_SEED_TRACKS = _music_picker_seed_tracks('mixed', MIXED_SEED_TRACKS)
 
 EMOTION_QUERY_PROFILES = {
     'happy': {
@@ -783,19 +842,13 @@ EMOTION_QUERY_PROFILES = {
         'fallback': ['nostalgic songs', 'throwback classics'],
     },
     'mixed': {
-        'seed_tracks': (
-            HAPPY_SEED_TRACKS[:10]
-            + SAD_SEED_TRACKS[:10]
-            + MOTIVATIONAL_SEED_TRACKS[:10]
-            + SURPRISING_SEED_TRACKS[:10]
-            + NOSTALGIC_SEED_TRACKS[:10]
-        ),
+        'seed_tracks': MIXED_SEED_TRACKS,
         'phrases': [
-            'mixed mood songs',
-            'balanced indie pop',
-            'emotional variety songs',
+            'bittersweet songs',
+            'melancholy indie pop',
+            'wistful acoustic songs',
         ],
-        'fallback': ['mood mix', 'indie mix'],
+        'fallback': ['bittersweet mix', 'indie mix'],
     },
 }
 
@@ -849,8 +902,10 @@ EMOTION_ALIGNMENT_HINTS = {
         'avoid_terms': ['rage', 'aggressive', 'workout'],
     },
     'mixed': {
-        'boost_terms': ['mix', 'variety', 'indie', 'alternative', 'balance'],
-        'avoid_terms': [],
+        'boost_terms': [
+            'bittersweet', 'wistful', 'melancholy', 'longing', 'indie', 'acoustic',
+        ],
+        'avoid_terms': ['party', 'rage', 'aggressive', 'workout', 'beast mode', 'club'],
     },
 }
 
@@ -992,7 +1047,9 @@ CURATED_PLAYABLE_CONTEXTS = {
     'lonely': ['sad_songs', 'timeless_love', 'all_out_80s'],
     'romantic': ['timeless_love', 'feel_good_dinner', 'happy_hits'],
     'nostalgic': ['all_out_80s', 'beatles_radio', 'timeless_love'],
-    'mixed': ['top_50_global', 'new_music_friday', 'happy_hits'],
+    # TODO: swap in a verified indie/OPM playlist id -- the library has no
+    # bittersweet-leaning context yet, so this reuses the closest existing ones.
+    'mixed': ['sad_songs', 'all_out_80s', 'new_music_friday'],
 }
 
 

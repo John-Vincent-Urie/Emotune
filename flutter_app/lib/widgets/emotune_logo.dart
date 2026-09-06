@@ -56,48 +56,58 @@ class EmoTuneLogo extends StatelessWidget {
 }
 
 class _SoundWavePainter extends CustomPainter {
+  /// Each eye is a tiny equaliser -- short, tall, short -- so the frequency
+  /// reading survives at the 60px home-screen size, where a longer waveform
+  /// blurs into a single band.
+  static const List<double> _barHalfHeights = [0.055, 0.105, 0.055];
+  static const List<double> _eyeCenters = [0.30, 0.70];
+  // Wider than the gap between eyes would suggest is needed: the two
+  // clusters have to out-group the bars inside them, or six bars read as
+  // one row instead of two eyes.
+  static const double _barGap = 0.09;
+
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
+    // Stroke scales with the logo: it is rendered anywhere from 60 to 130px,
+    // and a fixed width reads chunky at the small end and thin at the large.
+    final stroke = size.width * 0.05;
+
+    final barPaint = Paint()
       ..color = Colors.white
-      ..strokeWidth = 3
+      ..strokeWidth = stroke
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
-    final centerY = size.height * 0.42;
-    final startX = size.width * 0.2;
-    final endX = size.width * 0.8;
-    final totalWidth = endX - startX;
-    
-    // Draw sound wave bars (eyes)
-    final barHeights = [0.12, 0.22, 0.3, 0.22, 0.12, 0.22, 0.3, 0.22, 0.12];
-    final barCount = barHeights.length;
-    final barWidth = totalWidth / (barCount * 2 - 1);
-    
-    for (int i = 0; i < barCount; i++) {
-      final x = startX + i * barWidth * 2;
-      final h = size.height * barHeights[i];
-      canvas.drawLine(
-        Offset(x, centerY - h),
-        Offset(x, centerY + h),
-        paint,
-      );
+    final eyesY = size.height * 0.40;
+
+    for (final eyeCenter in _eyeCenters) {
+      for (var i = 0; i < _barHalfHeights.length; i++) {
+        final x = size.width * (eyeCenter + (i - 1) * _barGap);
+        final halfHeight = size.height * _barHalfHeights[i];
+        canvas.drawLine(
+          Offset(x, eyesY - halfHeight),
+          Offset(x, eyesY + halfHeight),
+          barPaint,
+        );
+      }
     }
 
-    // Smile
+    // Slightly heavier than the bars so the face reads before the waveform.
     final smilePaint = Paint()
       ..color = Colors.white
-      ..strokeWidth = 3
+      ..strokeWidth = stroke * 1.15
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
-    final smilePath = Path();
-    smilePath.moveTo(size.width * 0.3, size.height * 0.65);
-    smilePath.quadraticBezierTo(
-      size.width * 0.5, size.height * 0.78,
-      size.width * 0.7, size.height * 0.65,
-    );
-    canvas.drawPath(smilePath, smilePaint);
+    final smile = Path()
+      ..moveTo(size.width * 0.28, size.height * 0.60)
+      ..quadraticBezierTo(
+        size.width * 0.50,
+        size.height * 0.80,
+        size.width * 0.72,
+        size.height * 0.60,
+      );
+    canvas.drawPath(smile, smilePaint);
   }
 
   @override

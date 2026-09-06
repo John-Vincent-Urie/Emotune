@@ -292,9 +292,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
       final result = await ApiService.recommendByEmotion(
         emotion,
         text: 'Play songs that fit a $emotion mood.',
-        outcomeMode: studio.selectedOutcomeMode,
         sessionLengthMinutes: studio.sessionLengthMinutes,
-        checkInFrequencyTracks: studio.checkInFrequencyTracks,
         tasteProfile: _currentTasteProfile(),
       );
       if (!mounted || requestId != _requestSequence) {

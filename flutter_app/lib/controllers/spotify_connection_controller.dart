@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
+import '../providers/player_provider.dart';
 import '../services/api_service.dart';
 
 /// Handles connecting/disconnecting the user's Spotify account from the
@@ -16,7 +17,7 @@ class SpotifyConnectionController extends ChangeNotifier {
   bool get isConnecting => _isConnecting;
   bool get isDisconnecting => _isDisconnecting;
 
-  Future<void> connect(BuildContext context, String userId) async {
+  Future<void> connect(BuildContext context) async {
     if (_isConnecting) {
       return;
     }
@@ -25,7 +26,7 @@ class SpotifyConnectionController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final url = await ApiService.getSpotifyAuthUrl(userId);
+      final url = await ApiService.getSpotifyAuthUrl();
       final uri = Uri.parse(url);
       final launched = await launchUrl(
         uri,
@@ -55,6 +56,15 @@ class SpotifyConnectionController extends ChangeNotifier {
 
       if (!context.mounted) {
         return;
+      }
+
+      if (connected) {
+        // Linking a working account is the fix for an on-device playback
+        // block, so lift it here rather than making the user restart the app.
+        await context.read<PlayerProvider>().retrySpotifyBackgroundPlayback();
+        if (!context.mounted) {
+          return;
+        }
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
