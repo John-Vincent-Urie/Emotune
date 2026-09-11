@@ -29,7 +29,7 @@ class _FeelBetterDialogState extends State<FeelBetterDialog> {
         : 'We can keep the session going and check in again later, or lock this lane in and stop interrupting.';
 
     return Dialog(
-      backgroundColor: const Color(0xFF1A1A1A),
+      backgroundColor: AppColors.darkCard,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Padding(
         padding: const EdgeInsets.all(24),

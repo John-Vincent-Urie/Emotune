@@ -187,11 +187,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 8),
               Container(
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                  color: isDark ? AppColors.darkCard : Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                       color: isDark
-                          ? const Color(0xFF2A2A2A)
+                          ? AppColors.darkBorder
                           : Colors.grey.shade200),
                 ),
                 child: Column(
@@ -497,7 +497,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showDialog(
       context: ctx,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: AppColors.darkCard,
         title:
             const Text('Edit Profile', style: TextStyle(color: Colors.white)),
         content: TextField(
@@ -530,7 +530,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showDialog(
       context: ctx,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: AppColors.darkCard,
         title: const Text('Change Password',
             style: TextStyle(color: Colors.white)),
         content: Column(
@@ -579,16 +579,16 @@ Widget _sectionTitle(String title, bool isDark) => Text(
 Widget _card(bool isDark, {required Widget child}) => Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        color: isDark ? AppColors.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-            color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200),
+            color: isDark ? AppColors.darkBorder : Colors.grey.shade200),
       ),
       child: child,
     );
 
 Widget _divider(bool isDark) => Divider(
-      color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
+      color: isDark ? AppColors.darkBorder : Colors.grey.shade200,
       height: 1,
     );
 

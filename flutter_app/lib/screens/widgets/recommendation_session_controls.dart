@@ -50,10 +50,10 @@ class RecommendationSessionControls extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141414) : Colors.white,
+        color: isDark ? AppColors.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: isDark ? const Color(0xFF2A2A2A) : Colors.black12,
+          color: isDark ? AppColors.darkBorder : Colors.black12,
         ),
         boxShadow: isDark
             ? null
@@ -138,7 +138,7 @@ class RecommendationSessionControls extends StatelessWidget {
                       : (isDark ? Colors.white12 : Colors.black12),
                 ),
                 backgroundColor: isDark
-                    ? const Color(0xFF1B1B1B)
+                    ? AppColors.darkCard
                     : Colors.grey.shade50,
               );
             }).toList(),
@@ -174,7 +174,7 @@ class RecommendationSessionControls extends StatelessWidget {
                       : (isDark ? Colors.white12 : Colors.black12),
                 ),
                 backgroundColor: isDark
-                    ? const Color(0xFF1B1B1B)
+                    ? AppColors.darkCard
                     : Colors.grey.shade50,
               );
             }).toList(),
@@ -256,7 +256,7 @@ class _ToggleRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1A1A) : Colors.grey.shade50,
+        color: isDark ? AppColors.darkCard : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark ? Colors.white10 : Colors.black12,

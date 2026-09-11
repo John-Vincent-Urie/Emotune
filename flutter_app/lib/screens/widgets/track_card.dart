@@ -26,10 +26,10 @@ class TrackCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+          color: isDark ? AppColors.darkCard : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
+            color: isDark ? AppColors.darkBorder : Colors.grey.shade200,
           ),
           boxShadow: [
             BoxShadow(

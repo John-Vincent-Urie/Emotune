@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../widgets/emotune_logo.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import '../../theme/app_theme.dart';
+import '../../widgets/emotune_backdrop.dart';
+import '../../widgets/emotune_buttons.dart';
+import '../../widgets/emotune_logo.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -46,54 +50,43 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: FadeTransition(
-          opacity: _fadeAnim,
-          child: ScaleTransition(
-            scale: _scaleAnim,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const EmoTuneLogo(size: 130),
-                const SizedBox(height: 24),
-                const Text(
-                  'Welcome to EmoTune !',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Georgia',
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Let your mood decide your music',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                const SizedBox(height: 60),
-                SizedBox(
-                  width: 200,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pushReplacementNamed(context, '/welcome'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+      backgroundColor: AppColors.darkBg,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: EmoTuneBackdrop(showParticles: false)),
+          Center(
+            child: FadeTransition(
+              opacity: _fadeAnim,
+              child: ScaleTransition(
+                scale: _scaleAnim,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const EmoTuneLogo(size: 130),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Let your mood decide your music',
+                      style: GoogleFonts.manrope(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
-                    child: const Text('Continue', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
+                    const SizedBox(height: 48),
+                    SizedBox(
+                      width: 200,
+                      child: EmoTuneSecondaryButton(
+                        label: 'Continue',
+                        onPressed: () =>
+                            Navigator.pushReplacementNamed(context, '/welcome'),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

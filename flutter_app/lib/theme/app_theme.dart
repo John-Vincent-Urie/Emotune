@@ -2,36 +2,56 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
-  // Brand gradient colors (from logo)
-  static const Color gradientStart = Color(0xFF7EFFD4);  // Mint
-  static const Color gradientMid = Color(0xFF89F7C0);   // Green
-  static const Color gradientEnd = Color(0xFFDDFF7E);   // Lime yellow
+  // Brand gradient colors -- teal -> mint -> lime, the EmoTune identity used
+  // on the welcome screen and now carried through the whole app.
+  static const Color teal = Color(0xFF3EE7C4);
+  static const Color mint = Color(0xFF8FE39A);
+  static const Color lime = Color(0xFFCFF24A);
 
-  // Dark theme
-  static const Color darkBg = Color(0xFF000000);
-  static const Color darkSurface = Color(0xFF111111);
-  static const Color darkCard = Color(0xFF1A1A1A);
-  static const Color darkBorder = Color(0xFF2A2A2A);
+  // Kept as aliases so the ~90 existing call sites retint automatically.
+  static const Color gradientStart = teal;
+  static const Color gradientMid = mint;
+  static const Color gradientEnd = lime;
+
+  // Dark theme -- a near-black base rather than pure black, so cards and
+  // glows have somewhere to sit.
+  static const Color darkBg = Color(0xFF050608);
+  static const Color darkSurface = Color(0xFF0D1210);
+  static const Color darkCard = Color(0xFF141A17);
+  static const Color darkBorder = Color(0xFF232B27);
+
+  // Vignette used behind the animated backdrop on onboarding-style screens.
+  static const Color vignetteInner = Color(0xFF0B0F0E);
+  static const Color vignetteOuter = Color(0xFF030303);
+
+  // Text roles, for the small set of surfaces that read from the palette
+  // directly rather than through the theme's textTheme.
+  static const Color textPrimary = Color(0xFFF3F6F3);
+  static const Color textSecondary = Color(0xFF93A199);
+  static const Color textFine = Color(0xFF5C6A61);
 
   // Light theme
   static const Color lightBg = Color(0xFFF5F5F5);
   static const Color lightSurface = Color(0xFFFFFFFF);
   static const Color lightCard = Color(0xFFEEEEEE);
 
-  // Brand accent
-  static const Color accent = Color(0xFF9EFF65);         // Lime green
-  static const Color accentDark = Color(0xFF6BCF45);
-  
+  // Brand accent -- the lime step of the gradient reads well as a single
+  // accent color against both the dark and light surfaces.
+  static const Color accent = lime;
+  static const Color accentDark = Color(0xFF3F9E6E);
+
   // Button gradient
   static const LinearGradient buttonGradient = LinearGradient(
-    colors: [Color(0xFF9EFF65), Color(0xFFB8FF80)],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [teal, mint, lime],
   );
-  
+
   // Logo gradient
   static const LinearGradient logoGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF7EFFD4), Color(0xFF89E0FF), Color(0xFFDDFF7E)],
+    colors: [teal, mint, lime],
   );
 
   // Emotion colors
@@ -52,6 +72,22 @@ class AppColors {
   };
 }
 
+/// Display font for headlines and wordmarks -- the same Fraunces italic used
+/// on the welcome screen, applied wherever a screen wants that brand voice.
+TextStyle emoTuneHeadlineFont({
+  double fontSize = 26,
+  FontWeight fontWeight = FontWeight.w700,
+  Color? color,
+  double? height,
+}) {
+  return GoogleFonts.fraunces(
+    fontSize: fontSize,
+    fontWeight: fontWeight,
+    color: color,
+    height: height,
+  );
+}
+
 ThemeData buildDarkTheme() {
   return ThemeData(
     brightness: Brightness.dark,
@@ -62,16 +98,24 @@ ThemeData buildDarkTheme() {
       surface: AppColors.darkSurface,
     ),
     cardColor: AppColors.darkCard,
-    textTheme: GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme).copyWith(
-      displayLarge: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold),
-      bodyLarge: GoogleFonts.poppins(color: Colors.white),
-      bodyMedium: GoogleFonts.poppins(color: Colors.white70),
+    textTheme: GoogleFonts.manropeTextTheme(ThemeData.dark().textTheme).copyWith(
+      displayLarge: GoogleFonts.fraunces(color: Colors.white, fontWeight: FontWeight.w600),
+      displayMedium: GoogleFonts.fraunces(color: Colors.white, fontWeight: FontWeight.w600),
+      headlineLarge: GoogleFonts.fraunces(color: Colors.white, fontWeight: FontWeight.w600),
+      headlineMedium: GoogleFonts.fraunces(color: Colors.white, fontWeight: FontWeight.w600),
+      headlineSmall: GoogleFonts.fraunces(color: Colors.white, fontWeight: FontWeight.w600),
+      bodyLarge: GoogleFonts.manrope(color: Colors.white),
+      bodyMedium: GoogleFonts.manrope(color: Colors.white70),
     ),
-    appBarTheme: const AppBarTheme(
+    appBarTheme: AppBarTheme(
       backgroundColor: AppColors.darkBg,
       elevation: 0,
-      iconTheme: IconThemeData(color: Colors.white),
-      titleTextStyle: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+      iconTheme: const IconThemeData(color: Colors.white),
+      titleTextStyle: GoogleFonts.fraunces(
+        color: Colors.white,
+        fontSize: 19,
+        fontWeight: FontWeight.w600,
+      ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: AppColors.darkSurface,
@@ -118,13 +162,21 @@ ThemeData buildLightTheme() {
       surface: AppColors.lightSurface,
     ),
     cardColor: AppColors.lightSurface,
-    textTheme: GoogleFonts.poppinsTextTheme(ThemeData.light().textTheme),
+    textTheme: GoogleFonts.manropeTextTheme(ThemeData.light().textTheme).copyWith(
+      displayLarge: GoogleFonts.fraunces(fontWeight: FontWeight.w600),
+      displayMedium: GoogleFonts.fraunces(fontWeight: FontWeight.w600),
+      headlineLarge: GoogleFonts.fraunces(fontWeight: FontWeight.w600),
+      headlineMedium: GoogleFonts.fraunces(fontWeight: FontWeight.w600),
+      headlineSmall: GoogleFonts.fraunces(fontWeight: FontWeight.w600),
+    ),
     appBarTheme: AppBarTheme(
       backgroundColor: AppColors.lightBg,
       elevation: 0,
       iconTheme: const IconThemeData(color: Colors.black87),
-      titleTextStyle: GoogleFonts.poppins(
-        color: Colors.black87, fontSize: 18, fontWeight: FontWeight.w600,
+      titleTextStyle: GoogleFonts.fraunces(
+        color: Colors.black87,
+        fontSize: 19,
+        fontWeight: FontWeight.w600,
       ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(

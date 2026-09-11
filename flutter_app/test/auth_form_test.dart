@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'package:emotune/providers/auth_provider.dart';
 import 'package:emotune/screens/auth/login_register_screen.dart';
+import 'package:emotune/widgets/emotune_buttons.dart';
 
 /// Pumps an auth screen with the routes it can navigate to. No request is ever
 /// made: every case here is decided before the form would reach the network.
@@ -11,21 +12,27 @@ Future<void> _pumpAuth(WidgetTester tester, Widget screen) async {
   await tester.pumpWidget(
     ChangeNotifierProvider<AuthProvider>(
       create: (_) => AuthProvider(),
-      child: MaterialApp(
-        home: screen,
-        routes: {
-          '/login': (_) => const LoginScreen(),
-          '/register': (_) => const RegisterScreen(),
-          '/home': (_) => const Scaffold(body: Text('home')),
-        },
+      // The auth screens carry looping decorative animations (the backdrop
+      // blobs, button shine, logo pulse) that never settle on their own;
+      // reduced motion freezes them so pumpAndSettle can still be used here.
+      child: MediaQuery(
+        data: const MediaQueryData(disableAnimations: true),
+        child: MaterialApp(
+          home: screen,
+          routes: {
+            '/login': (_) => const LoginScreen(),
+            '/register': (_) => const RegisterScreen(),
+            '/home': (_) => const Scaffold(body: Text('home')),
+          },
+        ),
       ),
     ),
   );
   await tester.pumpAndSettle();
 }
 
-ElevatedButton _submitButton(WidgetTester tester) {
-  return tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+EmoTunePrimaryButton _submitButton(WidgetTester tester) {
+  return tester.widget<EmoTunePrimaryButton>(find.byType(EmoTunePrimaryButton));
 }
 
 /// The forms are taller than the default 800x600 test viewport, so anything
@@ -63,7 +70,7 @@ void main() {
       await tester.enterText(find.byType(TextFormField).last, 'secret1');
       await tester.pump();
 
-      await tester.tap(find.byType(ElevatedButton));
+      await tester.tap(find.byType(EmoTunePrimaryButton));
       await tester.pump();
 
       expect(find.text('Enter a valid email address'), findsOneWidget);
@@ -125,7 +132,7 @@ void main() {
       await tester.enterText(fieldAt(2), 'abc');
       await tester.pump();
       await _tap(tester, find.text('I agree to the Terms and Privacy Policy'));
-      await _tap(tester, find.byType(ElevatedButton));
+      await _tap(tester, find.byType(EmoTunePrimaryButton));
 
       expect(find.text('Use at least 6 characters'), findsOneWidget);
     });

@@ -42,8 +42,8 @@ class FullPlayerScreen extends StatelessWidget {
           colors: [
             _blendWithBlack(emotionColor, 0.20),
             _blendWithBlack(emotionColor, 0.55),
-            const Color(0xFF161616),
-            const Color(0xFF111111),
+            AppColors.darkCard,
+            AppColors.darkSurface,
           ],
           stops: const [0.0, 0.24, 0.55, 1.0],
         ),
@@ -364,7 +364,7 @@ class FullPlayerScreen extends StatelessWidget {
           content: Text(message),
           backgroundColor: result == null
               ? Colors.redAccent
-              : const Color(0xFF9EFF65),
+              : AppColors.accent,
         ),
       );
     } catch (_) {
@@ -625,7 +625,7 @@ class _HeaderArtwork extends StatelessWidget {
                     colors: [
                       FullPlayerScreen._blendWithBlack(accentColor, 0.15),
                       FullPlayerScreen._blendWithBlack(accentColor, 0.45),
-                      const Color(0xFF111111),
+                      AppColors.darkSurface,
                     ],
                   ),
                 ),

@@ -86,12 +86,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: isDark
-                              ? const Color(0xFF1A1A1A)
+                              ? AppColors.darkCard
                               : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: isDark
-                                ? const Color(0xFF2A2A2A)
+                                ? AppColors.darkBorder
                                 : Colors.grey.shade300,
                           ),
                         ),
@@ -197,12 +197,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: isDark
-                              ? const Color(0xFF151515)
+                              ? AppColors.darkCard
                               : Colors.grey.shade50,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: isDark
-                                ? const Color(0xFF2A2A2A)
+                                ? AppColors.darkBorder
                                 : Colors.grey.shade300,
                           ),
                         ),
@@ -258,11 +258,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 isCompactLayout ? 12 : 16,
               ),
               decoration: BoxDecoration(
-                color: isDark ? Colors.black : Colors.white,
+                color: isDark ? AppColors.darkBg : Colors.white,
                 border: Border(
                   top: BorderSide(
                     color:
-                        isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
+                        isDark ? AppColors.darkBorder : Colors.grey.shade200,
                   ),
                 ),
               ),
@@ -281,7 +281,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         filled: true,
                         fillColor: isDark
-                            ? const Color(0xFF1A1A1A)
+                            ? AppColors.darkCard
                             : Colors.grey.shade100,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(25),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/emotune_backdrop.dart';
+import '../../widgets/emotune_buttons.dart';
 import '../../widgets/emotune_logo.dart';
 import '../../theme/app_theme.dart';
 
@@ -52,6 +54,41 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool get _canSubmit =>
       _emailCtrl.text.trim().isNotEmpty && _passCtrl.text.isNotEmpty;
+
+  /// There is no password-reset endpoint on the backend yet -- /users/ only
+  /// exposes an authenticated change-password -- so say what is actually
+  /// possible instead of pretending to send a mail nothing would deliver.
+  Future<void> _forgotPassword() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.darkCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+        title: const Text(
+          'Forgot your password?',
+          style: TextStyle(color: Colors.white, fontSize: 18),
+        ),
+        content: Text(
+          'Resetting a forgotten password is not available yet. Once you are '
+          'logged in you can change it from Profile > Change Password.',
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.7),
+            fontSize: 14,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -105,8 +142,30 @@ class _LoginScreenState extends State<LoginScreen> {
                     : null,
                 onSubmitted: (_) => _submit(),
               ),
-              const SizedBox(height: 28),
-              _PrimaryButton(
+              const SizedBox(height: 4),
+              // Sits with the password field rather than below the button:
+              // it is a way out of that field, not a second submit action.
+              Align(
+                alignment: Alignment.centerRight,
+                child: ConstrainedBox(
+                  constraints:
+                      const BoxConstraints(minHeight: _kMinTapTarget),
+                  child: TextButton(
+                    onPressed: auth.isLoading ? null : _forgotPassword,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.accent,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      textStyle: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    child: const Text('Forgot password?'),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              EmoTunePrimaryButton(
                 label: 'Log in',
                 isLoading: auth.isLoading,
                 onPressed: _canSubmit ? _submit : null,
@@ -311,7 +370,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     setState(() => _personalizationOptIn = value),
               ),
               const SizedBox(height: 28),
-              _PrimaryButton(
+              EmoTunePrimaryButton(
                 label: 'Create account',
                 isLoading: auth.isLoading,
                 onPressed: _canSubmit ? _submit : null,
@@ -414,64 +473,69 @@ class _AuthScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.darkBg,
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: _kFormMaxWidth),
-            child: GestureDetector(
-              // Tapping the background dismisses the keyboard, the standard
-              // escape hatch on a form this tall.
-              onTap: () => FocusScope.of(context).unfocus(),
-              behavior: HitTestBehavior.opaque,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        icon: const Icon(Icons.arrow_back),
-                        color: AppColors.accent,
-                        tooltip: 'Back',
-                        onPressed: () => Navigator.maybePop(context),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    EmoTuneLogo(size: logoSize),
-                    const SizedBox(height: 28),
-                    Semantics(
-                      header: true,
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: EmoTuneBackdrop(showParticles: false)),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: _kFormMaxWidth),
+                child: GestureDetector(
+                  // Tapping the background dismisses the keyboard, the standard
+                  // escape hatch on a form this tall.
+                  onTap: () => FocusScope.of(context).unfocus(),
+                  behavior: HitTestBehavior.opaque,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: IconButton(
+                            icon: const Icon(Icons.arrow_back),
+                            color: AppColors.accent,
+                            tooltip: 'Back',
+                            onPressed: () => Navigator.maybePop(context),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 4),
+                        EmoTuneLogo(size: logoSize),
+                        const SizedBox(height: 28),
+                        Semantics(
+                          header: true,
+                          child: Text(
+                            title,
+                            style: emoTuneHeadlineFont(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                              height: 1.2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.66),
+                            fontSize: 13.5,
+                            height: 1.45,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        _ErrorBanner(message: error, onDismiss: onDismissError),
+                        child,
+                        const SizedBox(height: 24),
+                        footer,
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.66),
-                        fontSize: 13.5,
-                        height: 1.45,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _ErrorBanner(message: error, onDismiss: onDismissError),
-                    child,
-                    const SizedBox(height: 24),
-                    footer,
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -915,61 +979,6 @@ class _RequiredChip extends StatelessWidget {
           fontSize: 10,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.3,
-        ),
-      ),
-    );
-  }
-}
-
-/// Full-width submit button that keeps its height while it swaps in a spinner,
-/// so the layout never jumps at the moment the user is waiting on it.
-class _PrimaryButton extends StatelessWidget {
-  const _PrimaryButton({
-    required this.label,
-    required this.isLoading,
-    required this.onPressed,
-  });
-
-  final String label;
-  final bool isLoading;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 54,
-      child: ElevatedButton(
-        onPressed: isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.accent,
-          foregroundColor: Colors.black,
-          disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.28),
-          disabledForegroundColor: Colors.black.withValues(alpha: 0.45),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-          ),
-        ),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
-          child: isLoading
-              ? const SizedBox(
-                  key: ValueKey('loading'),
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.4,
-                    valueColor: AlwaysStoppedAnimation(Colors.black),
-                  ),
-                )
-              : Text(
-                  label,
-                  key: const ValueKey('label'),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
         ),
       ),
     );

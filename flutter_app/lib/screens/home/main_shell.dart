@@ -35,10 +35,10 @@ class _MainShellState extends State<MainShell> {
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF111111) : Colors.white,
+          color: isDark ? AppColors.darkSurface : Colors.white,
           border: Border(
             top: BorderSide(
-              color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
+              color: isDark ? AppColors.darkBorder : Colors.grey.shade200,
             ),
           ),
         ),
