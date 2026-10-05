@@ -36,7 +36,7 @@ Angry
 2.	"Halik Sobrang Diin Pt. 2" – Flow G ft. Skusta Clee 
 3.	"Mundo" – Guddhist Gunatita 
 4.	"Bawal Sa Laro" – 1096 Gang
-5.	"GATILYO" – BLKD
+5.	"Bazinga" – SB19
 Motivational
 •	English:
 1.	"Unstoppable" – Sia
@@ -51,24 +51,32 @@ Motivational
 4.	"Noypi" – Bamboo
 5.	"Triangulo" – Thyro, Yumi & Jeric Medina
 Fear
-•	English:
-1.	"drop dead" – Olivia Rodrigo 
-2.	"Bury a Friend" – Billie Eilish
-3.	"Thriller" – Michael Jackson
-4.	"Disturbia" – Rihanna
-5.	"Monster" – Kanye West ft. JAY-Z, Rick Ross, Nicki Minaj
+•	English (calming/grounding, per docs/music_therapy_guidelines.md -- this list
+	is for someone who IS afraid/anxious, not "songs about fear/horror"):
+1.	"Weightless" – Marconi Union
+2.	"River Flows in You" – Yiruma
+3.	"Holocene" – Bon Iver
+4.	"Saturn" – Sleeping At Last
+5.	"Clair de Lune" – Claude Debussy
 •	Filipino:
-1.	"Aswang Sa Maynila" – fitterkarma, Novocrane 
-2.	"Spoliarium" – Eraserheads
-3.	"Magasin" – Eraserheads
-4.	"Gatilyo" – Loonie
-5.	"Tsinelas" – Kamikazee
+1.	"Panatag" – Adie
+2.	"Kanlungan" – Noel Cabangon
+3.	"Sana" – Up Dharma Down
+4.	"Ngayon Kaya" – Zild
+5.	"Ilaw" – Reese Lansangan
+NOTE: the previous "Fear" list here was horror/scary-themed (Thriller, Monster,
+Disturbia, Aswang Sa Maynila) -- it matched the literal word "fear" as a genre
+aesthetic rather than the emotional state of someone feeling afraid, which risks
+deepening anxiety instead of easing it. Replaced to match the calming/grounding
+intent already defined in backend/api/spotify/constants.py's EMOTION_SEARCH_PARAMS
+for 'fear'. Please do a listening pass to confirm tempo/production before shipping
+-- these were chosen from documented mood/genre reputation, not a fresh listen.
 Depressing
 •	English:
 1.	"hate that i made you love me" – Ariana Grande 
 2.	"Cellophane" – FKA twigs
-3.	"I Know It's Over" – The Smiths
-4.	"Nutshell" – Alice in Chains
+3.	"Lean On Me" – Bill Withers
+4.	"Fix You" – Coldplay
 5.	"Black" – Pearl Jam
 •	Filipino:
 1.	"Pag-Ibig ay Kanibalismo II" – fitterkarma 
@@ -87,7 +95,7 @@ Surprising
 1.	"19 Underground" – ena mori 
 2.	"Aura" – IV OF SPADES 
 3.	"Buhay" – EUPHORIA
-4.	"Alapaap" – Eraserheads
+4.	"Ligaya" – Eraserheads
 5.	"Upuan" – Gloc-9
 Stressed
 •	English:
@@ -100,8 +108,8 @@ Stressed
 1.	"Tensionado" – Soapdish 
 2.	"LOBAT" – Costa Cashman 
 3.	"Bawal Lumabas" – Kim Chiu
-4.	"Laklak" – Teeth
-5.	"Inuman Na" – Parokya Ni Edgar
+4.	"Pagtingin" – Ben&Ben
+5.	"Kumpas" – Moira Dela Torre
 Calm
 •	English:
 1.	"Birds of a Feather" – Billie Eilish

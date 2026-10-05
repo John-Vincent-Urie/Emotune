@@ -83,6 +83,10 @@ Every prediction reports *how* it was made, so the path is auditable:
 `EMOTION_HIGH_CONFIDENCE_THRESHOLD`, `EMOTION_MEDIUM_CONFIDENCE_THRESHOLD` and
 `EMOTION_MIN_MARGIN_THRESHOLD`.
 
+For the full decision path — exact threshold values, what happens on each
+fallback branch, where the weights came from, and the known limits of the
+pipeline — see [PREDICTION_PIPELINE.md](PREDICTION_PIPELINE.md).
+
 **Plutchik profile (`backend/ml/plutchik_mapper.py`)** derives a secondary
 8-emotion profile (joy, trust, fear, surprise, sadness, disgust, anger,
 anticipation) from the 13 label scores. It is heuristic and used for
