@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/api_service.dart';
 import '../../widgets/emotune_backdrop.dart';
 import '../../widgets/emotune_buttons.dart';
 import '../../widgets/emotune_logo.dart';
@@ -55,38 +58,26 @@ class _LoginScreenState extends State<LoginScreen> {
   bool get _canSubmit =>
       _emailCtrl.text.trim().isNotEmpty && _passCtrl.text.isNotEmpty;
 
-  /// There is no password-reset endpoint on the backend yet -- /users/ only
-  /// exposes an authenticated change-password -- so say what is actually
-  /// possible instead of pretending to send a mail nothing would deliver.
+  /// Hands the reset flow whatever address is already typed, so the common
+  /// case -- right email, forgotten password -- costs no retyping.
   Future<void> _forgotPassword() async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.darkCard,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
+    final resetEmail = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ForgotPasswordScreen(
+          initialEmail: _emailCtrl.text.trim(),
         ),
-        title: const Text(
-          'Forgot your password?',
-          style: TextStyle(color: Colors.white, fontSize: 18),
-        ),
-        content: Text(
-          'Resetting a forgotten password is not available yet. Once you are '
-          'logged in you can change it from Profile > Change Password.',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.7),
-            fontSize: 14,
-            height: 1.5,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            style: TextButton.styleFrom(foregroundColor: AppColors.accent),
-            child: const Text('Got it'),
-          ),
-        ],
       ),
+    );
+    if (!mounted || resetEmail == null) return;
+
+    // Came back from a finished reset: put them on the field they still have
+    // to fill, with the address they just proved they own already in place.
+    _emailCtrl.text = resetEmail;
+    _passCtrl.clear();
+    _passFocus.requestFocus();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Password updated. Log in with it now.')),
     );
   }
 
@@ -191,7 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     if (success) {
       TextInput.finishAutofillContext();
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
     }
   }
 }
@@ -421,7 +412,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!mounted) return;
     if (success) {
       TextInput.finishAutofillContext();
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
     }
   }
 }
@@ -475,7 +466,7 @@ class _AuthScaffold extends StatelessWidget {
       backgroundColor: AppColors.darkBg,
       body: Stack(
         children: [
-          const Positioned.fill(child: EmoTuneBackdrop(showParticles: false)),
+          const Positioned.fill(child: EmoTuneBackdrop()),
           SafeArea(
             child: Center(
               child: ConstrainedBox(
@@ -496,7 +487,14 @@ class _AuthScaffold extends StatelessWidget {
                             icon: const Icon(Icons.arrow_back),
                             color: AppColors.accent,
                             tooltip: 'Back',
-                            onPressed: () => Navigator.maybePop(context),
+                            // After a session expiry the route stack was
+                            // cleared, so there is nothing to pop back to.
+                            onPressed: () => Navigator.canPop(context)
+                                ? Navigator.pop(context)
+                                : Navigator.pushReplacementNamed(
+                                    context,
+                                    '/welcome',
+                                  ),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -524,8 +522,12 @@ class _AuthScaffold extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 24),
-                        _ErrorBanner(message: error, onDismiss: onDismissError),
                         child,
+                        // Below the form rather than above it: shown above, a
+                        // failed submit pushed the button ~80px down, right
+                        // under a second tap. Here it lands next to the button
+                        // the user just pressed and nothing above it moves.
+                        _ErrorBanner(message: error, onDismiss: onDismissError),
                         const SizedBox(height: 24),
                         footer,
                       ],
@@ -567,7 +569,7 @@ class _ErrorBanner extends StatelessWidget {
                   key: ValueKey(message),
                   width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
-                  margin: const EdgeInsets.only(bottom: 20),
+                  margin: const EdgeInsets.only(top: 16),
                   decoration: BoxDecoration(
                     color: errorColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
@@ -801,8 +803,6 @@ class _PasswordStrengthMeter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (password.isEmpty) return const SizedBox.shrink();
-
     const labels = ['Too short', 'Weak', 'Fair', 'Strong'];
     const colors = [
       Color(0xFFFF6B6B),
@@ -812,42 +812,48 @@ class _PasswordStrengthMeter extends StatelessWidget {
     ];
     final score = _score;
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Row(
-        children: [
-          for (var index = 0; index < 3; index++) ...[
-            Expanded(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOut,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: index < score
-                      ? colors[score]
-                      : Colors.white.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(2),
+    // Hidden rather than removed while the field is empty, so its first
+    // keystroke doesn't shove every field and the button below it down.
+    return AnimatedOpacity(
+      opacity: password.isEmpty ? 0 : 1,
+      duration: const Duration(milliseconds: 180),
+      child: Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Row(
+          children: [
+            for (var index = 0; index < 3; index++) ...[
+              Expanded(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOut,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: index < score
+                        ? colors[score]
+                        : Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              if (index < 2) const SizedBox(width: 6),
+            ],
+            const SizedBox(width: 12),
+            // The bars carry the same meaning as the word, so a viewer who
+            // cannot separate the colors still gets the verdict.
+            SizedBox(
+              width: 66,
+              child: Text(
+                labels[score],
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  color: colors[score],
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
-            if (index < 2) const SizedBox(width: 6),
           ],
-          const SizedBox(width: 12),
-          // The bars carry the same meaning as the word, so a viewer who
-          // cannot separate the colors still gets the verdict.
-          SizedBox(
-            width: 66,
-            child: Text(
-              labels[score],
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                color: colors[score],
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1029,6 +1035,520 @@ class _SwitchAuthLink extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Forgotten password: email a one-time code, verify it, choose a new password
+// ---------------------------------------------------------------------------
+
+enum _ResetStep { email, code, password, done }
+
+/// Three steps behind one back button. Splitting them across routes would let
+/// the user walk backwards into a step whose code has already been spent, so
+/// the flow advances in place and only ever offers the way forward.
+class ForgotPasswordScreen extends StatefulWidget {
+  const ForgotPasswordScreen({super.key, this.initialEmail = ''});
+
+  /// Prefilled from the login form when the user came from there.
+  final String initialEmail;
+
+  @override
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+}
+
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  /// Long enough that a slow mail hop lands first, short enough not to strand
+  /// anyone whose code genuinely never arrives.
+  static const int _resendCooldownSeconds = 60;
+  static const int _codeLength = 6;
+
+  final _emailCtrl = TextEditingController();
+  final _codeCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+
+  final _emailFocus = FocusNode();
+  final _codeFocus = FocusNode();
+  final _passFocus = FocusNode();
+  final _confirmFocus = FocusNode();
+
+  _ResetStep _step = _ResetStep.email;
+  bool _busy = false;
+  String? _error;
+  bool _obscure = true;
+  int _resendIn = 0;
+  Timer? _resendTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailCtrl.text = widget.initialEmail;
+    for (final controller in [_emailCtrl, _codeCtrl, _passCtrl, _confirmCtrl]) {
+      controller.addListener(_onTyping);
+    }
+  }
+
+  @override
+  void dispose() {
+    _resendTimer?.cancel();
+    for (final controller in [_emailCtrl, _codeCtrl, _passCtrl, _confirmCtrl]) {
+      controller.dispose();
+    }
+    for (final node in [_emailFocus, _codeFocus, _passFocus, _confirmFocus]) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
+  void _onTyping() {
+    // Buttons track the fields, and a stale error under a field the user has
+    // already corrected is just noise.
+    setState(() => _error = null);
+  }
+
+  bool get _emailLooksValid => _validateEmail(_emailCtrl.text) == null;
+  bool get _codeComplete => _codeCtrl.text.length == _codeLength;
+  bool get _passwordsReady =>
+      _passCtrl.text.length >= 6 && _passCtrl.text == _confirmCtrl.text;
+
+  String get _email => _emailCtrl.text.trim().toLowerCase();
+
+  void _startResendCooldown() {
+    _resendTimer?.cancel();
+    setState(() => _resendIn = _resendCooldownSeconds);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() => _resendIn -= 1);
+      if (_resendIn <= 0) timer.cancel();
+    });
+  }
+
+  /// Every step is the same shape: disable the form, call, show what broke.
+  Future<void> _run(Future<void> Function() action) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await action();
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Could not reach EmoTune. Check your connection.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _sendCode({bool resending = false}) {
+    return _run(() async {
+      await ApiService.requestPasswordReset(_email);
+      if (!mounted) return;
+      setState(() {
+        _step = _ResetStep.code;
+        if (resending) _codeCtrl.clear();
+      });
+      _startResendCooldown();
+      _codeFocus.requestFocus();
+      if (resending) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('A new code is on its way.')),
+        );
+      }
+    });
+  }
+
+  Future<void> _verifyCode() {
+    return _run(() async {
+      await ApiService.verifyPasswordResetCode(_email, _codeCtrl.text);
+      if (!mounted) return;
+      setState(() => _step = _ResetStep.password);
+      _passFocus.requestFocus();
+    });
+  }
+
+  Future<void> _resetPassword() {
+    return _run(() async {
+      await ApiService.confirmPasswordReset(
+        _email,
+        _codeCtrl.text,
+        _passCtrl.text,
+      );
+      if (!mounted) return;
+      _resendTimer?.cancel();
+      setState(() => _step = _ResetStep.done);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _AuthScaffold(
+      title: _title,
+      subtitle: _subtitle,
+      logoSize: 72,
+      error: _error,
+      onDismissError: () => setState(() => _error = null),
+      footer: _footer(),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        alignment: Alignment.topCenter,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          child: KeyedSubtree(
+            key: ValueKey(_step),
+            child: _stepBody(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String get _title {
+    switch (_step) {
+      case _ResetStep.email:
+        return 'Forgot password';
+      case _ResetStep.code:
+        return 'Check your email';
+      case _ResetStep.password:
+        return 'Choose a new password';
+      case _ResetStep.done:
+        return 'Password updated';
+    }
+  }
+
+  String get _subtitle {
+    switch (_step) {
+      case _ResetStep.email:
+        return 'Enter the email on your account and we will send you a '
+            '$_codeLength-digit code.';
+      case _ResetStep.code:
+        return 'We sent a $_codeLength-digit code to $_email. It expires in a '
+            'few minutes.';
+      case _ResetStep.password:
+        return 'Code confirmed. Pick a password you have not used here before.';
+      case _ResetStep.done:
+        return 'You can log in with your new password now.';
+    }
+  }
+
+  Widget _stepBody() {
+    switch (_step) {
+      case _ResetStep.email:
+        return _emailStep();
+      case _ResetStep.code:
+        return _codeStep();
+      case _ResetStep.password:
+        return _passwordStep();
+      case _ResetStep.done:
+        return _doneStep();
+    }
+  }
+
+  Widget _emailStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _AuthField(
+          label: 'Email',
+          hint: 'name@example.com',
+          controller: _emailCtrl,
+          focusNode: _emailFocus,
+          enabled: !_busy,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.email],
+          validator: _validateEmail,
+          onSubmitted: (_) => _emailLooksValid ? _sendCode() : null,
+        ),
+        const SizedBox(height: 28),
+        EmoTunePrimaryButton(
+          label: 'Send code',
+          isLoading: _busy,
+          onPressed: _emailLooksValid ? _sendCode : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _codeStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _OtpField(
+          controller: _codeCtrl,
+          focusNode: _codeFocus,
+          length: _codeLength,
+          enabled: !_busy,
+          // Verifying the moment the last digit lands saves a tap; the button
+          // stays for anyone who pastes or edits their way to six digits.
+          onCompleted: _verifyCode,
+        ),
+        const SizedBox(height: 20),
+        EmoTunePrimaryButton(
+          label: 'Verify code',
+          isLoading: _busy,
+          onPressed: _codeComplete ? _verifyCode : null,
+        ),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: _kMinTapTarget),
+              child: TextButton(
+                onPressed:
+                    _busy || _resendIn > 0 ? null : () => _sendCode(resending: true),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.accent,
+                  disabledForegroundColor: Colors.white.withValues(alpha: 0.35),
+                ),
+                child: Text(
+                  _resendIn > 0 ? 'Resend in ${_resendIn}s' : 'Resend code',
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _passwordStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _AuthField(
+          label: 'New password',
+          hint: 'At least 6 characters',
+          controller: _passCtrl,
+          focusNode: _passFocus,
+          enabled: !_busy,
+          obscure: _obscure,
+          onToggleObscure: () => setState(() => _obscure = !_obscure),
+          textInputAction: TextInputAction.next,
+          autofillHints: const [AutofillHints.newPassword],
+          validator: (value) => (value == null || value.length < 6)
+              ? 'Use at least 6 characters'
+              : null,
+          onSubmitted: (_) => _confirmFocus.requestFocus(),
+        ),
+        const SizedBox(height: 12),
+        _PasswordStrengthMeter(password: _passCtrl.text),
+        const SizedBox(height: 18),
+        _AuthField(
+          label: 'Confirm new password',
+          hint: 'Type it again',
+          controller: _confirmCtrl,
+          focusNode: _confirmFocus,
+          enabled: !_busy,
+          obscure: _obscure,
+          textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.newPassword],
+          showMatchTick:
+              _confirmCtrl.text.isNotEmpty && _confirmCtrl.text == _passCtrl.text,
+          validator: (value) =>
+              (value != _passCtrl.text) ? 'Passwords do not match' : null,
+          onSubmitted: (_) => _passwordsReady ? _resetPassword() : null,
+        ),
+        const SizedBox(height: 28),
+        EmoTunePrimaryButton(
+          label: 'Reset password',
+          isLoading: _busy,
+          onPressed: _passwordsReady ? _resetPassword : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _doneStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Icon(Icons.check_circle_outline, color: AppColors.accent, size: 56),
+        const SizedBox(height: 24),
+        EmoTunePrimaryButton(
+          label: 'Back to login',
+          isLoading: false,
+          // Hands the address back so the login form can prefill it.
+          onPressed: () => Navigator.pop(context, _email),
+        ),
+      ],
+    );
+  }
+
+  Widget _footer() {
+    if (_step == _ResetStep.done) return const SizedBox.shrink();
+    if (_step == _ResetStep.code) {
+      return _SwitchAuthLink(
+        prompt: 'Wrong address?',
+        actionLabel: 'Change it',
+        onPressed: _busy
+            ? null
+            : () {
+                _resendTimer?.cancel();
+                setState(() {
+                  _step = _ResetStep.email;
+                  _codeCtrl.clear();
+                  _resendIn = 0;
+                });
+                _emailFocus.requestFocus();
+              },
+      );
+    }
+    return _SwitchAuthLink(
+      prompt: 'Remembered it?',
+      actionLabel: 'Log in',
+      onPressed: _busy ? null : () => Navigator.pop(context),
+    );
+  }
+}
+
+/// Six boxes that share one hidden text field.
+///
+/// Six separate fields is the obvious build and the wrong one: it breaks
+/// pasting a code, makes backspace ambiguous, and fights autofill. One field
+/// behind a painted row keeps all of that working for free.
+class _OtpField extends StatefulWidget {
+  const _OtpField({
+    required this.controller,
+    required this.focusNode,
+    required this.length,
+    required this.onCompleted,
+    this.enabled = true,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final int length;
+  final VoidCallback onCompleted;
+  final bool enabled;
+
+  @override
+  State<_OtpField> createState() => _OtpFieldState();
+}
+
+class _OtpFieldState extends State<_OtpField> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onChanged);
+    widget.focusNode.addListener(_onFocusChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onChanged);
+    widget.focusNode.removeListener(_onFocusChanged);
+    super.dispose();
+  }
+
+  void _onFocusChanged() => setState(() {});
+
+  bool _fired = false;
+
+  void _onChanged() {
+    setState(() {});
+    final complete = widget.controller.text.length == widget.length;
+    // Only fire on the transition into completeness, or editing a full code
+    // would re-submit on every keystroke.
+    if (complete && !_fired) {
+      _fired = true;
+      widget.focusNode.unfocus();
+      widget.onCompleted();
+    } else if (!complete) {
+      _fired = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final digits = widget.controller.text;
+    final cursorAt = digits.length;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        IgnorePointer(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              for (var i = 0; i < widget.length; i++)
+                _box(
+                  digit: i < digits.length ? digits[i] : '',
+                  active: widget.focusNode.hasFocus &&
+                      (i == cursorAt || (cursorAt == widget.length && i == cursorAt - 1)),
+                ),
+            ],
+          ),
+        ),
+        // Invisible, but full-width so a tap anywhere on the row opens the
+        // keyboard and lands the caret at the end.
+        Positioned.fill(
+          child: TextField(
+            controller: widget.controller,
+            focusNode: widget.focusNode,
+            enabled: widget.enabled,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.oneTimeCode],
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(widget.length),
+            ],
+            showCursor: false,
+            cursorColor: Colors.transparent,
+            style: const TextStyle(color: Colors.transparent, fontSize: 1),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              filled: false,
+              counterText: '',
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _box({required String digit, required bool active}) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      width: 46,
+      height: 58,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.darkSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: active
+              ? AppColors.accent
+              : digit.isNotEmpty
+                  ? Colors.white.withValues(alpha: 0.28)
+                  : AppColors.darkBorder,
+          width: active ? 1.6 : 1,
+        ),
+      ),
+      child: Text(
+        digit,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }

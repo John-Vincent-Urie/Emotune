@@ -7,10 +7,13 @@ import '../../providers/player_provider.dart';
 import '../../providers/recommendation_studio_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/emotune_logo.dart';
+import 'widgets/home_empty_state.dart';
+import 'widgets/home_header.dart';
+import 'widgets/mood_composer.dart';
 import '../widgets/track_card.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/feel_better_dialog.dart';
+import '../support/support_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,7 +22,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   static const Duration _progressiveAppendDelay = Duration(milliseconds: 180);
   static const _session = RecommendationSessionController();
 
@@ -27,13 +31,23 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isAnalyzing = false;
   Map<String, dynamic>? _lastResult;
   String? _aiMessage;
+  bool _isCrisis = false;
+  // Gentle check-in from the backend's concern tier; music still plays.
+  Map<String, dynamic>? _supportCheckIn;
   List<Map<String, dynamic>> _tracks = [];
   bool _loadingMoreTracks = false;
   int _requestSequence = 0;
+  bool? _reduceMotion;
+  bool _entranceStarted = false;
+  late final AnimationController _entrance;
 
   @override
   void initState() {
     super.initState();
+    _entrance = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
     final player = context.read<PlayerProvider>();
     player.onFeelBetter = (result) {
       if (mounted) {
@@ -49,34 +63,61 @@ class _HomeScreenState extends State<HomeScreen> {
       player.onFeelBetter = null;
     }
     _promptCtrl.dispose();
+    _entrance.dispose();
     super.dispose();
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduce = MediaQuery.of(context).disableAnimations;
+    if (reduce == _reduceMotion) return;
+    _reduceMotion = reduce;
+    if (reduce) {
+      _entrance.value = 1;
+      _entranceStarted = true;
+    } else if (!_entranceStarted) {
+      _entranceStarted = true;
+      _entrance.forward();
+    }
+  }
+
+  bool get _isEmptyState => _tracks.isEmpty && _aiMessage == null;
+
+  @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final isCompactLayout = screenWidth < 390;
-    final composerButtonSize = isCompactLayout ? 44.0 : 48.0;
+    final colors = context.emoColors;
+    final reduceMotion = _reduceMotion ?? false;
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            // Header
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  EmoTuneLogo(size: 60, showText: true),
-                ],
-              ),
-            ),
+            // Brand header -- fixed above the body, so it stays put once the
+            // results replace the empty state.
+            HomeHeader(entrance: _entrance, reduceMotion: reduceMotion),
 
             // Chat/Result area
             Expanded(
-              child: SingleChildScrollView(
+              child: _isEmptyState
+                  ? LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        child: ConstrainedBox(
+                          // Centre in whatever space is left, but stay
+                          // scrollable so the chips survive a short screen
+                          // with the keyboard up.
+                          constraints:
+                              BoxConstraints(minHeight: constraints.maxHeight),
+                          child: Center(
+                            child: HomeEmptyState(
+                              entrance: _entrance,
+                              reduceMotion: reduceMotion,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,28 +126,61 @@ class _HomeScreenState extends State<HomeScreen> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: isDark
-                              ? AppColors.darkCard
-                              : Colors.grey.shade100,
+                          color: _isCrisis
+                              ? const Color(0xFFFFB020).withValues(alpha: 0.12)
+                              : colors.card,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: isDark
-                                ? AppColors.darkBorder
-                                : Colors.grey.shade300,
+                            color: _isCrisis
+                                ? const Color(0xFFFFB020)
+                                : colors.divider,
                           ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (_isCrisis) ...[
+                              const Row(
+                                children: [
+                                  Icon(
+                                    Icons.favorite,
+                                    color: Color(0xFFFFB020),
+                                    size: 18,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    "We'd rather check in than play a song",
+                                    style: TextStyle(
+                                      color: Color(0xFFFFB020),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                            ],
                             Text(
                               _aiMessage!,
                               style: TextStyle(
-                                color: isDark ? Colors.white : Colors.black87,
+                                color: colors.textPrimary,
                                 fontSize: 14,
                                 height: 1.5,
                               ),
                             ),
-                            if (_lastResult != null) ...[
+                            if (_isCrisis) ...[
+                              const SizedBox(height: 12),
+                              FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFFB020),
+                                  foregroundColor: Colors.black,
+                                ),
+                                icon: const Icon(Icons.support_agent),
+                                label: const Text('Get support now'),
+                                onPressed: _openCrisisSupport,
+                              ),
+                            ],
+                            if (!_isCrisis && _lastResult != null) ...[
                               const SizedBox(height: 8),
                               Row(
                                 children: [
@@ -144,6 +218,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 16),
                     ],
+                    if (_supportCheckIn != null && !_isCrisis) ...[
+                      _buildCheckInBanner(colors),
+                      const SizedBox(height: 16),
+                    ],
                     if (_loadingMoreTracks) ...[
                       Row(
                         children: [
@@ -160,7 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Text(
                               'Loading the rest of your playlist...',
                               style: TextStyle(
-                                color: isDark ? Colors.white54 : Colors.black54,
+                                color: colors.textSecondary,
                                 fontSize: 13,
                               ),
                             ),
@@ -191,26 +269,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                     if (_lastResult != null &&
                         _tracks.isEmpty &&
-                        !_isAnalyzing) ...[
+                        !_isAnalyzing &&
+                        !_isCrisis) ...[
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: isDark
-                              ? AppColors.darkCard
-                              : Colors.grey.shade50,
+                          color: colors.card,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isDark
-                                ? AppColors.darkBorder
-                                : Colors.grey.shade300,
-                          ),
+                          border: Border.all(color: colors.divider),
                         ),
                         child: Text(
                           'No music recommendations were found for that prompt yet. '
                           'Try another feeling, or reconnect Spotify and try again.',
                           style: TextStyle(
-                            color: isDark ? Colors.white70 : Colors.black54,
+                            color: colors.textSecondary,
                             fontSize: 13,
                             height: 1.5,
                           ),
@@ -218,29 +291,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 80),
                     ],
-                    if (_tracks.isEmpty && _aiMessage == null)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 60),
-                          child: Column(
-                            children: [
-                              Icon(Icons.music_note,
-                                  size: 60,
-                                  color:
-                                      isDark ? Colors.white12 : Colors.black12),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Tell me how you feel...',
-                                style: TextStyle(
-                                  color:
-                                      isDark ? Colors.white30 : Colors.black38,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -249,79 +299,13 @@ class _HomeScreenState extends State<HomeScreen> {
             // Mini player
             const MiniPlayer(),
 
-            // Prompt input
-            Container(
-              padding: EdgeInsets.fromLTRB(
-                isCompactLayout ? 12 : 16,
-                8,
-                isCompactLayout ? 12 : 16,
-                isCompactLayout ? 12 : 16,
-              ),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkBg : Colors.white,
-                border: Border(
-                  top: BorderSide(
-                    color:
-                        isDark ? AppColors.darkBorder : Colors.grey.shade200,
-                  ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _promptCtrl,
-                      style: TextStyle(
-                          color: isDark ? Colors.white : Colors.black87),
-                      decoration: InputDecoration(
-                        hintText: 'I feel......',
-                        hintStyle: TextStyle(
-                          color: isDark ? Colors.white38 : Colors.black38,
-                          fontStyle: FontStyle.italic,
-                        ),
-                        filled: true,
-                        fillColor: isDark
-                            ? AppColors.darkCard
-                            : Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(25),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: isCompactLayout ? 14 : 16,
-                          vertical: isCompactLayout ? 10 : 12,
-                        ),
-                      ),
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _analyze(),
-                    ),
-                  ),
-                  SizedBox(width: isCompactLayout ? 6 : 8),
-                  GestureDetector(
-                    onTap: _isAnalyzing ? null : _analyze,
-                    child: Container(
-                      width: composerButtonSize,
-                      height: composerButtonSize,
-                      decoration: const BoxDecoration(
-                        gradient: AppColors.buttonGradient,
-                        shape: BoxShape.circle,
-                      ),
-                      child: _isAnalyzing
-                          ? Padding(
-                              padding:
-                                  EdgeInsets.all(isCompactLayout ? 11 : 12),
-                              child: const CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.black),
-                            )
-                          : Icon(
-                              Icons.send,
-                              color: Colors.black,
-                              size: isCompactLayout ? 18 : 20,
-                            ),
-                    ),
-                  ),
-                ],
-              ),
+            // Prompt input -- present from the first frame, not part of the
+            // entrance sequence.
+            MoodComposer(
+              controller: _promptCtrl,
+              isBusy: _isAnalyzing,
+              onSubmit: _analyze,
+              reduceMotion: reduceMotion,
             ),
           ],
         ),
@@ -339,6 +323,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _isAnalyzing = true;
       _tracks = [];
       _aiMessage = null;
+      _isCrisis = false;
+      _supportCheckIn = null;
       _loadingMoreTracks = false;
     });
 
@@ -358,14 +344,30 @@ class _HomeScreenState extends State<HomeScreen> {
           result['continuation_token']?.toString().trim() ?? '';
       final loadingMoreTracks =
           result['loading_more_tracks'] == true && continuationToken.isNotEmpty;
+      final isCrisis = result['crisis'] == true;
+      final checkIn = result['support_check_in'];
       setState(() {
         _lastResult = result;
         _aiMessage = result['ai_response'];
+        _isCrisis = isCrisis;
+        _supportCheckIn =
+            checkIn is Map ? Map<String, dynamic>.from(checkIn) : null;
         _tracks = normalizedTracks;
         _loadingMoreTracks = loadingMoreTracks;
       });
       _promptCtrl.clear();
-      if (normalizedTracks.isNotEmpty) {
+      if (isCrisis) {
+        // A song from the previous request must not keep playing under the
+        // support screen. Paused rather than cleared, so nothing is lost.
+        final player = context.read<PlayerProvider>();
+        if (player.isPlaying) {
+          unawaited(player.togglePlayPause());
+        }
+        // Full-screen so it cannot be scrolled past; the card stays behind it
+        // with a button to reopen it.
+        unawaited(_openCrisisSupport());
+      }
+      if (!isCrisis && normalizedTracks.isNotEmpty) {
         unawaited(_autoplayInitialTrack(normalizedTracks, result));
       }
       if (loadingMoreTracks) {
@@ -402,6 +404,79 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _isAnalyzing = false);
       }
     }
+  }
+
+  Future<void> _openCrisisSupport() {
+    return SupportScreen.open(
+      context,
+      level: 'crisis',
+      message: _aiMessage ?? '',
+      resources: List<dynamic>.from(_lastResult?['support_resources'] ?? []),
+    );
+  }
+
+  Widget _buildCheckInBanner(EmoTuneColors colors) {
+    const amber = Color(0xFFFFB020);
+    final checkIn = _supportCheckIn!;
+    final message = checkIn['message']?.toString() ?? '';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: amber.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: amber.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.favorite, color: amber, size: 18),
+              SizedBox(width: 8),
+              Text(
+                'Checking in on you',
+                style: TextStyle(
+                  color: amber,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: TextStyle(color: colors.textPrimary, fontSize: 14, height: 1.5),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              TextButton(
+                onPressed: () => SupportScreen.open(
+                  context,
+                  level: 'concern',
+                  message: message,
+                  resources: List<dynamic>.from(checkIn['resources'] ?? []),
+                ),
+                child: const Text(
+                  'Talk to a counselor',
+                  style: TextStyle(color: amber, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => setState(() => _supportCheckIn = null),
+                child: Text(
+                  "I'm okay",
+                  style: TextStyle(color: colors.textSecondary),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _autoplayInitialTrack(
@@ -529,7 +604,6 @@ class _HomeScreenState extends State<HomeScreen> {
     await _session.playTrackFromList(
       context,
       tracks: _tracks,
-      index: index,
       selectedTrack: track,
       lastResult: _lastResult,
       currentTasteProfile: _currentTasteProfile(),

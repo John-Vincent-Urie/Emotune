@@ -7,6 +7,8 @@ import '../../providers/recommendation_studio_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/emotune_page_header.dart';
+import '../../widgets/emotune_toggle.dart';
 import '../widgets/recommendation_session_controls.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -81,7 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final themeProvider = context.watch<ThemeProvider>();
     final studio = context.watch<RecommendationStudioProvider>();
     final user = auth.user;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = context.emoColors;
 
     if (user == null) {
       return Scaffold(
@@ -95,300 +97,222 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text('Profile'),
-        actions: [
-          IconButton(
-            icon:
-                Icon(themeProvider.isDark ? Icons.light_mode : Icons.dark_mode),
-            onPressed: themeProvider.toggleTheme,
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await auth.logout();
-              if (!context.mounted) return;
-              Navigator.pushReplacementNamed(context, '/welcome');
-            },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+      body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Profile header
-            _ProfileHeader(user: user, isDark: isDark),
-
-            const SizedBox(height: 32),
-
-            // Theme toggle
-            _sectionTitle('Appearance', isDark),
-            const SizedBox(height: 12),
-            _card(
-              isDark,
-              child: Row(
-                children: [
-                  Icon(
-                    themeProvider.isDark ? Icons.dark_mode : Icons.light_mode,
-                    color: AppColors.accent,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    themeProvider.isDark ? 'Dark Mode' : 'Light Mode',
-                    style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87),
-                  ),
-                  const Spacer(),
-                  Switch(
-                    value: themeProvider.isDark,
-                    onChanged: (_) => themeProvider.toggleTheme(),
-                    activeThumbColor: AppColors.accent,
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Preferred Artists
-            _sectionTitle('Preferred Artists', isDark),
-            const SizedBox(height: 8),
-            Text('Artists we\'ll prioritize in recommendations',
-                style: TextStyle(
-                    color: isDark ? Colors.white54 : Colors.black54,
-                    fontSize: 12)),
-            const SizedBox(height: 12),
-
-            // Artist search
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _artistSearchCtrl,
-                    style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87),
-                    enabled: !_isSavingArtists,
-                    decoration: const InputDecoration(
-                      hintText: 'Search an artist...',
-                      prefixIcon: Icon(Icons.search),
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    onChanged: _searchArtists,
-                  ),
+            EmoTunePageHeader(
+              title: 'Profile',
+              actions: [
+                EmoTuneIconButton(
+                  icon: themeProvider.isDark
+                      ? Icons.light_mode_outlined
+                      : Icons.dark_mode_outlined,
+                  onTap: themeProvider.toggleTheme,
+                ),
+                EmoTuneIconButton(
+                  icon: Icons.logout_rounded,
+                  onTap: () => _confirmLogout(context, auth),
                 ),
               ],
             ),
-
-            if (_searchResults.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkCard : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: isDark
-                          ? AppColors.darkBorder
-                          : Colors.grey.shade200),
-                ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 2, 20, 32),
                 child: Column(
-                  children: _searchResults.take(5).map<Widget>((artist) {
-                    final name = artist['name'] as String;
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundImage: artist['image'] != null
-                            ? NetworkImage(artist['image'])
-                            : null,
-                        backgroundColor: AppColors.accent.withValues(alpha: 0.2),
-                        child: artist['image'] == null
-                            ? Text(name[0],
-                                style: const TextStyle(color: AppColors.accent))
-                            : null,
-                      ),
-                      title: Text(name,
-                          style: TextStyle(
-                              color: isDark ? Colors.white : Colors.black87)),
-                      trailing: _artists.contains(name)
-                          ? const Icon(Icons.check, color: AppColors.accent)
-                          : IconButton(
-                              icon: const Icon(Icons.add,
-                                  color: AppColors.accent),
-                              onPressed: _isSavingArtists
-                                  ? null
-                                  : () => _addArtist(name),
-                            ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ],
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _ProfileHeader(user: user),
 
-            const SizedBox(height: 12),
-
-            // Current artists
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _artists.map<Widget>((a) {
-                return Chip(
-                  label: Text(a.toString()),
-                  backgroundColor: AppColors.accent.withValues(alpha: 0.15),
-                  labelStyle: const TextStyle(color: AppColors.accent),
-                  deleteIcon: const Icon(Icons.close,
-                      size: 16, color: AppColors.accent),
-                  onDeleted: _isSavingArtists
-                      ? null
-                      : () => _removeArtist(a.toString()),
-                );
-              }).toList(),
-            ),
-
-            const SizedBox(height: 24),
-
-            _sectionTitle('Privacy & Personalization', isDark),
-            const SizedBox(height: 12),
-            _card(
-              isDark,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.auto_awesome,
-                    color: AppColors.accent,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const _SectionTitle('Appearance'),
+                    _SettingsCard(
                       children: [
-                        Text(
-                          'Mood-based personalization',
-                          style: TextStyle(
-                            color: isDark ? Colors.white : Colors.black87,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'When this is on, EmoTune can learn from your listening sessions to improve future recommendations.',
-                          style: TextStyle(
-                            color: isDark ? Colors.white54 : Colors.black54,
-                            fontSize: 12,
-                            height: 1.4,
+                        _SettingsRow(
+                          icon: Icons.dark_mode_outlined,
+                          title: 'Dark mode',
+                          trailing: EmoTuneToggle(
+                            value: themeProvider.isDark,
+                            onChanged: (_) => themeProvider.toggleTheme(),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Switch(
-                    value: user['personalization_opt_in'] != false,
-                    onChanged: _updatePersonalizationOptIn,
-                    activeThumbColor: AppColors.accent,
-                  ),
-                ],
-              ),
-            ),
 
-            const SizedBox(height: 24),
+                    const _SectionTitle('Preferred artists'),
+                    _SettingsCard(
+                      padding: const EdgeInsets.all(14),
+                      children: [
+                        Text(
+                          "Artists we'll prioritize in recommendations.",
+                          style: TextStyle(
+                            color: colors.textSecondary,
+                            fontSize: 11.5,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        _SearchBox(
+                          controller: _artistSearchCtrl,
+                          enabled: !_isSavingArtists,
+                          onChanged: _searchArtists,
+                        ),
+                        if (_searchResults.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: colors.cardAlt,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: colors.divider),
+                            ),
+                            child: Column(
+                              children: _searchResults.take(5).map<Widget>((artist) {
+                                final name = artist['name'] as String;
+                                final saved = _artists.contains(name);
+                                return ListTile(
+                                  dense: true,
+                                  leading: CircleAvatar(
+                                    radius: 16,
+                                    backgroundImage: artist['image'] != null
+                                        ? NetworkImage(artist['image'])
+                                        : null,
+                                    backgroundColor:
+                                        AppColors.accent.withValues(alpha: 0.2),
+                                    child: artist['image'] == null
+                                        ? Text(
+                                            name.isNotEmpty ? name[0] : '?',
+                                            style: const TextStyle(
+                                                color: AppColors.accentDark),
+                                          )
+                                        : null,
+                                  ),
+                                  title: Text(
+                                    name,
+                                    style: TextStyle(color: colors.textPrimary),
+                                  ),
+                                  trailing: saved
+                                      ? const Icon(Icons.check,
+                                          color: AppColors.mint)
+                                      : IconButton(
+                                          icon: const Icon(Icons.add,
+                                              color: AppColors.mint),
+                                          onPressed: _isSavingArtists
+                                              ? null
+                                              : () => _addArtist(name),
+                                        ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
+                        if (_artists.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _artists.map<Widget>((a) {
+                              return _ArtistChip(
+                                label: a.toString(),
+                                onRemove: _isSavingArtists
+                                    ? null
+                                    : () => _removeArtist(a.toString()),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ],
+                    ),
 
-            _sectionTitle('Recommendation Studio', isDark),
-            const SizedBox(height: 8),
-            Text(
-              'These recommendation settings apply across Home and Discover, so you only need to tune them once here.',
-              style: TextStyle(
-                color: isDark ? Colors.white54 : Colors.black54,
-                fontSize: 12,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 12),
-            RecommendationSessionControls(
-              sessionLengthMinutes: studio.sessionLengthMinutes,
-              onSessionLengthChanged: studio.setSessionLengthMinutes,
-              familiarity: studio.familiarity,
-              onFamiliarityChanged: studio.setFamiliarity,
-              preferInstrumental: studio.preferInstrumental,
-              onPreferInstrumentalChanged: studio.setPreferInstrumental,
-              trainOnThisSession: studio.trainOnThisSession,
-              onTrainOnThisSessionChanged: studio.setTrainOnThisSession,
-              title: 'Recommendation Studio',
-              subtitle:
-                  'Shape the session timing and taste controls that EmoTune should use by default.',
-            ),
+                    const _SectionTitle('Privacy & personalization'),
+                    _SettingsCard(
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.auto_awesome_rounded,
+                          title: 'Mood-based personalization',
+                          subtitle:
+                              'Lets EmoTune learn from your sessions to improve future picks.',
+                          trailing: EmoTuneToggle(
+                            value: user['personalization_opt_in'] != false,
+                            onChanged: _updatePersonalizationOptIn,
+                          ),
+                        ),
+                      ],
+                    ),
 
-            const SizedBox(height: 24),
+                    const _SectionTitle('Recommendation studio'),
+                    RecommendationSessionControls(
+                      sessionLengthMinutes: studio.sessionLengthMinutes,
+                      onSessionLengthChanged: studio.setSessionLengthMinutes,
+                      familiarity: studio.familiarity,
+                      onFamiliarityChanged: studio.setFamiliarity,
+                      preferInstrumental: studio.preferInstrumental,
+                      onPreferInstrumentalChanged: studio.setPreferInstrumental,
+                      trainOnThisSession: studio.trainOnThisSession,
+                      onTrainOnThisSessionChanged: studio.setTrainOnThisSession,
+                      title: 'Shape session timing and taste',
+                      subtitle: 'Applies across Home and Discover.',
+                    ),
 
-            // Account settings
-            _sectionTitle('Account', isDark),
-            const SizedBox(height: 12),
-
-            _card(
-              isDark,
-              child: Column(
-                children: [
-                  _settingsTile(
-                    Icons.person_outline,
-                    'Edit Profile',
-                    () => _showEditProfile(context, user),
-                    isDark,
-                  ),
-                  _divider(isDark),
-                  _settingsTile(
-                    Icons.lock_outline,
-                    'Change Password',
-                    () => _showChangePassword(context),
-                    isDark,
-                  ),
-                  _divider(isDark),
-                  _settingsTile(
-                    Icons.music_note,
-                    _spotifyConnection.isConnecting
-                        ? 'Connecting Spotify...'
-                        : 'Connect Spotify',
-                    _spotifyConnection.isConnecting
-                        ? null
-                        : () => _spotifyConnection.connect(context),
-                    isDark,
-                    trailing: _spotifyConnection.isConnecting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : user['is_spotify_connected'] == true
-                            ? const Icon(Icons.check_circle,
-                                color: Colors.green, size: 18)
-                            : null,
-                  ),
-                  if (user['is_spotify_connected'] == true) ...[
-                    _divider(isDark),
-                    _settingsTile(
-                      Icons.link_off,
-                      _spotifyConnection.isDisconnecting
-                          ? 'Disconnecting Spotify...'
-                          : 'Disconnect Spotify',
-                      _spotifyConnection.isDisconnecting
-                          ? null
-                          : () => _spotifyConnection.disconnect(context),
-                      isDark,
-                      trailing: _spotifyConnection.isDisconnecting
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.link_off, size: 18),
+                    const _SectionTitle('Account'),
+                    _SettingsCard(
+                      children: [
+                        _SettingsRow(
+                          icon: Icons.person_outline_rounded,
+                          title: 'Edit profile',
+                          chevron: true,
+                          onTap: () => _showEditProfile(context, user),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.lock_outline_rounded,
+                          title: 'Change password',
+                          chevron: true,
+                          onTap: () => _showChangePassword(context),
+                        ),
+                        _SettingsRow(
+                          icon: Icons.graphic_eq_rounded,
+                          title: _spotifyConnection.isConnecting
+                              ? 'Connecting Spotify...'
+                              : 'Connect Spotify',
+                          subtitle: user['is_spotify_connected'] == true
+                              ? 'Connected'
+                              : null,
+                          onTap: _spotifyConnection.isConnecting
+                              ? null
+                              : () => _spotifyConnection.connect(context),
+                          trailing: _spotifyConnection.isConnecting
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2),
+                                )
+                              : user['is_spotify_connected'] == true
+                                  ? const Icon(Icons.check_circle_rounded,
+                                      color: AppColors.mint, size: 18)
+                                  : null,
+                        ),
+                        if (user['is_spotify_connected'] == true)
+                          _SettingsRow(
+                            icon: Icons.link_off_rounded,
+                            title: _spotifyConnection.isDisconnecting
+                                ? 'Disconnecting Spotify...'
+                                : 'Disconnect Spotify',
+                            onTap: _spotifyConnection.isDisconnecting
+                                ? null
+                                : () => _spotifyConnection.disconnect(context),
+                            trailing: _spotifyConnection.isDisconnecting
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : null,
+                          ),
+                      ],
                     ),
                   ],
-                ],
+                ),
               ),
             ),
-
-            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -492,17 +416,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> _confirmLogout(BuildContext ctx, AuthProvider auth) async {
+    final colors = ctx.emoColors;
+    final confirmed = await showDialog<bool>(
+      context: ctx,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: colors.card,
+        title: Text('Log out?', style: TextStyle(color: colors.textPrimary)),
+        content: Text(
+          'You will need to sign in again to access your account.',
+          style: TextStyle(color: colors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Log out'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await auth.logout();
+    if (!ctx.mounted) return;
+    Navigator.pushNamedAndRemoveUntil(ctx, '/welcome', (route) => false);
+  }
+
   void _showEditProfile(BuildContext ctx, Map<String, dynamic> user) {
     final usernameCtrl = TextEditingController(text: user['username']);
+    final colors = ctx.emoColors;
     showDialog(
       context: ctx,
       builder: (_) => AlertDialog(
-        backgroundColor: AppColors.darkCard,
-        title:
-            const Text('Edit Profile', style: TextStyle(color: Colors.white)),
+        backgroundColor: colors.card,
+        title: Text('Edit Profile', style: TextStyle(color: colors.textPrimary)),
         content: TextField(
           controller: usernameCtrl,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: colors.textPrimary),
           decoration: const InputDecoration(labelText: 'Display name'),
         ),
         actions: [
@@ -527,26 +482,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showChangePassword(BuildContext ctx) {
     final oldCtrl = TextEditingController();
     final newCtrl = TextEditingController();
+    final colors = ctx.emoColors;
     showDialog(
       context: ctx,
       builder: (_) => AlertDialog(
-        backgroundColor: AppColors.darkCard,
-        title: const Text('Change Password',
-            style: TextStyle(color: Colors.white)),
+        backgroundColor: colors.card,
+        title: Text('Change Password', style: TextStyle(color: colors.textPrimary)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: oldCtrl,
               obscureText: true,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: colors.textPrimary),
               decoration: const InputDecoration(labelText: 'Old Password'),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: newCtrl,
               obscureText: true,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: colors.textPrimary),
               decoration: const InputDecoration(labelText: 'New Password'),
             ),
           ],
@@ -567,117 +522,323 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-Widget _sectionTitle(String title, bool isDark) => Text(
-      title,
-      style: TextStyle(
-        color: isDark ? Colors.white : Colors.black87,
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-      ),
-    );
+/// Small-caps section label above each settings card, matching the HTML
+/// mockup's `.section-title`.
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.label);
 
-Widget _card(bool isDark, {required Widget child}) => Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-            color: isDark ? AppColors.darkBorder : Colors.grey.shade200),
-      ),
-      child: child,
-    );
-
-Widget _divider(bool isDark) => Divider(
-      color: isDark ? AppColors.darkBorder : Colors.grey.shade200,
-      height: 1,
-    );
-
-Widget _settingsTile(
-    IconData icon, String title, VoidCallback? onTap, bool isDark,
-    {Widget? trailing}) {
-  return ListTile(
-    contentPadding: EdgeInsets.zero,
-    leading: Icon(icon, color: AppColors.accent),
-    title: Text(title,
-        style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
-    trailing: trailing ?? const Icon(Icons.chevron_right, color: Colors.grey),
-    onTap: onTap,
-  );
-}
-
-/// The avatar/username/email/Spotify-connection-badge block at the top of
-/// the profile screen, pulled out of `build()` since it's a large
-/// self-contained, purely-display section.
-class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.user, required this.isDark});
-
-  final Map<String, dynamic> user;
-  final bool isDark;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    final isSpotifyConnected = user['is_spotify_connected'] == true;
-    return Center(
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 50,
-            backgroundColor: AppColors.accent.withValues(alpha: 0.2),
-            child: Text(
-              (user['username'] as String? ?? 'U')[0].toUpperCase(),
-              style: const TextStyle(
-                fontSize: 40,
-                fontWeight: FontWeight.bold,
-                color: AppColors.accent,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            user['username'] ?? '',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Colors.black87,
-            ),
-          ),
-          Text(
-            user['email'] ?? '',
-            style: TextStyle(
-              color: isDark ? Colors.white54 : Colors.black54,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: (isSpotifyConnected ? Colors.green : Colors.grey)
-                  .withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isSpotifyConnected ? Colors.green : Colors.grey,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+    final colors = context.emoColors;
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 10),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          color: colors.textSecondary,
+          fontSize: 11.5,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+/// The rounded, bordered card that groups settings rows, matching the HTML
+/// mockup's `.settings-card`.
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({
+    required this.children,
+    this.padding,
+  });
+
+  final List<Widget> children;
+  final EdgeInsetsGeometry? padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.emoColors;
+    return Container(
+      width: double.infinity,
+      padding: padding ?? const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: colors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.divider),
+      ),
+      child: padding != null
+          ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: children)
+          : Column(
               children: [
-                Icon(Icons.music_note,
-                    size: 14,
-                    color: isSpotifyConnected ? Colors.green : Colors.grey),
-                const SizedBox(width: 4),
+                for (var i = 0; i < children.length; i++)
+                  Container(
+                    decoration: BoxDecoration(
+                      border: i < children.length - 1
+                          ? Border(bottom: BorderSide(color: colors.divider))
+                          : null,
+                    ),
+                    child: children[i],
+                  ),
+              ],
+            ),
+    );
+  }
+}
+
+/// One row inside a [_SettingsCard]: a tinted icon square, title/subtitle,
+/// and either a trailing widget (toggle, status) or a chevron for navigation.
+class _SettingsRow extends StatelessWidget {
+  const _SettingsRow({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.chevron = false,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+  final bool chevron;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.emoColors;
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: colors.cardAlt,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(icon, size: 15, color: AppColors.mint),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  isSpotifyConnected
-                      ? 'Spotify Connected'
-                      : 'Spotify Not Connected',
+                  title,
                   style: TextStyle(
-                    color: isSpotifyConnected ? Colors.green : Colors.grey,
-                    fontSize: 12,
+                    color: colors.textPrimary,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      color: colors.textSecondary,
+                      fontSize: 11.5,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
+          if (trailing != null) trailing!,
+          if (chevron && trailing == null)
+            Icon(Icons.chevron_right_rounded, size: 18, color: colors.textSecondary),
         ],
+      ),
+    );
+
+    if (onTap == null) {
+      return row;
+    }
+    return InkWell(onTap: onTap, child: row);
+  }
+}
+
+class _SearchBox extends StatelessWidget {
+  const _SearchBox({
+    required this.controller,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.emoColors;
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.inputBackground,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          Icon(Icons.search_rounded, size: 16, color: colors.textSecondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              enabled: enabled,
+              style: TextStyle(color: colors.textPrimary, fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'Search an artist...',
+                hintStyle: TextStyle(color: colors.textSecondary),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              onChanged: onChanged,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ArtistChip extends StatelessWidget {
+  const _ArtistChip({required this.label, this.onRemove});
+
+  final String label;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.emoColors;
+    return Container(
+      padding: const EdgeInsets.only(left: 12, right: 6, top: 6, bottom: 6),
+      decoration: BoxDecoration(
+        color: colors.cardAlt,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.divider),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: colors.textPrimary,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onRemove,
+            child: Icon(Icons.close_rounded, size: 15, color: colors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The avatar/username/email/Spotify-connection-badge block at the top of
+/// the profile screen, styled after the HTML mockup's `.avatar-block`.
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({required this.user});
+
+  final Map<String, dynamic> user;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.emoColors;
+    final isSpotifyConnected = user['is_spotify_connected'] == true;
+    final initial = (user['username'] as String? ?? 'U')[0].toUpperCase();
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          children: [
+            Container(
+              width: 76,
+              height: 76,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0x40CFF24A),
+                    Color(0x333EE7C4),
+                  ],
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                initial,
+                style: emoTuneHeadlineFont(fontSize: 28, color: AppColors.lime),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              user['username'] ?? '',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: colors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              user['email'] ?? '',
+              style: TextStyle(color: colors.textSecondary, fontSize: 12.5),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isSpotifyConnected
+                      ? AppColors.teal
+                      : colors.divider,
+                  width: 1.4,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.graphic_eq_rounded,
+                    size: 13,
+                    color: isSpotifyConnected
+                        ? const Color(0xFF22B892)
+                        : colors.textSecondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    isSpotifyConnected
+                        ? 'Spotify connected'
+                        : 'Spotify not connected',
+                    style: TextStyle(
+                      color: isSpotifyConnected
+                          ? const Color(0xFF22B892)
+                          : colors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

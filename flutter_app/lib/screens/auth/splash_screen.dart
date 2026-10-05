@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
+import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/emotune_backdrop.dart';
 import '../../widgets/emotune_buttons.dart';
@@ -34,11 +36,24 @@ class _SplashScreenState extends State<SplashScreen>
     );
     _controller.forward();
 
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/welcome');
-      }
-    });
+    // Hold the splash for its usual three seconds, but route on the restored
+    // session: going straight to Welcome logged every returning user out on
+    // each launch or page reload even though their tokens were still valid.
+    Future.delayed(const Duration(seconds: 3), _continue);
+  }
+
+  bool _routed = false;
+
+  Future<void> _continue() async {
+    if (_routed) return;
+    _routed = true;
+    final auth = context.read<AuthProvider>();
+    await auth.loadUser();
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(
+      context,
+      auth.isLoggedIn || auth.hasSavedSession ? '/home' : '/welcome',
+    );
   }
 
   @override
@@ -77,8 +92,7 @@ class _SplashScreenState extends State<SplashScreen>
                       width: 200,
                       child: EmoTuneSecondaryButton(
                         label: 'Continue',
-                        onPressed: () =>
-                            Navigator.pushReplacementNamed(context, '/welcome'),
+                        onPressed: _continue,
                       ),
                     ),
                   ],

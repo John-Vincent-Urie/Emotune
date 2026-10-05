@@ -7,6 +7,8 @@ import '../../providers/recommendation_studio_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/player_provider.dart';
+import '../../widgets/emotion_chip.dart';
+import '../../widgets/emotune_page_header.dart';
 import '../widgets/track_card.dart';
 
 class RecommendationsScreen extends StatefulWidget {
@@ -40,22 +42,6 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
     'romantic',
     'nostalgic',
     'mixed',
-  ];
-
-  final List<String> _emotionEmojis = [
-    '😊',
-    '😢',
-    '😠',
-    '💪',
-    '😨',
-    '😔',
-    '😲',
-    '😤',
-    '😌',
-    '🥺',
-    '💕',
-    '🌅',
-    '🎭',
   ];
 
   String? _selectedEmotion;
@@ -97,63 +83,37 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text('Recommendations 🎵'),
-      ),
-      body: Column(
+      body: SafeArea(
+        child: Column(
         children: [
+          const EmoTunePageHeader(
+            title: 'Recommendations',
+            titleIcon: Icon(
+              Icons.explore_rounded,
+              color: AppColors.mint,
+              size: 18,
+            ),
+          ),
           // Emotion selector
-          Container(
-            height: 80,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: ListView.builder(
+          SizedBox(
+            height: 44,
+            child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               itemCount: _emotions.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 9),
               itemBuilder: (ctx, i) {
                 final em = _emotions[i];
-                final emoji = _emotionEmojis[i];
-                final isSelected = _selectedEmotion == em;
-                final color = AppColors.emotionColors[em] ?? AppColors.accent;
-
-                return GestureDetector(
+                return EmotionChip(
+                  label: '${em[0].toUpperCase()}${em.substring(1)}',
+                  color: AppColors.emotionColors[em] ?? AppColors.accent,
+                  selected: _selectedEmotion == em,
                   onTap: () => _selectEmotion(em),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.only(right: 10),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected ? color : color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: isSelected ? color : color.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(emoji, style: const TextStyle(fontSize: 16)),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${em[0].toUpperCase()}${em.substring(1)}',
-                          style: TextStyle(
-                            color: isSelected
-                                ? Colors.white
-                                : (isDark ? Colors.white54 : Colors.black54),
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 );
               },
             ),
           ),
+          const SizedBox(height: 8),
 
           // Tracks
           Expanded(
@@ -272,6 +232,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                           ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -452,7 +413,6 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
     await _session.playTrackFromList(
       context,
       tracks: normalizedTracks,
-      index: index,
       selectedTrack: selectedTrack,
       lastResult: _lastResult,
       currentTasteProfile: _currentTasteProfile(),

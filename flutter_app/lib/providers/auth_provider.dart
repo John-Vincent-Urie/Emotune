@@ -20,17 +20,56 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadUser() async {
+  Future<void>? _bootstrap;
+  bool _hasSavedSession = false;
+
+  /// True when the device still holds a session the backend has not
+  /// rejected -- including when the backend could not be reached at launch,
+  /// so a server that is down does not sign the user out.
+  bool get hasSavedSession => _hasSavedSession;
+
+  /// Restores the saved session once; later callers (the splash screen and
+  /// main.dart both ask) share the same attempt.
+  Future<void> loadUser() => _bootstrap ??= _restoreSession();
+
+  Future<void> _restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
     if (token == null) return;
-    
+    _hasSavedSession = true;
+
+    _restoring = true;
     try {
+      // An expired access token is renewed inside ApiService, so a 401 here
+      // means the refresh token was rejected too.
       _user = await ApiService.getProfile();
       notifyListeners();
-    } catch (e) {
-      await logout();
+    } on ApiException catch (e) {
+      // Only an auth rejection ends the session. A network error or a 5xx
+      // keeps the tokens so the next launch can try again.
+      if (e.statusCode == 401 || e.statusCode == 403) {
+        _hasSavedSession = false;
+        await logout();
+      }
+    } catch (_) {
+      // Unexpected failure: keep the saved session rather than wipe it.
+    } finally {
+      _restoring = false;
     }
+  }
+
+  bool _restoring = false;
+
+  /// ApiService could not renew the session and has already cleared the
+  /// tokens. Returns whether the user was inside the app, i.e. whether the
+  /// caller should send them to login; during the launch restore the splash
+  /// screen does its own routing.
+  bool handleSessionExpired() {
+    final wasSignedIn = !_restoring && (_user != null || _hasSavedSession);
+    _user = null;
+    _hasSavedSession = false;
+    notifyListeners();
+    return wasSignedIn;
   }
 
   Future<bool> reloadUser() async {
@@ -137,6 +176,7 @@ class AuthProvider extends ChangeNotifier {
     await prefs.remove('access_token');
     await prefs.remove('refresh_token');
     _user = null;
+    _hasSavedSession = false;
     notifyListeners();
   }
 

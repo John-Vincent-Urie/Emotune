@@ -42,9 +42,27 @@ class EmoTuneApp extends StatefulWidget {
 }
 
 class _EmoTuneAppState extends State<EmoTuneApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+
   @override
   void initState() {
     super.initState();
+    // ApiService has already cleared the tokens by the time this runs; reset
+    // the signed-in state and, if the user was inside the app, send them to
+    // login instead of leaving every screen failing with 401s.
+    ApiService.onSessionExpired = () async {
+      if (!mounted || !context.read<AuthProvider>().handleSessionExpired()) {
+        return;
+      }
+      _navigatorKey.currentState
+          ?.pushNamedAndRemoveUntil('/login', (route) => false);
+      _messengerKey.currentState?.showSnackBar(
+        const SnackBar(
+          content: Text('Your session expired. Please sign in again.'),
+        ),
+      );
+    };
     // Load saved user session
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AuthProvider>().loadUser();
@@ -55,12 +73,22 @@ class _EmoTuneAppState extends State<EmoTuneApp> {
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
 
+    // A theme swap repaints every token at once; crossfading it reads as the
+    // app changing its mind rather than blinking. MediaQuery is available here
+    // because View installs it above MaterialApp.
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+
     return MaterialApp(
+      navigatorKey: _navigatorKey,
+      scaffoldMessengerKey: _messengerKey,
       title: 'EmoTune',
       debugShowCheckedModeBanner: false,
       theme: buildLightTheme(),
       darkTheme: buildDarkTheme(),
       themeMode: themeProvider.themeMode,
+      themeAnimationDuration:
+          reduceMotion ? Duration.zero : const Duration(milliseconds: 400),
+      themeAnimationCurve: Curves.easeInOut,
       initialRoute: '/',
       routes: {
         '/': (_) => const SplashScreen(),

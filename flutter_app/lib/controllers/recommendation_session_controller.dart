@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/player_provider.dart';
 import '../services/spotify_remote_service.dart';
 import '../screens/home/full_player_screen.dart';
@@ -125,18 +126,40 @@ class RecommendationSessionController {
     Map<String, dynamic> selectedTrack,
   ) {
     final playlist = PlayerProvider.normalizeTrackList(tracks);
-    final selectedTrackId = selectedTrack['id']?.toString().trim() ?? '';
-    final selectedTrackUri = selectedTrack['uri']?.toString().trim() ?? '';
-    final containsSelection = playlist.any((track) {
-      final trackId = track['id']?.toString().trim() ?? '';
-      final trackUri = track['uri']?.toString().trim() ?? '';
-      return (selectedTrackId.isNotEmpty && trackId == selectedTrackId) ||
-          (selectedTrackUri.isNotEmpty && trackUri == selectedTrackUri);
-    });
+    // Compare against a normalized copy: every entry in [playlist] has had its
+    // id and uri filled in from whichever identifier it arrived with, so a
+    // selection still carrying only a spotify_url would never match a raw
+    // id/uri comparison and would be treated as absent from its own list.
+    final selectedIdentity = PlayerProvider.trackIdentityOf(selectedTrack);
+    final containsSelection = selectedIdentity.isNotEmpty &&
+        playlist.any(
+          (track) => PlayerProvider.trackIdentityOf(track) == selectedIdentity,
+        );
     if (containsSelection && playlist.isNotEmpty) {
       return playlist;
     }
     return [selectedTrack];
+  }
+
+  /// Where [selectedTrack] sits in the playlist that will actually be loaded.
+  ///
+  /// The row index a screen tapped indexes its own `_tracks`, not the list
+  /// [playlistForSelection] returns: that one is filtered (entries carrying no
+  /// identifier at all are dropped) and may be replaced outright by a
+  /// single-track list. Re-resolving by identity keeps the tapped song and the
+  /// index that starts playback in step however the list was reshaped.
+  int indexOfSelection(
+    List<Map<String, dynamic>> playlist,
+    Map<String, dynamic> selectedTrack,
+  ) {
+    final selectedIdentity = PlayerProvider.trackIdentityOf(selectedTrack);
+    if (selectedIdentity.isEmpty) {
+      return 0;
+    }
+    final matchedIndex = playlist.indexWhere(
+      (track) => PlayerProvider.trackIdentityOf(track) == selectedIdentity,
+    );
+    return matchedIndex >= 0 ? matchedIndex : 0;
   }
 
   Future<void> openPlayer(BuildContext context) async {
@@ -157,7 +180,6 @@ class RecommendationSessionController {
   Future<void> playTrackFromList(
     BuildContext context, {
     required List<Map<String, dynamic>> tracks,
-    required int index,
     required Map<String, dynamic> selectedTrack,
     required Map<String, dynamic>? lastResult,
     required Map<String, dynamic> currentTasteProfile,
@@ -183,7 +205,7 @@ class RecommendationSessionController {
         autoplay: false,
       );
       await player.playTrackAtIndex(
-        trackList.length == 1 ? 0 : index,
+        indexOfSelection(trackList, selectedTrack),
         preferInstantPreview: previewUrl.isNotEmpty,
       );
       if (!context.mounted) return;
@@ -191,17 +213,32 @@ class RecommendationSessionController {
       return;
     }
 
+    // Spotify stopped returning preview clips, so off Android this is the
+    // path almost every recommendation takes. The old message only said the
+    // song was "not directly playable", which read as a broken button; hand
+    // the user the one way they can actually listen.
     if (previewUrl.isEmpty && spotifyUrl.isNotEmpty) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              (selectedTrack['item_type']?.toString() ?? 'track') == 'playlist'
-                  ? 'This playlist needs Android Spotify playback in the current app build.'
-                  : 'This recommendation is not directly playable in the current app build.',
+        final isPlaylist =
+            (selectedTrack['item_type']?.toString() ?? 'track') == 'playlist';
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                isPlaylist
+                    ? 'Playlists play through Spotify. Open it there to listen.'
+                    : 'No preview for this song here. Open it in Spotify to listen.',
+              ),
+              action: SnackBarAction(
+                label: 'Open Spotify',
+                onPressed: () => launchUrl(
+                  Uri.parse(spotifyUrl),
+                  mode: LaunchMode.externalApplication,
+                ),
+              ),
             ),
-          ),
-        );
+          );
       }
       return;
     }
@@ -216,7 +253,7 @@ class RecommendationSessionController {
       autoplay: false,
     );
     await player.playTrackAtIndex(
-      trackList.length == 1 ? 0 : index,
+      indexOfSelection(trackList, selectedTrack),
       preferInstantPreview: previewUrl.isNotEmpty,
     );
     if (!context.mounted) return;

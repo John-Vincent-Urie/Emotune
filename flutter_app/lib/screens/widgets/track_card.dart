@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
+import '../../providers/player_provider.dart';
 import '../../theme/app_theme.dart';
 
 class TrackCard extends StatelessWidget {
@@ -21,6 +23,10 @@ class TrackCard extends StatelessWidget {
     final emotionColor = AppColors.emotionColors[emotion] ?? AppColors.accent;
     final subtitle = _subtitleText();
     final staticPickLabel = _staticPickLabel();
+    final itemType = track['item_type']?.toString().trim().toLowerCase() ?? 'track';
+    final canFavorite = itemType == 'track';
+    final player = canFavorite ? context.watch<PlayerProvider>() : null;
+    final isFavorite = player?.isFavoriteTrack(track) ?? false;
 
     return GestureDetector(
       onTap: onTap,
@@ -88,30 +94,46 @@ class TrackCard extends StatelessWidget {
                             color: Colors.black, size: 20),
                       ),
                     ),
-                    if (staticPickLabel != null ||
-                        track['is_preferred'] == true)
+                    if (staticPickLabel != null)
                       Positioned(
                         top: 8,
                         left: 8,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (staticPickLabel != null)
-                              _CardBadge(
-                                label: staticPickLabel,
-                                background: AppColors.gradientEnd,
-                                foreground: Colors.white,
+                        child: _CardBadge(
+                          label: staticPickLabel,
+                          background: AppColors.gradientEnd,
+                          foreground: Colors.white,
+                        ),
+                      ),
+                    if (canFavorite)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Semantics(
+                          button: true,
+                          label: isFavorite
+                              ? 'Remove from favorites'
+                              : 'Add to favorites',
+                          child: GestureDetector(
+                            onTap: () => player!
+                                .toggleFavoriteForTrack(track, emotion: emotion),
+                            child: Container(
+                              width: 26,
+                              height: 26,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.32),
+                                shape: BoxShape.circle,
                               ),
-                            if (track['is_preferred'] == true) ...[
-                              if (staticPickLabel != null)
-                                const SizedBox(height: 4),
-                              const _CardBadge(
-                                label: '★ Fav',
-                                background: Colors.amber,
-                                foreground: Colors.black,
+                              child: Icon(
+                                isFavorite
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                size: 14,
+                                color: isFavorite
+                                    ? const Color(0xFFE2645B)
+                                    : Colors.white,
                               ),
-                            ],
-                          ],
+                            ),
+                          ),
                         ),
                       ),
                   ],

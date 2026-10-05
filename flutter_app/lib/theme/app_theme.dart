@@ -72,6 +72,102 @@ class AppColors {
   };
 }
 
+/// Every surface colour the redesigned screens use, in one object per theme.
+///
+/// Screens read these instead of branching on `isDark` with literal hex, which
+/// is what lets a single theme swap repaint the whole app -- and, because
+/// [lerp] interpolates every token, lets MaterialApp animate that swap instead
+/// of snapping.
+@immutable
+class EmoTuneColors extends ThemeExtension<EmoTuneColors> {
+  const EmoTuneColors({
+    required this.background,
+    required this.inputBackground,
+    required this.card,
+    required this.cardAlt,
+    required this.textPrimary,
+    required this.textSecondary,
+    required this.divider,
+  });
+
+  final Color background;
+  final Color inputBackground;
+  final Color card;
+  // Matches the HTML design's `--card-bg-2` -- a step further from the page
+  // background than [card], used for icon squares, reply bubbles and
+  // unselected segmented buttons that sit on top of a card.
+  final Color cardAlt;
+  final Color textPrimary;
+  final Color textSecondary;
+  final Color divider;
+
+  static const EmoTuneColors light = EmoTuneColors(
+    background: Color(0xFFF5F6F2),
+    inputBackground: Color(0xFFEEEFEA),
+    card: Color(0xFFFFFFFF),
+    cardAlt: Color(0xFFF7F8F5),
+    textPrimary: Color(0xFF1B1F1C),
+    textSecondary: Color(0xFF767F76),
+    divider: Color(0x14000000),
+  );
+
+  static const EmoTuneColors dark = EmoTuneColors(
+    background: Color(0xFF06070A),
+    inputBackground: Color(0xFF0E1210),
+    card: Color(0xFF101413),
+    cardAlt: Color(0xFF0D110F),
+    textPrimary: Color(0xFFF3F6F3),
+    textSecondary: Color(0xFF8B948C),
+    divider: Color(0x14FFFFFF),
+  );
+
+  /// Convenience accessor so screens read `context.emoColors` rather than
+  /// repeating the extension lookup.
+  static EmoTuneColors of(BuildContext context) =>
+      Theme.of(context).extension<EmoTuneColors>() ?? dark;
+
+  @override
+  EmoTuneColors copyWith({
+    Color? background,
+    Color? inputBackground,
+    Color? card,
+    Color? cardAlt,
+    Color? textPrimary,
+    Color? textSecondary,
+    Color? divider,
+  }) {
+    return EmoTuneColors(
+      background: background ?? this.background,
+      inputBackground: inputBackground ?? this.inputBackground,
+      card: card ?? this.card,
+      cardAlt: cardAlt ?? this.cardAlt,
+      textPrimary: textPrimary ?? this.textPrimary,
+      textSecondary: textSecondary ?? this.textSecondary,
+      divider: divider ?? this.divider,
+    );
+  }
+
+  @override
+  EmoTuneColors lerp(ThemeExtension<EmoTuneColors>? other, double t) {
+    if (other is! EmoTuneColors) {
+      return this;
+    }
+    return EmoTuneColors(
+      background: Color.lerp(background, other.background, t)!,
+      inputBackground: Color.lerp(inputBackground, other.inputBackground, t)!,
+      card: Color.lerp(card, other.card, t)!,
+      cardAlt: Color.lerp(cardAlt, other.cardAlt, t)!,
+      textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
+      textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
+      divider: Color.lerp(divider, other.divider, t)!,
+    );
+  }
+}
+
+extension EmoTuneColorsContext on BuildContext {
+  EmoTuneColors get emoColors => EmoTuneColors.of(this);
+}
+
 /// Display font for headlines and wordmarks -- the same Fraunces italic used
 /// on the welcome screen, applied wherever a screen wants that brand voice.
 TextStyle emoTuneHeadlineFont({
@@ -91,7 +187,8 @@ TextStyle emoTuneHeadlineFont({
 ThemeData buildDarkTheme() {
   return ThemeData(
     brightness: Brightness.dark,
-    scaffoldBackgroundColor: AppColors.darkBg,
+    scaffoldBackgroundColor: EmoTuneColors.dark.background,
+    extensions: const [EmoTuneColors.dark],
     colorScheme: const ColorScheme.dark(
       primary: AppColors.accent,
       secondary: AppColors.gradientStart,
@@ -155,7 +252,8 @@ ThemeData buildDarkTheme() {
 ThemeData buildLightTheme() {
   return ThemeData(
     brightness: Brightness.light,
-    scaffoldBackgroundColor: AppColors.lightBg,
+    scaffoldBackgroundColor: EmoTuneColors.light.background,
+    extensions: const [EmoTuneColors.light],
     colorScheme: const ColorScheme.light(
       primary: AppColors.accentDark,
       secondary: Color(0xFF00B894),

@@ -5,7 +5,12 @@ import '../../theme/app_theme.dart';
 import 'package:intl/intl.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  const HistoryScreen({super.key, this.isActive = false});
+
+  /// MainShell keeps every tab alive inside an IndexedStack, so this screen is
+  /// only built once. Without a signal for "the tab is now on screen" the list
+  /// would keep showing whatever was on the server when the app launched.
+  final bool isActive;
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -16,26 +21,76 @@ class _HistoryScreenState extends State<HistoryScreen>
   late TabController _tabCtrl;
   List<dynamic> _history = [];
   List<dynamic> _stats = [];
-  bool _loading = true;
+  bool _loading = false;
+  bool _loadInFlight = false;
+  bool _hasLoaded = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
-    _load();
+    if (widget.isActive) {
+      _load();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant HistoryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Refetch every time the tab comes forward: a prompt submitted on Home has
+    // already written new rows by the time the user gets here.
+    if (widget.isActive && !oldWidget.isActive) {
+      _load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
-    try {
-      final hist = await ApiService.getHistory();
-      final stats = await ApiService.getEmotionStats();
+    if (_loadInFlight) return;
+    _loadInFlight = true;
+
+    // Only blank the screen out on the very first fetch. Later refreshes keep
+    // the existing rows visible so switching tabs doesn't flash a spinner.
+    if (!_hasLoaded) {
       setState(() {
-        _history = hist;
-        _stats = stats;
-        _loading = false;
+        _loading = true;
+        _error = null;
       });
-    } catch (e) {
-      setState(() => _loading = false);
+    }
+
+    try {
+      final results = await Future.wait([
+        ApiService.getHistory(),
+        ApiService.getEmotionStats(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _history = results[0];
+        _stats = results[1];
+        _loading = false;
+        _hasLoaded = true;
+        _error = null;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load your history right now.';
+      });
+    } finally {
+      _loadInFlight = false;
     }
   }
 
@@ -47,6 +102,13 @@ class _HistoryScreenState extends State<HistoryScreen>
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: const Text('History'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh),
+            onPressed: _loading ? null : _load,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabCtrl,
           indicatorColor: AppColors.accent,
@@ -63,23 +125,67 @@ class _HistoryScreenState extends State<HistoryScreen>
           : TabBarView(
               controller: _tabCtrl,
               children: [
-                _buildHistoryList(isDark),
-                _buildPieChart(isDark),
+                RefreshIndicator(
+                  onRefresh: _load,
+                  child: _buildHistoryList(isDark),
+                ),
+                RefreshIndicator(
+                  onRefresh: _load,
+                  child: _buildPieChart(isDark),
+                ),
               ],
             ),
     );
   }
 
+  /// Placeholders have to stay scrollable or pull-to-refresh can't be started
+  /// from an empty tab.
+  Widget _buildPlaceholder(bool isDark, String message, {bool isError = false}) {
+    return LayoutBuilder(
+      builder: (ctx, constraints) => ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: isDark ? Colors.white54 : Colors.black54),
+                    ),
+                  ),
+                  if (isError) ...[
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: _load,
+                      child: const Text('Try again'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHistoryList(bool isDark) {
+    if (_error != null && _history.isEmpty) {
+      return _buildPlaceholder(isDark, _error!, isError: true);
+    }
     if (_history.isEmpty) {
-      return Center(
-        child: Text('No history yet',
-            style: TextStyle(
-                color: isDark ? Colors.white54 : Colors.black54)),
-      );
+      return _buildPlaceholder(isDark, 'No history yet');
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       itemCount: _history.length,
       itemBuilder: (ctx, i) {
@@ -161,15 +267,17 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Widget _buildPieChart(bool isDark) {
+    if (_error != null && _stats.isEmpty) {
+      return _buildPlaceholder(isDark, _error!, isError: true);
+    }
     if (_stats.isEmpty) {
-      return Center(
-        child: Text('No emotion data yet',
-            style: TextStyle(
-                color: isDark ? Colors.white54 : Colors.black54)),
-      );
+      return _buildPlaceholder(isDark, 'No emotion data yet');
     }
 
     final total = _stats.fold<int>(0, (sum, s) => sum + (s['count'] as int));
+    if (total == 0) {
+      return _buildPlaceholder(isDark, 'No emotion data yet');
+    }
 
     final sections = _stats.map<PieChartSectionData>((s) {
       final emotion = s['detected_emotion'] as String;
@@ -188,6 +296,7 @@ class _HistoryScreenState extends State<HistoryScreen>
     }).toList();
 
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [

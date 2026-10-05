@@ -64,6 +64,14 @@ class PlayerProvider extends ChangeNotifier {
   Future<void>? _previewQueueReady;
   List<int?> _previewSourceIndexByPlaylistIndex = <int?>[];
   int _previewQueueVersion = 0;
+  bool _previewQueueAttached = false;
+  int? _activePreviewSourceIndex;
+  // Bumped by every call that hands the local player a different audio source.
+  // Preparing the queue and the single-URL fallback race each other (the
+  // prepared queue is only waited on for [_preparedPreviewSeekTimeout]), so
+  // each one checks it still holds the newest token before recording what the
+  // player is pointed at.
+  int _playerSourceVersion = 0;
   bool _isAdvancingTrack = false;
   bool _isWarmingSpotifyPlayback = false;
   bool _isSeekInProgress = false;
@@ -200,6 +208,9 @@ class PlayerProvider extends ChangeNotifier {
           List<dynamic> rawTracks) =>
       track_utils.normalizeTrackList(rawTracks);
 
+  static String trackIdentityOf(Map<String, dynamic> rawTrack) =>
+      track_utils.trackIdentity(rawTrack);
+
   void _applyRecommendationContext({
     Map<String, dynamic>? sessionPlan,
     Map<String, dynamic>? tasteProfile,
@@ -284,6 +295,7 @@ class PlayerProvider extends ChangeNotifier {
         notifyListeners();
       }
     });
+    _player.currentIndexStream.listen(_handlePreviewQueueIndexChange);
     _player.playerStateStream.listen((state) {
       if (_isUsingSpotifyRemote) {
         return;
@@ -351,7 +363,11 @@ class PlayerProvider extends ChangeNotifier {
     _repeatMode = 'off';
     _isUsingSpotifyAppRemote = false;
     _isAdvancingTrack = false;
-    _configurePreviewQueueForPlaylist(_playlist);
+    _resetCurrentSelectionForNewPlaylist();
+    _configurePreviewQueueForPlaylist(
+      _playlist,
+      pauseExistingPlayback: true,
+    );
     if (_playlist.isNotEmpty) {
       unawaited(_warmSpotifyPlaybackForTrack(_playlist.first));
     }
@@ -583,6 +599,16 @@ class PlayerProvider extends ChangeNotifier {
         _applyOptimisticRemoteTransportState(
           isPlaying: wasPlaying,
           clearError: false,
+        );
+        // A rejection does not mean nothing changed: the Web API answers 403
+        // when the command was redundant, so resuming something already
+        // playing fails while the state is exactly what the user asked for.
+        // Reverting on that alone makes the button look dead. Ask Spotify what
+        // is actually happening and let the answer win.
+        unawaited(
+          _refreshSpotifyPlaybackStateFromBackend(
+            delay: const Duration(milliseconds: 150),
+          ),
         );
       }
       return;
@@ -826,7 +852,22 @@ class PlayerProvider extends ChangeNotifier {
   Future<bool?> toggleFavoriteForCurrentTrack() =>
       _favorites.toggleForTrack(_currentTrack, emotion: _currentEmotion);
 
+  /// Favorites any track, not just the one currently playing -- what the
+  /// heart toggle on a song card (Home/Discover/Favorites grids) calls.
+  Future<bool?> toggleFavoriteForTrack(
+    Map<String, dynamic> track, {
+    String? emotion,
+  }) =>
+      _favorites.toggleForTrack(track, emotion: emotion);
+
   Future<void> refreshFavorites() => _favorites.refresh();
+
+  /// Every hearted track, newest first -- what the Favorites tab renders, so
+  /// a heart tapped on any card lands there without a refetch.
+  List<Map<String, dynamic>> get favoriteTracks => _favorites.favorites;
+
+  /// False until the first favorites fetch lands.
+  bool get favoritesLoaded => _favorites.isLoaded;
 
   bool isFavoriteTrack(Map<String, dynamic>? track) =>
       _favorites.isFavorite(track);
@@ -840,6 +881,15 @@ class PlayerProvider extends ChangeNotifier {
         _isUsingSpotifyAppRemote = false;
         final usedPreparedSource = await _seekPreparedPreviewForCurrentTrack();
         if (!usedPreparedSource) {
+          // setUrl replaces the prepared queue as the player's audio source,
+          // so the cached source indexes no longer address anything. Left
+          // marked as attached, the next track would seek by index into the
+          // single URL set here and play the wrong clip. Claiming the newest
+          // source token also stops an in-flight _preparePreviewQueue from
+          // reporting the queue as attached once this URL has replaced it.
+          _playerSourceVersion += 1;
+          _previewQueueAttached = false;
+          _activePreviewSourceIndex = null;
           await _player.setUrl(previewUrl.toString());
         }
         await _player.play();
@@ -849,12 +899,14 @@ class PlayerProvider extends ChangeNotifier {
           'This is a local preview clip. Full playback still needs Spotify in the background.',
         );
       } else {
+        _isPlaying = false;
         _errorMessage = track_utils.isContainerItem(track)
             ? 'This Spotify playlist is still being resolved. Try again in a moment.'
             : 'This recommendation is not directly playable inside the app.';
         _setPlaybackStatus('not_directly_playable', _errorMessage);
       }
     } catch (error) {
+      _isPlaying = false;
       _errorMessage = 'Error playing track: $error';
       _setPlaybackStatus('preview_error', _errorMessage);
     }
@@ -1029,6 +1081,9 @@ class PlayerProvider extends ChangeNotifier {
   Future<void> _advanceAfterTrackCompletion() async {
     try {
       if (_repeatMode == 'track') {
+        // Still a finished play: without this the session plan, listen time
+        // and check-ins froze for as long as repeat-one was on.
+        _trackListened(endedReason: 'completed');
         await playTrackAtIndex(_currentIndex, preferInstantPreview: true);
         return;
       }
@@ -1537,7 +1592,17 @@ class PlayerProvider extends ChangeNotifier {
   void _handleSpotifyRemoteEvent(SpotifyRemoteEvent event) {
     switch (event.type) {
       case 'connected':
-        _isUsingSpotifyRemote = true;
+        // Connecting only means the App Remote transport is available; the
+        // best-effort warmup connects before every local preview too. Claiming
+        // playback here froze the preview's progress bar (every local player
+        // stream is gated on _isUsingSpotifyRemote), pointed play/pause at
+        // Spotify instead of the clip, and let whatever the phone's Spotify
+        // app happened to be playing overwrite the current track. Ownership is
+        // claimed where playback actually starts, in
+        // _markAppRemotePlaybackStarted.
+        if (!_isUsingSpotifyRemote) {
+          return;
+        }
         _isUsingSpotifyAppRemote = true;
         _errorMessage = null;
         notifyListeners();
@@ -1555,12 +1620,21 @@ class PlayerProvider extends ChangeNotifier {
         }
         return;
       case 'player_state':
+        if (!_isUsingSpotifyAppRemote) {
+          return;
+        }
         _applySpotifyAppRemotePlayerState(event.data);
         return;
       case 'player_context':
+        if (!_isUsingSpotifyAppRemote) {
+          return;
+        }
         _applySpotifyAppRemoteContext(event.data);
         return;
       case 'context_queue':
+        if (!_isUsingSpotifyAppRemote) {
+          return;
+        }
         _applySpotifyAppRemoteContextQueue(event.data);
         return;
       case 'error':
@@ -1769,7 +1843,12 @@ class PlayerProvider extends ChangeNotifier {
     return null;
   }
 
-  void _configurePreviewQueueForPlaylist(List<Map<String, dynamic>> playlist) {
+  void _configurePreviewQueueForPlaylist(
+    List<Map<String, dynamic>> playlist, {
+    int? initialPlaylistIndex,
+    Duration? initialPosition,
+    bool pauseExistingPlayback = false,
+  }) {
     final previewSources = <AudioSource>[];
     final sourceIndexByPlaylistIndex = List<int?>.filled(playlist.length, null);
 
@@ -1792,10 +1871,30 @@ class PlayerProvider extends ChangeNotifier {
     _previewSourceIndexByPlaylistIndex = sourceIndexByPlaylistIndex;
     _previewQueueVersion += 1;
     final queueVersion = _previewQueueVersion;
+    _previewQueueAttached = false;
+    _activePreviewSourceIndex = null;
+
+    final initialSourceIndex = initialPlaylistIndex == null
+        ? null
+        : _previewSourceIndexForPlaylistIndex(initialPlaylistIndex);
+    // An anchor that resolves to nothing must not quietly fall through to
+    // source 0: that is the whole reason a rebuild used to start the first
+    // preview in the list. When the track to stay on has no local clip,
+    // nothing here should be audible, so stop instead of attaching and
+    // playing something else.
+    final shouldPause = pauseExistingPlayback ||
+        (initialPlaylistIndex != null && initialSourceIndex == null);
 
     if (previewSources.isEmpty) {
       _previewQueueSource = null;
       _previewQueueReady = null;
+      if (shouldPause) {
+        // Nothing here can be previewed locally, so no new source replaces the
+        // old one. Without this the clip from the previous queue kept playing
+        // underneath the newly loaded playlist.
+        _playerSourceVersion += 1;
+        unawaited(_stopPreviewPlayback());
+      }
       return;
     }
 
@@ -1807,8 +1906,62 @@ class PlayerProvider extends ChangeNotifier {
     _previewQueueReady = _preparePreviewQueue(
       previewQueue,
       queueVersion: queueVersion,
+      initialSourceIndex: initialSourceIndex,
+      initialPosition: initialSourceIndex == null ? null : initialPosition,
+      pauseExistingPlayback: shouldPause,
     );
     unawaited(_previewQueueReady!);
+  }
+
+  /// A newly loaded playlist replaces the queue the selection pointed into, so
+  /// re-anchor it. Left alone, [_currentIndex] kept addressing the old queue:
+  /// Next walked off the end and did nothing, and pressing play started the new
+  /// queue while the player still showed the previous track.
+  void _resetCurrentSelectionForNewPlaylist() {
+    final currentTrack = _currentTrack;
+    if (currentTrack != null) {
+      final identity = track_utils.trackIdentity(currentTrack);
+      final matchedIndex = identity.isEmpty
+          ? -1
+          : _playlist.indexWhere(
+              (track) => track_utils.trackIdentity(track) == identity,
+            );
+      if (matchedIndex >= 0) {
+        _currentIndex = matchedIndex;
+        return;
+      }
+    }
+
+    _currentIndex = 0;
+    if (_isUsingSpotifyRemote) {
+      // Spotify keeps playing whatever it was handed; the remote state refresh
+      // stays the source of truth for what is on screen.
+      return;
+    }
+    _currentTrack = null;
+    _isPlaying = false;
+    _position = Duration.zero;
+    _duration = Duration.zero;
+  }
+
+  /// just_audio advances between the children of a [ConcatenatingAudioSource]
+  /// on its own. That queue holds only the tracks that have a preview URL and
+  /// knows nothing about shuffle, repeat or listen tracking, so an automatic
+  /// hop played the wrong song while the UI still showed the previous one and
+  /// skipped the whole end-of-track pipeline. Treat it as the current track
+  /// finishing and let EmoTune choose what plays next.
+  void _handlePreviewQueueIndexChange(int? sourceIndex) {
+    final activeSourceIndex = _activePreviewSourceIndex;
+    if (_isUsingSpotifyRemote ||
+        _isLoading ||
+        _isAdvancingTrack ||
+        sourceIndex == null ||
+        activeSourceIndex == null ||
+        sourceIndex == activeSourceIndex) {
+      return;
+    }
+    _activePreviewSourceIndex = sourceIndex;
+    _onTrackCompleted();
   }
 
   void _extendPreviewQueueForMergedPlaylist({
@@ -1822,7 +1975,15 @@ class PlayerProvider extends ChangeNotifier {
     final previewQueue = _previewQueueSource;
     if (previewQueue == null ||
         _previewSourceIndexByPlaylistIndex.length != previousPlaylistLength) {
-      _configurePreviewQueueForPlaylist(mergedPlaylist);
+      // Same reason as the addAll failure below: a rebuild hands the player a
+      // fresh source and just_audio carries `playing` across setAudioSource,
+      // so without an anchor the audio jumped to the first preview in the list
+      // while the UI still showed the track the user picked.
+      _configurePreviewQueueForPlaylist(
+        mergedPlaylist,
+        initialPlaylistIndex: _currentIndex,
+        initialPosition: _position,
+      );
       return;
     }
 
@@ -1863,7 +2024,13 @@ class PlayerProvider extends ChangeNotifier {
       try {
         await previewQueue.addAll(appendedSources);
       } catch (_) {
-        _configurePreviewQueueForPlaylist(mergedPlaylist);
+        // Rebuilding hands the player a fresh source, which would restart the
+        // queue from the top; keep it on the track that is playing.
+        _configurePreviewQueueForPlaylist(
+          mergedPlaylist,
+          initialPlaylistIndex: _currentIndex,
+          initialPosition: _position,
+        );
       }
     });
     unawaited(_previewQueueReady!);
@@ -1872,16 +2039,45 @@ class PlayerProvider extends ChangeNotifier {
   Future<void> _preparePreviewQueue(
     ConcatenatingAudioSource previewQueue, {
     required int queueVersion,
+    int? initialSourceIndex,
+    Duration? initialPosition,
+    bool pauseExistingPlayback = false,
   }) async {
+    final sourceVersion = ++_playerSourceVersion;
     try {
-      await _player.setAudioSource(previewQueue);
+      if (pauseExistingPlayback) {
+        // just_audio carries `playing` across setAudioSource, so a queue loaded
+        // while a clip was playing started its own first preview immediately —
+        // even for callers that asked for autoplay: false.
+        await _player.pause();
+      }
+      await _player.setAudioSource(
+        previewQueue,
+        initialIndex: initialSourceIndex,
+        initialPosition: initialPosition,
+      );
+      if (_playerSourceVersion != sourceVersion ||
+          _previewQueueVersion != queueVersion ||
+          _previewQueueSource != previewQueue) {
+        return;
+      }
+      _previewQueueAttached = true;
+      _activePreviewSourceIndex = initialSourceIndex ?? 0;
     } catch (_) {
-      if (_previewQueueVersion != queueVersion ||
+      // Losing the source token means a newer call -- normally the single-URL
+      // fallback that gave up waiting on this load -- deliberately interrupted
+      // us. just_audio reports that as a load error, but the queue itself is
+      // fine and still addresses the right clips, so tearing it down here
+      // dropped every remaining track in the playlist onto the fallback path.
+      if (_playerSourceVersion != sourceVersion ||
+          _previewQueueVersion != queueVersion ||
           _previewQueueSource != previewQueue) {
         return;
       }
       _previewQueueSource = null;
       _previewQueueReady = null;
+      _previewQueueAttached = false;
+      _activePreviewSourceIndex = null;
       _previewSourceIndexByPlaylistIndex =
           List<int?>.filled(_playlist.length, null);
     }
@@ -1902,7 +2098,22 @@ class PlayerProvider extends ChangeNotifier {
       if (_previewQueueSource != previewQueue) {
         return false;
       }
-      await _player.seek(Duration.zero, index: previewIndex);
+      final sourceVersion = _previewQueueAttached
+          ? _playerSourceVersion
+          : ++_playerSourceVersion;
+      if (_previewQueueAttached) {
+        await _player.seek(Duration.zero, index: previewIndex);
+      } else {
+        // A single-URL fallback took the player away from the prepared queue;
+        // seeking by index would address that URL instead. Re-attach first.
+        await _player.setAudioSource(previewQueue, initialIndex: previewIndex);
+      }
+      if (_playerSourceVersion != sourceVersion ||
+          _previewQueueSource != previewQueue) {
+        return false;
+      }
+      _previewQueueAttached = true;
+      _activePreviewSourceIndex = previewIndex;
       return true;
     } on TimeoutException {
       return false;
@@ -1975,6 +2186,23 @@ class PlayerProvider extends ChangeNotifier {
       }
       notifyListeners();
       return true;
+    }
+
+    // A blocked App Remote says nothing about the Web API. App Remote is the
+    // on-device SDK and is what the authorization failure applies to; the Web
+    // API drives whatever device the Spotify account already has active, and
+    // keeps working. Giving up here left the app silent on every track after
+    // the first failure -- and because the branch below clears
+    // _isUsingSpotifyRemote, it also froze the progress tick and pointed
+    // play/pause at a local player holding nothing.
+    if (_supportsSpotifyRemotePlayback(track)) {
+      await _stopPreviewPlayback();
+      final webPlaybackError = await _playSpotifyViaWebApi(track);
+      if (webPlaybackError == null) {
+        unawaited(_refreshSpotifyPlaybackStateFromBackend());
+        notifyListeners();
+        return true;
+      }
     }
 
     _isUsingSpotifyRemote = false;
@@ -2115,22 +2343,42 @@ class PlayerProvider extends ChangeNotifier {
             ? _playlist[matchedPlaylistIndex]
             : null;
 
-    final syncedTrack = <String, dynamic>{
-      if (matchedTrack != null) ...matchedTrack,
-      ...?_currentTrack,
-      'id': itemId.isNotEmpty ? itemId : (_currentTrack?['id'] ?? itemUri),
+    // Fields only carry over from the track already on screen while Spotify is
+    // still on that same track. Once it has moved on, the old artwork, album
+    // and preview clip belong to the previous song: keeping them left the
+    // player showing the last track's cover art, and handed a later preview
+    // fallback the wrong clip to play.
+    final previousTrack = _currentTrack;
+    final previousIdentity =
+        previousTrack == null ? '' : track_utils.trackIdentity(previousTrack);
+    final incomingIdentity = track_utils.trackIdentity(<String, dynamic>{
+      'id': itemId,
+      'uri': itemUri,
       'item_type': itemType,
-      'uri': itemUri.isNotEmpty ? itemUri : _currentTrack?['uri'],
+    });
+    final isSameTrack =
+        previousIdentity.isNotEmpty && previousIdentity == incomingIdentity;
+    final baseTrack = <String, dynamic>{
+      if (matchedTrack != null) ...matchedTrack,
+      if (isSameTrack) ...?previousTrack,
+    };
+
+    final syncedTrack = <String, dynamic>{
+      ...baseTrack,
+      'id': itemId.isNotEmpty ? itemId : (baseTrack['id'] ?? itemUri),
+      'item_type': itemType,
+      'uri': itemUri.isNotEmpty ? itemUri : baseTrack['uri'],
       'spotify_url': itemId.isNotEmpty
           ? 'https://open.spotify.com/$itemType/$itemId'
-          : (_currentTrack?['spotify_url'] ?? ''),
-      'name': snapshot['item_name'] ?? _currentTrack?['name'] ?? '',
-      'artist': snapshot['artist_name'] ?? _currentTrack?['artist'] ?? '',
-      'album': snapshot['album_name'] ?? _currentTrack?['album'],
-      'image': snapshot['image_url'] ?? _currentTrack?['image'],
+          : (baseTrack['spotify_url'] ?? ''),
+      'name': _firstNonEmpty(snapshot['item_name'], baseTrack['name']) ?? '',
+      'artist':
+          _firstNonEmpty(snapshot['artist_name'], baseTrack['artist']) ?? '',
+      'album': _firstNonEmpty(snapshot['album_name'], baseTrack['album']),
+      'image': _firstNonEmpty(snapshot['image_url'], baseTrack['image']),
       'duration_ms':
-          snapshot['duration_ms'] ?? _currentTrack?['duration_ms'] ?? 0,
-      'preview_url': _currentTrack?['preview_url'],
+          snapshot['duration_ms'] ?? baseTrack['duration_ms'] ?? 0,
+      'preview_url': baseTrack['preview_url'],
     };
 
     _currentTrack = normalizeTrack(syncedTrack);
@@ -2153,6 +2401,15 @@ class PlayerProvider extends ChangeNotifier {
     } else if (_contextQueue.isEmpty) {
       _currentContext = null;
     }
+  }
+
+  static String? _firstNonEmpty(Object? value, Object? fallback) {
+    final preferred = value?.toString().trim() ?? '';
+    if (preferred.isNotEmpty) {
+      return preferred;
+    }
+    final alternative = fallback?.toString().trim() ?? '';
+    return alternative.isNotEmpty ? alternative : null;
   }
 
   @override

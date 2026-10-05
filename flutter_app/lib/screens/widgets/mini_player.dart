@@ -21,6 +21,7 @@ class MiniPlayer extends StatelessWidget {
     final playbackStatus = _shouldShowPlaybackStatus(player)
         ? player.playbackStatusShortLabel
         : '';
+    final imageUrl = track['image']?.toString().trim() ?? '';
 
     return GestureDetector(
       onTap: () {
@@ -60,15 +61,19 @@ class MiniPlayer extends StatelessWidget {
                       child: SizedBox(
                         width: 40,
                         height: 40,
-                        child: track['image'] != null && track['image'].isNotEmpty
+                        // Without placeholder/errorWidget a reload or a failed
+                        // fetch drew nothing, which on the dark card showed
+                        // up as a black square.
+                        child: imageUrl.isNotEmpty
                             ? CachedNetworkImage(
-                                imageUrl: track['image'],
+                                imageUrl: imageUrl,
                                 fit: BoxFit.cover,
+                                useOldImageOnUrlChange: true,
+                                placeholder: (_, __) => const _ArtFallback(),
+                                errorWidget: (_, __, ___) =>
+                                    const _ArtFallback(),
                               )
-                            : Container(
-                                color: AppColors.accent.withValues(alpha: 0.3),
-                                child: const Icon(Icons.music_note, size: 20),
-                              ),
+                            : const _ArtFallback(),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -161,5 +166,17 @@ class MiniPlayer extends StatelessWidget {
       'preview_error' => false,
       _ => true,
     };
+  }
+}
+
+class _ArtFallback extends StatelessWidget {
+  const _ArtFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.accent.withValues(alpha: 0.3),
+      child: const Icon(Icons.music_note, size: 20),
+    );
   }
 }
