@@ -32,6 +32,25 @@ OUTCOME_MODE_CONFIG = {
             "mixed": 0.1,
         },
         "target_weight": 0.58,
+        # The iso-principle (Altshuler 1944; see docs/music_therapy_guidelines.md)
+        # is match-then-shift: meet the listener where they are, then move the
+        # music toward the steadier state over the session rather than jumping
+        # there immediately. A single fixed target_weight cannot express that --
+        # it lands on one point of the arc and stays there -- so the weight is
+        # read per session phase, using the settle/support/close clock that
+        # `update_session_plan_progress` already advances on every track end.
+        #
+        # `settle` stays above 0.0 on purpose. A full match would hand someone
+        # who just said they feel hopeless a playlist that only deepens it, and
+        # the shift here is reactive (it needs the listener to answer a check-in),
+        # so the arc is not guaranteed to complete. Leaning toward their emotion
+        # without ever abandoning the steadier pull is the safer reading while
+        # that remains true.
+        "phase_target_weights": {
+            "settle": 0.40,
+            "support": 0.58,
+            "close": 0.78,
+        },
         "default_session_minutes": 20,
         "default_check_in_tracks": 3,
         "check_in_prompt": "Has this session helped you settle down a little?",
@@ -116,6 +135,23 @@ def normalize_outcome_mode(value) -> str:
 
 def outcome_mode_config(mode: str | None) -> dict:
     return OUTCOME_MODE_CONFIG[normalize_outcome_mode(mode)]
+
+
+def outcome_target_weight(mode: str | None, phase=None) -> float:
+    """How hard this mode pulls toward its target, at this point in the session.
+
+    An unknown or absent phase falls back to the mode's flat `target_weight`, so
+    callers that know nothing about session progress keep the pre-iso behaviour.
+    """
+    config = outcome_mode_config(mode)
+    phase_weights = config.get("phase_target_weights") or {}
+    normalized_phase = str(phase or "").strip().lower()
+    weight = (
+        phase_weights[normalized_phase]
+        if normalized_phase in phase_weights
+        else config.get("target_weight")
+    )
+    return min(max(_safe_float(weight, 0.5), 0.0), 1.0)
 
 
 def normalize_taste_profile(raw_taste_profile: Mapping | None) -> dict:
@@ -222,7 +258,7 @@ def _confidence_margin(ranking: list[dict]) -> float:
     )
 
 
-def apply_outcome_mode(result: Mapping | None, outcome_mode: str) -> dict:
+def apply_outcome_mode(result: Mapping | None, outcome_mode: str, phase=None) -> dict:
     working_result = dict(result) if isinstance(result, Mapping) else {}
     normalized_mode = normalize_outcome_mode(outcome_mode)
     config = outcome_mode_config(normalized_mode)
@@ -243,15 +279,28 @@ def apply_outcome_mode(result: Mapping | None, outcome_mode: str) -> dict:
         }
 
     target_scores = _normalize_weight_map(config.get("target_weights"))
-    target_weight = min(max(_safe_float(config.get("target_weight"), 0.5), 0.0), 1.0)
+    target_weight = outcome_target_weight(normalized_mode, phase)
     base_weight = max(0.0, 1.0 - target_weight)
 
+    # An emotion with no seat in target_weights (e.g. calm_me_down never wants to
+    # land on "angry") gets no target-side floor to compete against. Blended
+    # plainly at base_weight, a confident-enough reading can still out-score every
+    # target emotion and keep the top slot -- letting the mode land right back on
+    # the emotion it exists to steer away from, no matter how sure the classifier
+    # is. Discounting it by base_weight again (so its ceiling is base_weight**2,
+    # e.g. 0.42**2 ~= 0.18 at this mode's default) keeps it available as a
+    # secondary signal for ranking without ever letting it outrank a real target
+    # emotion's floor (target_weight * its own share, e.g. calm's 0.55 * 0.58 ~=
+    # 0.32) -- see docs/music_therapy_guidelines.md, "angry" entry.
     combined_scores = {}
     for emotion in base_scores:
-        combined_scores[emotion] = (
-            base_scores.get(emotion, 0.0) * base_weight
-            + target_scores.get(emotion, 0.0) * target_weight
-        )
+        if emotion in target_scores:
+            combined_scores[emotion] = (
+                base_scores.get(emotion, 0.0) * base_weight
+                + target_scores[emotion] * target_weight
+            )
+        else:
+            combined_scores[emotion] = base_scores.get(emotion, 0.0) * base_weight * base_weight
 
     total = sum(combined_scores.values())
     if total > 0:
@@ -271,6 +320,8 @@ def apply_outcome_mode(result: Mapping | None, outcome_mode: str) -> dict:
         "outcome_mode": normalized_mode,
         "outcome_label": config["label"],
         "outcome_description": config["description"],
+        "outcome_phase": str(phase or "").strip().lower() or None,
+        "outcome_target_weight": target_weight,
     }
 
 

@@ -10,14 +10,16 @@ every original method name as a delegating method, so every existing caller
 for the actual implementations, and spotify/utils.py for the small stateless
 helpers shared across all of them.
 
-`requests` and `time` are imported here (even though this module no longer
-makes HTTP calls directly) because the test suite patches them via dotted
-paths like `api.spotify_service.requests.post` / `api.spotify_service.time.monotonic`;
-since `requests`/`time` are shared singleton modules, patching an attribute
-through this import still patches the exact same callable the collaborators
-use.
+`time` is imported here (even though this module no longer makes HTTP calls
+directly) because the test suite patches it via a dotted path like
+`api.spotify_service.time.monotonic`; since `time` is a shared singleton
+module, patching an attribute through this import still patches the exact same
+callable the collaborators use.
+
+Outbound HTTP no longer goes through `requests` directly -- it goes through the
+pooled session in `api/http_client.py`, so tests patch `api.http_client.post`
+rather than `api.spotify_service.requests.post`.
 """
-import requests
 import time
 import logging
 

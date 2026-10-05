@@ -1804,6 +1804,7 @@ class SpotifyRecommendationEngine:
             'spotify_errors': [],
             'token_failures': [],
             'reason': None,
+            'retry_after': None,
         }
 
         resolved_target_size = max(int(target_size or pool.target_size()), 1)
@@ -1835,10 +1836,19 @@ class SpotifyRecommendationEngine:
         result['tracks'] = pooled_tracks
         result['ok'] = bool(pooled_tracks)
         if not pooled_tracks:
-            result['reason'] = (
-                result['spotify_errors'][0]['reason']
-                if result['spotify_errors']
-                else 'no_results'
+            first_error = (
+                result['spotify_errors'][0] if result['spotify_errors'] else {}
+            )
+            result['reason'] = first_error.get('reason') or 'no_results'
+            # Surfaced so `refresh_emotion_pools` can wait exactly as long as
+            # Spotify asked instead of guessing at a backoff.
+            result['retry_after'] = next(
+                (
+                    error['retry_after']
+                    for error in result['spotify_errors']
+                    if error.get('retry_after') is not None
+                ),
+                None,
             )
         return result
 

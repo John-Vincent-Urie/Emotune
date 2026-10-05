@@ -1,20 +1,33 @@
+import logging
+
 from rest_framework import status, permissions
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model, authenticate
 from django.db.models import Count
+from django.utils import timezone
+from .emails import send_password_reset_code
 from .models import (
-    EMOTION_CHOICES, FavoriteTrack, ListeningSession, PromptHistory, UserPreference,
+    EMOTION_CHOICES, FavoriteTrack, ListeningSession, PasswordResetCode,
+    PromptHistory, UserPreference,
 )
 from .throttles import (
-    LoginEmailThrottle, LoginIPThrottle, PasswordChangeThrottle, RegisterThrottle,
+    LoginEmailThrottle, LoginIPThrottle, PasswordChangeThrottle,
+    PasswordResetEmailThrottle, PasswordResetIPThrottle,
+    PasswordResetVerifyEmailThrottle, PasswordResetVerifyIPThrottle,
+    RegisterThrottle,
 )
 from .serializers import (
     UserSerializer, RegisterSerializer, ChangePasswordSerializer,
-    FavoriteTrackSerializer, PromptHistorySerializer, UserPreferenceSerializer
+    FavoriteTrackSerializer, PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer, PasswordResetVerifySerializer,
+    PromptHistorySerializer, UserPreferenceSerializer
 )
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -109,6 +122,149 @@ def change_password(request):
         user.save()
         return Response({'message': 'Password changed successfully'})
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Forgotten-password reset, by one-time code emailed to the account address.
+
+# Returned whether or not the address has an account: answering differently
+# would turn this endpoint into a way to test which emails are registered.
+_RESET_SENT_MESSAGE = (
+    'If that email has an EmoTune account, a reset code is on its way.'
+)
+_RESET_CODE_INVALID = 'That code is invalid or has expired. Request a new one.'
+
+
+def _resolve_reset_code(email, code):
+    """Look up the live code for an address and check it.
+
+    Returns ``(user, record, error_response)`` with exactly one of the first
+    pair or the error populated. A wrong guess is counted here, so both the
+    verify and confirm endpoints burn attempts at the same rate.
+    """
+    user = User.objects.filter(email__iexact=email).first()
+    record = None
+    if user is not None:
+        record = (
+            PasswordResetCode.objects
+            .filter(user=user, used_at__isnull=True)
+            .order_by('-created_at')
+            .first()
+        )
+
+    # No account, no code, expired, already spent, or out of attempts all
+    # collapse to one answer -- each distinction would leak something.
+    if user is None or record is None or not record.is_usable:
+        return None, None, Response(
+            {'error': _RESET_CODE_INVALID},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not record.matches(code):
+        record.attempts += 1
+        record.save(update_fields=['attempts'])
+        if record.attempts_remaining == 0:
+            return None, None, Response(
+                {'error': 'Too many wrong codes. Request a new one.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        # The count goes in the message as well as the field: the app surfaces
+        # `error` verbatim, and "4 tries left" is the part that changes what
+        # the user does next.
+        tries = record.attempts_remaining
+        noun = 'try' if tries == 1 else 'tries'
+        return None, None, Response(
+            {
+                'error': f'That code is not right. {tries} {noun} left.',
+                'attempts_remaining': tries,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return user, record, None
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+@throttle_classes([PasswordResetIPThrottle, PasswordResetEmailThrottle])
+def password_reset_request(request):
+    """Email a one-time code to the address, if an account owns it."""
+    serializer = PasswordResetRequestSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    email = serializer.validated_data['email']
+    user = User.objects.filter(email__iexact=email).first()
+
+    if user is not None:
+        record, code = PasswordResetCode.issue(user)
+        try:
+            send_password_reset_code(user, code)
+        except Exception:
+            # The code is useless to a user who never received it, and leaving
+            # it live would only eat into their attempt budget later.
+            record.delete()
+            logger.exception('Password reset mail failed for %s', email)
+            # This does reveal that the address exists, but only while mail is
+            # broken -- and a silent success would strand the user instead.
+            return Response(
+                {'error': 'Could not send the code right now. Try again shortly.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+    return Response({
+        'message': _RESET_SENT_MESSAGE,
+        'expires_in_minutes': int(PasswordResetCode.LIFETIME.total_seconds() // 60),
+        'code_length': PasswordResetCode.CODE_LENGTH,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+@throttle_classes([PasswordResetVerifyIPThrottle, PasswordResetVerifyEmailThrottle])
+def password_reset_verify(request):
+    """Check a code without spending it, so the app can gate its next step."""
+    serializer = PasswordResetVerifySerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    _user, record, error = _resolve_reset_code(
+        serializer.validated_data['email'],
+        serializer.validated_data['code'],
+    )
+    if error is not None:
+        return error
+    return Response({'valid': True, 'expires_at': record.expires_at})
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+@throttle_classes([PasswordResetVerifyIPThrottle, PasswordResetVerifyEmailThrottle])
+def password_reset_confirm(request):
+    """Spend the code and set the new password."""
+    serializer = PasswordResetConfirmSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    user, record, error = _resolve_reset_code(
+        serializer.validated_data['email'],
+        serializer.validated_data['code'],
+    )
+    if error is not None:
+        return error
+
+    user.set_password(serializer.validated_data['new_password'])
+    user.save(update_fields=['password'])
+
+    record.used_at = timezone.now()
+    record.save(update_fields=['used_at'])
+    PasswordResetCode.objects.filter(user=user, used_at__isnull=True).delete()
+
+    # Whoever knew the old password may still hold a live session. A reset is
+    # how someone recovers a compromised account, so end those sessions too.
+    for token in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=token)
+
+    return Response({'message': 'Password updated. You can log in with it now.'})
 
 
 @api_view(['PUT'])

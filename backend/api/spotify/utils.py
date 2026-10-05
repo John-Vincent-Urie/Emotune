@@ -106,6 +106,7 @@ def _classify_upstream_failure(
     response_text='',
     *,
     endpoint='',
+    source='',
 ):
     combined_text = ' '.join(
         [str(error_message or '').strip(), str(response_text or '').strip()]
@@ -125,6 +126,23 @@ def _classify_upstream_failure(
         'invalid_client' in combined_text
         or 'invalid client' in combined_text
     ):
+        # Spotify answers invalid_client for two different faults, and sending
+        # someone to edit .env when the credentials are fine wastes real time.
+        # A refresh token is bound to the app that issued it, so on a refresh
+        # the far likelier cause is a link made under an older Spotify app.
+        if source == 'refresh_token':
+            return {
+                'reason': 'refresh_token_rejected',
+                'retryable': False,
+                'recommended_action': (
+                    'Spotify rejected this account\'s refresh token. It was most '
+                    'likely issued by a different Spotify app than the current '
+                    'SPOTIFY_CLIENT_ID, so reconnect Spotify in EmoTune to get a '
+                    'fresh token. If reconnecting also fails, then check that '
+                    'SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET belong to the '
+                    'same Spotify app.'
+                ),
+            }
         return {
             'reason': 'client_credentials_invalid',
             'retryable': False,
@@ -244,12 +262,14 @@ def _build_failure_response(
     error_code=None,
     endpoint='',
     source='spotify',
+    retry_after=None,
 ):
     classification = _classify_upstream_failure(
         status_code,
         error_message=error_message,
         response_text=response_text,
         endpoint=endpoint,
+        source=source,
     )
     return {
         'ok': False,
@@ -264,7 +284,28 @@ def _build_failure_response(
         'source': source,
         'retryable': classification['retryable'],
         'recommended_action': classification['recommended_action'],
+        # Seconds Spotify asked us to wait, from the Retry-After header on a
+        # 429. Only a rate-limited response carries one; everything else leaves
+        # this None. Callers that retry (the pool refresh command) must honour
+        # it -- Spotify's block can be far longer than any fixed backoff guess.
+        'retry_after': retry_after,
     }
+
+
+def _parse_retry_after(value):
+    """Return the Retry-After header as whole seconds, or None.
+
+    Spotify sends a plain seconds count. The HTTP spec also allows a date, but
+    Spotify does not use it, so an unparseable value is simply ignored rather
+    than guessed at.
+    """
+    if value is None:
+        return None
+    try:
+        seconds = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return seconds if seconds >= 0 else None
 
 def _build_request_exception_failure_response(
     error,
@@ -317,6 +358,7 @@ def _compact_failure(result, *, source=None, extra=None):
         'error': result.get('error'),
         'error_code': result.get('error_code'),
         'recommended_action': result.get('recommended_action'),
+        'retry_after': result.get('retry_after'),
     }
     if extra:
         compact.update(extra)

@@ -8,6 +8,7 @@ urlpatterns = [
     path('recommendation-playlist/', views.recommendation_playlist, name='recommendation_playlist'),
     path('feel-better/', views.check_feel_better, name='feel_better'),
     path('feel-better-response/', views.feel_better_response, name='feel_better_response'),
+    path('support-resources/', views.support_resources, name='support_resources'),
     
     # Spotify
     path('spotify/app-remote-config/', views.spotify_app_remote_config, name='spotify_app_remote_config'),

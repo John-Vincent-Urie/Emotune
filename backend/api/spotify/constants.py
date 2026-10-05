@@ -139,7 +139,17 @@ def _load_music_picker_doc_seed_tracks():
         if seed_tracks
     }
 
-# Emotion to Spotify search mapping
+# Emotion to Spotify search mapping.
+#
+# Therapeutic rationale, evidence, and known gaps for every entry below are in
+# docs/music_therapy_guidelines.md -- read that before changing keywords/genres
+# here, since a wrong-feeling change (e.g. matching literal word meaning instead
+# of the emotional state, as the old 'fear' seed tracks in docs/music.md did) is
+# the app's main safety risk, not a cosmetic one.
+#
+# Note: 'audio_features' below is not read by anything -- Spotify's audio-features
+# endpoint 403s for apps registered after Nov 2024 (see recommendations.py), so the
+# actual selection mechanism is the keyword/genre text search, not these targets.
 EMOTION_SEARCH_PARAMS = {
     'happy': {
         'keywords': ['feel good', 'upbeat', 'joyful', 'sunshine', 'celebration'],

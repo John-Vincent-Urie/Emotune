@@ -12,6 +12,7 @@ import requests
 from django.conf import settings
 from django.utils import timezone
 
+from .. import http_client
 from .utils import (
     _build_failure_response,
     _build_request_exception_failure_response,
@@ -20,6 +21,7 @@ from .utils import (
     _extract_error_details,
     _normalize_scopes,
     _parse_response_json,
+    _parse_retry_after,
     _token_payload_summary,
 )
 from .constants import SPOTIFY_AUTH_URL, SPOTIFY_TOKEN_URL, SPOTIFY_API_BASE
@@ -65,7 +67,7 @@ class SpotifyAuthClient:
         resolved_redirect_uri = redirect_uri or self.redirect_uri
         auth = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
         try:
-            response = requests.post(
+            response = http_client.post(
                 SPOTIFY_TOKEN_URL,
                 headers={
                     'Authorization': f'Basic {auth}',
@@ -124,7 +126,7 @@ class SpotifyAuthClient:
         """Refresh an access token"""
         auth = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
         try:
-            response = requests.post(
+            response = http_client.post(
                 SPOTIFY_TOKEN_URL,
                 headers={
                     'Authorization': f'Basic {auth}',
@@ -209,7 +211,7 @@ class SpotifyAuthClient:
 
         auth = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
         try:
-            response = requests.post(
+            response = http_client.post(
                 SPOTIFY_TOKEN_URL,
                 headers={
                     'Authorization': f'Basic {auth}',
@@ -393,7 +395,7 @@ class SpotifyAuthClient:
     ):
         """Call a Spotify Web API endpoint and return a debug-friendly payload."""
         try:
-            response = requests.request(
+            response = http_client.request(
                 method,
                 f"{SPOTIFY_API_BASE}{path}",
                 headers={'Authorization': f'Bearer {token}'},
@@ -463,6 +465,7 @@ class SpotifyAuthClient:
             response_json=payload,
             error_code=error_details['error_code'],
             endpoint=path,
+            retry_after=_parse_retry_after(response.headers.get('Retry-After')),
         )
 
     def _spotify_get(self, token, path, params=None, timeout_seconds=None):

@@ -38,6 +38,30 @@ class RegistrationTests(TestCase):
         self.assertFalse(user.personalization_opt_in)
         self.assertIsNotNone(user.terms_accepted_at)
 
+    def _register(self, display_name, email):
+        return self.client.post(
+            '/api/users/register/',
+            {
+                'username': display_name,
+                'email': email,
+                'password': 'password123',
+                'confirm_password': 'password123',
+                'accept_terms': True,
+            },
+            format='json',
+        )
+
+    def test_display_name_may_contain_spaces(self):
+        response = self._register('  QA Tester  ', 'qa@example.com')
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()['user']['username'], 'QA Tester')
+        self.assertEqual(User.objects.get(email='qa@example.com').username, 'QA Tester')
+
+    def test_two_people_can_share_a_display_name(self):
+        self.assertEqual(self._register('Maria', 'maria1@example.com').status_code, 201)
+        self.assertEqual(self._register('Maria', 'maria2@example.com').status_code, 201)
+
     def test_register_requires_terms_acceptance(self):
         response = self.client.post(
             '/api/users/register/',

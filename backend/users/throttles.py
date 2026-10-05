@@ -18,18 +18,26 @@ class LoginIPThrottle(AnonRateThrottle):
     scope = 'login_ip'
 
 
-class LoginEmailThrottle(SimpleRateThrottle):
-    """Cap login attempts against a single account, whatever the source IP."""
+class EmailScopedThrottle(SimpleRateThrottle):
+    """Rate limit keyed on the submitted email rather than the caller's IP.
 
-    scope = 'login_email'
+    Subclasses only need to set a scope. Attributing the attempt to the account
+    being targeted is what stops a distributed attack on one mailbox.
+    """
 
     def get_cache_key(self, request, view):
         email = request.data.get('email') if hasattr(request, 'data') else None
         email = str(email or '').strip().lower()
         if not email:
-            # Nothing to attribute the attempt to; LoginIPThrottle still covers it.
+            # Nothing to attribute the attempt to; the IP throttle still covers it.
             return None
         return self.cache_format % {'scope': self.scope, 'ident': email}
+
+
+class LoginEmailThrottle(EmailScopedThrottle):
+    """Cap login attempts against a single account, whatever the source IP."""
+
+    scope = 'login_email'
 
 
 class RegisterThrottle(AnonRateThrottle):
@@ -42,3 +50,31 @@ class PasswordChangeThrottle(UserRateThrottle):
     """Limit old-password guesses on an already authenticated session."""
 
     scope = 'password_change'
+
+
+class PasswordResetIPThrottle(AnonRateThrottle):
+    """Keep one client from spraying reset codes at many addresses."""
+
+    scope = 'password_reset_ip'
+
+
+class PasswordResetEmailThrottle(EmailScopedThrottle):
+    """Cap how often one address can be mailed a code -- anti mail-bomb."""
+
+    scope = 'password_reset_email'
+
+
+# Entering a code is scoped separately from asking for one. Sharing a bucket
+# means a user who mistypes their code burns the budget that lets them request
+# a replacement, and the two actions deserve very different rates: a handful of
+# mails an hour, but enough guesses to spend the code's own attempt budget.
+class PasswordResetVerifyIPThrottle(AnonRateThrottle):
+    """Cap code submissions from a single client address."""
+
+    scope = 'password_reset_verify_ip'
+
+
+class PasswordResetVerifyEmailThrottle(EmailScopedThrottle):
+    """Cap code submissions against a single account, whatever the source IP."""
+
+    scope = 'password_reset_verify_email'

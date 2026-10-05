@@ -12,6 +12,8 @@ import logging
 import requests
 from django.conf import settings
 
+from . import http_client
+
 logger = logging.getLogger(__name__)
 
 GEMINI_API_BASE = 'https://generativelanguage.googleapis.com'
@@ -880,7 +882,7 @@ class LLMMusicPicker:
         }
 
     def _post_completion_request(self, payload):
-        return requests.post(
+        return http_client.post(
             self._request_url(),
             headers=self._request_headers(),
             json=payload,

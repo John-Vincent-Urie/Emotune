@@ -87,6 +87,32 @@ class ChangePasswordSerializer(serializers.Serializer):
         return data
 
 
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        return str(value or '').strip().lower()
+
+
+class PasswordResetVerifySerializer(PasswordResetRequestSerializer):
+    code = serializers.CharField(min_length=1)
+
+    def validate_code(self, value):
+        return str(value or '').strip()
+
+
+class PasswordResetConfirmSerializer(PasswordResetVerifySerializer):
+    # Same floor as registration, so a reset cannot be used to sneak past the
+    # rule the sign-up form enforces.
+    new_password = serializers.CharField(min_length=6)
+    confirm_new_password = serializers.CharField()
+
+    def validate(self, data):
+        if data['new_password'] != data['confirm_new_password']:
+            raise serializers.ValidationError("New passwords do not match.")
+        return data
+
+
 class FavoriteTrackSerializer(serializers.ModelSerializer):
     class Meta:
         model = FavoriteTrack

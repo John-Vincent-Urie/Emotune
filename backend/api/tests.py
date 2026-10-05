@@ -1,6 +1,7 @@
 import json
 from datetime import timedelta
 from io import StringIO
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from unittest.mock import Mock, patch
 
@@ -1944,7 +1945,7 @@ class SpotifyRecommendationTests(TestCase):
         self.assertIn('all_scores', payload['messages'][1]['content'])
         self.assertIn('confidence_margin', payload['messages'][1]['content'])
 
-    @patch('api.llm_music_picker.requests.post')
+    @patch('api.http_client.post')
     def test_build_search_plan_fills_with_fallback_queries(self, mock_post):
         picker = LLMMusicPicker()
         picker.enabled = True
@@ -1988,7 +1989,7 @@ class SpotifyRecommendationTests(TestCase):
         self.assertEqual(len(result['search_queries']), 4)
         self.assertEqual(result['playlist_category'], 'bright pop')
 
-    @patch('api.llm_music_picker.requests.post')
+    @patch('api.http_client.post')
     def test_build_search_plan_supports_gemini_provider(self, mock_post):
         picker = LLMMusicPicker()
         picker.enabled = True
@@ -2112,7 +2113,7 @@ class SpotifyRecommendationTests(TestCase):
             ),
             (
                 'fear',
-                'track:"drop dead" artist:"Olivia Rodrigo"',
+                'track:"Weightless" artist:"Marconi Union"',
                 'calming songs for anxiety',
             ),
         ]
@@ -2140,7 +2141,7 @@ class SpotifyRecommendationTests(TestCase):
             queries[0],
             'track:"Good Luck, Babe!" artist:"Chappell Roan"',
         )
-        self.assertIn('track:"GATILYO" artist:"BLKD"', queries)
+        self.assertIn('track:"Bazinga" artist:"SB19"', queries)
         self.assertIn('angry rock songs', queries)
 
     def test_emotion_query_profiles_use_music_doc_seed_catalogs(self):
@@ -2691,7 +2692,7 @@ class SpotifyRecommendationTests(TestCase):
         spotify_service._client_token = None
         spotify_service._client_token_expires_at = None
 
-        with patch('api.spotify_service.requests.post', return_value=response) as mock_post:
+        with patch('api.http_client.post', return_value=response) as mock_post:
             first_token = spotify_service.get_client_token()
             second_token = spotify_service.get_client_token()
 
@@ -2708,7 +2709,7 @@ class SpotifyRecommendationTests(TestCase):
 
         with self.assertLogs('api.spotify_service', level='WARNING') as logs:
             with patch(
-                'api.spotify_service.requests.post',
+                'api.http_client.post',
                 side_effect=requests.ConnectionError('dns lookup failed'),
             ):
                 result = service.get_client_token_details()
@@ -2760,7 +2761,7 @@ class SpotifyRecommendationTests(TestCase):
         user.save()
 
         with patch(
-            'api.spotify_service.requests.post',
+            'api.http_client.post',
             side_effect=requests.ConnectionError('dns lookup failed'),
         ):
             details = service.ensure_valid_token_with_details(user)
@@ -3524,7 +3525,13 @@ class EmotionClassifierTests(TestCase):
         model_source, is_local = classifier._resolve_model_source(settings.ML_MODEL_PATH)
 
         self.assertTrue(is_local)
-        self.assertTrue(str(model_source).endswith('backend\\ml\\models\\bert_emotion_model'))
+        # Compared as a Path, not a string suffix: the resolver joins with the
+        # OS separator, so a hardcoded one only ever passes on the machine it
+        # was written on.
+        expected = (
+            Path(settings.BASE_DIR) / 'ml' / 'models' / 'bert_emotion_model'
+        ).resolve()
+        self.assertEqual(Path(model_source), expected)
 
     @patch.object(EmotionClassifier, '_load_model', return_value=None)
     @patch.object(EmotionClassifier, '_load_goemotions_model', return_value=None)

@@ -31,6 +31,7 @@ from .spotify_oauth_state import (
     issue_state as issue_spotify_oauth_state,
     read_state as read_spotify_oauth_state,
 )
+from .llm_music_picker import LLMMusicPicker
 from .music_picker import music_picker
 from .recommendation_session import (
     apply_outcome_mode,
@@ -47,6 +48,16 @@ from ml.emotion_classifier import EMOTIONS, get_classifier, get_ai_response
 from ml.plutchik_mapper import build_plutchik_profile
 from users.models import PromptHistory, UserPreference, FavoriteTrack, ListeningSession
 from users.serializers import PromptHistorySerializer
+from .models import SupportEvent, SupportResource
+from .safety import (
+    CONCERN_CHECK_IN_MESSAGE,
+    RISK_CONCERN,
+    RISK_CRISIS,
+    assess_concern,
+    SEVERITY_CRISIS,
+    assess_crisis_severity,
+    build_crisis_support_message,
+)
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -88,6 +99,96 @@ def _fallback_analysis():
         'fallback_reason': 'classifier_error',
         'needs_review': True,
         'label_schema_version': 'v1',
+    }
+
+
+def _support_resources_payload():
+    return [resource.to_payload() for resource in SupportResource.visible()]
+
+
+def _record_support_event(level, trigger, source):
+    """Count a safety-check hit. Never pass text or a user here (see SupportEvent)."""
+    try:
+        SupportEvent.objects.create(level=level, trigger=trigger, source=source)
+    except Exception:
+        # Counting is for reporting only; it must never block the support response.
+        logger.exception("Could not record support event")
+
+
+def _attach_concern_check_in(payload, trigger):
+    """Mark a normal (music-bearing) payload with the gentle check-in tier."""
+    payload['risk_level'] = RISK_CONCERN
+    payload['support_check_in'] = {
+        'message': CONCERN_CHECK_IN_MESSAGE,
+        'trigger': trigger,
+        'resources': _support_resources_payload(),
+    }
+    return payload
+
+
+def _build_crisis_response_payload(severity=SEVERITY_CRISIS):
+    """Short-circuit payload for text matching `safety.assess_crisis_severity`.
+
+    `crisis_severity` is "imminent" when the text names a plan, method or time
+    ("tonight", pills, a bridge), so a client can put emergency contacts first.
+
+    Shaped like `EmotionResponseBuilder.build()`'s return value (same keys the
+    Flutter client already reads off this endpoint) so a client that doesn't yet
+    branch on `crisis` still gets a coherent "no tracks, here's a message" result
+    instead of a differently-shaped response it has to guess about. `tracks: []`
+    is deliberate -- this path must never hand back a playlist.
+    """
+    all_scores = {emotion: 0.0 for emotion in EMOTIONS}
+    return {
+        'crisis': True,
+        'risk_level': RISK_CRISIS,
+        'crisis_severity': severity,
+        'support_resources': _support_resources_payload(),
+        'emotion': 'mixed',
+        'confidence': 0.0,
+        'all_scores': all_scores,
+        'top_emotions': [],
+        'secondary_emotion': None,
+        'plutchik_scores': {},
+        'plutchik_top_emotions': [],
+        'plutchik_dominant_emotion': None,
+        'plutchik_profile_version': 'v1',
+        'outcome_mode': 'match_mood',
+        'outcome_label': None,
+        'outcome_description': None,
+        'recommendation_target_emotion': 'mixed',
+        'taste_profile': normalize_taste_profile(None),
+        'session_plan': None,
+        'prediction_source': 'system',
+        'prediction_strategy': 'crisis_short_circuit',
+        'confidence_band': 'low',
+        'confidence_margin': 0.0,
+        'prediction_fallback_used': False,
+        'prediction_fallback_reason': None,
+        'needs_review': True,
+        'ai_response': build_crisis_support_message(),
+        'tracks': [],
+        'selected_track': None,
+        'selected_track_source': None,
+        'music_picker_strategy': None,
+        'music_picker_reason': None,
+        'music_picker_used_fallback': False,
+        'music_picker_intent': None,
+        'music_picker_artist_name': None,
+        'music_picker_track_name': None,
+        'music_picker_playlist_category': None,
+        'music_picker_confirmation': None,
+        'tracks_source': 'crisis_short_circuit',
+        'tracks_fallback_used': False,
+        'tracks_fallback_reason': None,
+        'tracks_personalized': False,
+        'tracks_personalization_sources': [],
+        'tracks_personalization_missing_scopes': [],
+        'progressive_stage': 'initial',
+        'loading_more_tracks': False,
+        'continuation_token': None,
+        'history_id': None,
+        'recovery_plan': None,
     }
 
 
@@ -345,6 +446,99 @@ def _recommendation_continuation_max_age_seconds():
     )
 
 
+EMPTY_LLM_SEARCH_PLAN = {
+    'used': False,
+    'search_queries': [],
+    'playlist_category': None,
+    'strategy': None,
+    'reason': None,
+    'provider': None,
+    'model': None,
+    'confidence': None,
+    'error': None,
+}
+
+
+def _build_llm_search_plan(
+    *,
+    prompt_text,
+    emotion,
+    top_emotions=None,
+    all_scores=None,
+    confidence_band=None,
+    confidence_margin=None,
+    preferred_artists=None,
+    skip=False,
+):
+    """Ask the LLM for Spotify search queries built from the prompt itself.
+
+    The built-in query builder only ever sees the emotion label, so two very
+    different prompts that both land on "sad" retrieve the same candidates.
+    This reads the sentence the user actually wrote.
+
+    It is strictly additive: the returned queries are appended to the built-in
+    ones (`_build_recommendation_queries` already accepts `llm_queries`), and
+    the linear ranker still decides the final order. Anything short of a usable
+    plan -- disabled, unconfigured, timed out, malformed -- returns the empty
+    plan, which leaves retrieval exactly as it is today. The picker's own
+    heuristic fallback queries are deliberately discarded rather than merged:
+    they are a thinner restatement of what the query builder already produces.
+    """
+    if skip or not str(prompt_text or '').strip():
+        return dict(EMPTY_LLM_SEARCH_PLAN)
+
+    picker = LLMMusicPicker()
+    if not picker.is_configured():
+        return dict(EMPTY_LLM_SEARCH_PLAN)
+
+    try:
+        plan = picker.build_search_plan(
+            prompt_text=prompt_text,
+            emotion=emotion,
+            top_emotions=top_emotions,
+            all_scores=all_scores,
+            confidence_band=confidence_band,
+            confidence_margin=confidence_margin,
+            preferred_artists=preferred_artists,
+        )
+    except Exception:
+        # Candidate retrieval must survive anything the LLM layer does; the
+        # built-in queries alone are a complete result.
+        logger.exception("LLM search plan failed for emotion %r", emotion)
+        return dict(EMPTY_LLM_SEARCH_PLAN)
+
+    if not isinstance(plan, dict) or not plan.get('ok'):
+        failed = dict(EMPTY_LLM_SEARCH_PLAN)
+        failed['error'] = (
+            plan.get('error') if isinstance(plan, dict) else 'llm_search_plan_unavailable'
+        )
+        return failed
+
+    queries = [
+        ' '.join(str(query or '').split())
+        for query in (plan.get('search_queries') or [])
+    ]
+    queries = [query for query in queries if query]
+    if not queries:
+        failed = dict(EMPTY_LLM_SEARCH_PLAN)
+        failed['error'] = 'llm_search_plan_missing_queries'
+        return failed
+
+    return {
+        'used': True,
+        'search_queries': queries,
+        'playlist_category': (
+            str(plan.get('playlist_category') or '').strip() or None
+        ),
+        'strategy': plan.get('strategy') or 'llm_search_plan',
+        'reason': plan.get('reason'),
+        'provider': plan.get('provider'),
+        'model': plan.get('model'),
+        'confidence': plan.get('confidence'),
+        'error': None,
+    }
+
+
 def _ensure_hybrid_result(result):
     if not isinstance(result, dict):
         result = _fallback_analysis()
@@ -505,8 +699,18 @@ class EmotionResponseBuilder:
         plutchik_top_emotions = self.result.get('plutchik_top_emotions') or []
         plutchik_dominant_emotion = self.result.get('plutchik_dominant_emotion')
         plutchik_profile_version = self.result.get('plutchik_profile_version', 'v1')
+        # Where on the iso-principle arc this request sits. A session plan handed
+        # in by a continuation or a feel-better transition carries the phase the
+        # listen-time clock has already advanced to; a fresh request has none, and
+        # "settle" is the honest answer for one -- the listener just told us how
+        # they feel, so this is the match step, not the arrival.
+        blend_phase = (
+            str(self.session_plan.get('phase') or '').strip().lower()
+            if isinstance(self.session_plan, dict)
+            else ''
+        ) or 'settle'
         outcome_profile = _ensure_hybrid_result(
-            apply_outcome_mode(self.result, normalized_outcome_mode)
+            apply_outcome_mode(self.result, normalized_outcome_mode, phase=blend_phase)
         )
         outcome_label = outcome_profile.get('outcome_label')
         outcome_description = outcome_profile.get('outcome_description')
@@ -619,6 +823,29 @@ class EmotionResponseBuilder:
         )
         spotify_query_mode = 'continuation' if is_continuation_stage else 'default'
 
+        # The initial stage exists to get one track playing as fast as
+        # possible, so it keeps the built-in queries and skips the round trip.
+        # Every later stage can spend it: the user is already listening.
+        llm_search_plan = _build_llm_search_plan(
+            prompt_text=self.text,
+            emotion=recommendation_emotion,
+            top_emotions=recommendation_top_emotions,
+            all_scores=recommendation_all_scores,
+            confidence_band=confidence_band,
+            confidence_margin=confidence_margin,
+            preferred_artists=preferred_artists,
+            skip=is_initial_stage,
+        )
+        # Omitted entirely rather than passed empty, so a request with no usable
+        # plan reaches Spotify as the exact call it made before the LLM existed.
+        llm_lookup_kwargs = {}
+        if llm_search_plan['used']:
+            llm_lookup_kwargs['llm_queries'] = llm_search_plan['search_queries']
+            if llm_search_plan['playlist_category']:
+                llm_lookup_kwargs['playlist_category'] = (
+                    llm_search_plan['playlist_category']
+                )
+
         try:
             spotify_result = spotify_service.get_recommendations_with_details(
                 recommendation_emotion,
@@ -626,6 +853,7 @@ class EmotionResponseBuilder:
                 preferred_artists=preferred_artists,
                 top_emotions=recommendation_top_emotions,
                 all_scores=recommendation_all_scores,
+                **llm_lookup_kwargs,
                 limit=spotify_lookup_limit,
                 include_personalization=spotify_lookup_include_personalization,
                 time_budget_seconds=spotify_lookup_time_budget_seconds,
@@ -786,22 +1014,41 @@ class EmotionResponseBuilder:
                 'outcome_label': outcome_label,
                 'outcome_description': outcome_description,
                 'search_plan': {
-                    'strategy': 'spotify_emotion_candidate_retrieval',
-                    'reason': (
+                    'strategy': (
+                        llm_search_plan['strategy']
+                        if llm_search_plan['used']
+                        else 'spotify_emotion_candidate_retrieval'
+                    ),
+                    'reason': llm_search_plan['reason'] or (
                         'Candidates were retrieved from Spotify personalization, '
                         'emotion queries, and curated fallbacks before final ranking.'
                     ),
                     'used_fallback': bool(spotify_result.get('used_fallback')),
-                    'queries': [],
-                    'provider': playlist_result.get('provider'),
-                    'model': playlist_result.get('model'),
-                    'error': spotify_result.get('fallback_reason'),
-                    'confidence': None,
+                    # The LLM's queries, when it produced any. An empty list
+                    # means retrieval ran on the built-in queries alone.
+                    'queries': llm_search_plan['search_queries'],
+                    'provider': (
+                        llm_search_plan['provider']
+                        if llm_search_plan['used']
+                        else playlist_result.get('provider')
+                    ),
+                    'model': (
+                        llm_search_plan['model']
+                        if llm_search_plan['used']
+                        else playlist_result.get('model')
+                    ),
+                    'error': (
+                        llm_search_plan['error']
+                        or spotify_result.get('fallback_reason')
+                    ),
+                    'confidence': llm_search_plan['confidence'],
                     'intent': 'candidate_retrieval',
                     'artist_name': None,
                     'track_name': None,
                     'playlist_category': (
-                        playlist_result.get('playlist_category') or emotion
+                        llm_search_plan['playlist_category']
+                        or playlist_result.get('playlist_category')
+                        or emotion
                     ),
                     'confirmation': None,
                 },
@@ -919,6 +1166,7 @@ class EmotionResponseBuilder:
             'outcome_mode': normalized_outcome_mode,
             'outcome_label': outcome_label,
             'outcome_description': outcome_description,
+            'outcome_phase': outcome_profile.get('outcome_phase'),
             'recommendation_target_emotion': recommendation_target_emotion,
             'taste_profile': normalized_taste_profile,
             'session_plan': self.session_plan,
@@ -1170,6 +1418,17 @@ def analyze_emotion(request):
     text = str(request.data.get('text', '')).strip()
     if not text:
         return Response({'error': 'Text is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    severity = assess_crisis_severity(text)
+    if severity:
+        logger.warning(
+            "Crisis-risk language (%s) detected in analyze_emotion (user=%s)",
+            severity,
+            request.user.id if request.user.is_authenticated else None,
+        )
+        _record_support_event(RISK_CRISIS, 'phrase', 'analyze_emotion')
+        return Response(_build_crisis_response_payload(severity))
+
     outcome_mode = _request_outcome_mode(request)
     session_length_minutes = _request_session_length_minutes(request)
     check_in_frequency_tracks = _request_check_in_frequency_tracks(request)
@@ -1183,19 +1442,22 @@ def analyze_emotion(request):
         logger.exception("Emotion analysis failed for text input")
         result = _fallback_analysis()
 
-    return Response(
-        _build_emotion_response_payload(
-            request,
-            text=text,
-            result=result,
-            persist_history=True,
-            recommendation_stage='initial',
-            outcome_mode=outcome_mode,
-            session_length_minutes=session_length_minutes,
-            check_in_frequency_tracks=check_in_frequency_tracks,
-            taste_profile=taste_profile,
-        )
+    payload = _build_emotion_response_payload(
+        request,
+        text=text,
+        result=result,
+        persist_history=True,
+        recommendation_stage='initial',
+        outcome_mode=outcome_mode,
+        session_length_minutes=session_length_minutes,
+        check_in_frequency_tracks=check_in_frequency_tracks,
+        taste_profile=taste_profile,
     )
+    concern_trigger = assess_concern(text, result)
+    if concern_trigger:
+        _record_support_event(RISK_CONCERN, concern_trigger, 'analyze_emotion')
+        _attach_concern_check_in(payload, concern_trigger)
+    return Response(payload)
 
 
 @api_view(['POST'])
@@ -1213,9 +1475,18 @@ def recommend_by_emotion(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    text = str(
-        request.data.get('text', '') or f'Play songs for a {emotion} mood.'
-    ).strip()
+    raw_text = str(request.data.get('text', '')).strip()
+    severity = assess_crisis_severity(raw_text) if raw_text else None
+    if severity:
+        logger.warning(
+            "Crisis-risk language (%s) detected in recommend_by_emotion (user=%s)",
+            severity,
+            request.user.id if request.user.is_authenticated else None,
+        )
+        _record_support_event(RISK_CRISIS, 'phrase', 'recommend_by_emotion')
+        return Response(_build_crisis_response_payload(severity))
+
+    text = raw_text or f'Play songs for a {emotion} mood.'
     outcome_mode = _request_outcome_mode(request)
     session_length_minutes = _request_session_length_minutes(request)
     check_in_frequency_tracks = _request_check_in_frequency_tracks(request)
@@ -1231,19 +1502,25 @@ def recommend_by_emotion(request):
         )
     )
     result = _build_explicit_emotion_result(emotion)
-    return Response(
-        _build_emotion_response_payload(
-            request,
-            text=text,
-            result=result,
-            persist_history=persist_history,
-            recommendation_stage='initial',
-            outcome_mode=outcome_mode,
-            session_length_minutes=session_length_minutes,
-            check_in_frequency_tracks=check_in_frequency_tracks,
-            taste_profile=taste_profile,
-        )
+    payload = _build_emotion_response_payload(
+        request,
+        text=text,
+        result=result,
+        persist_history=persist_history,
+        recommendation_stage='initial',
+        outcome_mode=outcome_mode,
+        session_length_minutes=session_length_minutes,
+        check_in_frequency_tracks=check_in_frequency_tracks,
+        taste_profile=taste_profile,
     )
+    # Phrase check on caller-supplied text only. The result here is the tab the
+    # user picked, not a prediction, so choosing "depressing" must not count as
+    # a model-confident concern.
+    concern_trigger = assess_concern(raw_text)
+    if concern_trigger:
+        _record_support_event(RISK_CONCERN, concern_trigger, 'recommend_by_emotion')
+        _attach_concern_check_in(payload, concern_trigger)
+    return Response(payload)
 
 
 @api_view(['POST'])
@@ -1988,6 +2265,20 @@ def search_tracks(request):
     )
 
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def support_resources(request):
+    """Verified hotlines and counselors for the app's support screen.
+
+    Public on purpose: someone in crisis whose login has expired must still be
+    able to reach this list.
+    """
+    return Response({
+        'message': build_crisis_support_message(),
+        'resources': _support_resources_payload(),
+    })
+
+
 # Admin Views
 @api_view(['GET'])
 @permission_classes([IsAdminUser])
@@ -2012,10 +2303,20 @@ def admin_dashboard(request):
         .order_by('-count')
     )
     
+    # Counts only -- SupportEvent stores no text or user (see api/models.py).
+    support_events = (
+        SupportEvent.objects
+        .filter(created_at__gte=timezone.now() - timedelta(days=30))
+        .values('level', 'trigger')
+        .annotate(count=Count('id'))
+        .order_by('level', 'trigger')
+    )
+
     return Response({
         'total_users': total_users,
         'monthly_playlists': list(monthly_playlists),
         'mood_distribution': list(mood_distribution),
+        'support_events_last_30_days': list(support_events),
     })
 
 

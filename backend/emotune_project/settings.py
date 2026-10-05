@@ -152,6 +152,34 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Email -- used by the forgotten-password code in users/emails.py.
+#
+# For Gmail, EMAIL_HOST_USER is the full address and EMAIL_HOST_PASSWORD must be
+# a 16-character App Password (Google Account > Security > 2-Step Verification >
+# App passwords). Gmail's SMTP refuses a normal account password outright.
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = env_int('EMAIL_PORT', 587)
+EMAIL_USE_TLS = env_bool('EMAIL_USE_TLS', True)
+EMAIL_USE_SSL = env_bool('EMAIL_USE_SSL', False)
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+# A hung SMTP connection would otherwise hold a request worker open.
+EMAIL_TIMEOUT = env_int('EMAIL_TIMEOUT', 10)
+DEFAULT_FROM_EMAIL = (
+    os.getenv('DEFAULT_FROM_EMAIL')
+    or (f'EmoTune <{EMAIL_HOST_USER}>' if EMAIL_HOST_USER else 'EmoTune <no-reply@emotune.local>')
+)
+
+# With no credentials there is nothing to authenticate with, so print the mail
+# to the console instead. The reset flow then still works end to end offline --
+# the code shows up in the runserver log.
+EMAIL_BACKEND = os.getenv('DJANGO_EMAIL_BACKEND') or (
+    'django.core.mail.backends.smtp.EmailBackend'
+    if EMAIL_HOST_USER
+    else 'django.core.mail.backends.console.EmailBackend'
+)
+
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -169,6 +197,10 @@ REST_FRAMEWORK = {
         'login_email': os.getenv('THROTTLE_LOGIN_EMAIL', '10/min'),
         'register': os.getenv('THROTTLE_REGISTER', '10/hour'),
         'password_change': os.getenv('THROTTLE_PASSWORD_CHANGE', '10/hour'),
+        'password_reset_ip': os.getenv('THROTTLE_PASSWORD_RESET_IP', '20/hour'),
+        'password_reset_email': os.getenv('THROTTLE_PASSWORD_RESET_EMAIL', '6/hour'),
+        'password_reset_verify_ip': os.getenv('THROTTLE_PASSWORD_RESET_VERIFY_IP', '60/hour'),
+        'password_reset_verify_email': os.getenv('THROTTLE_PASSWORD_RESET_VERIFY_EMAIL', '20/hour'),
     },
 }
 
@@ -360,6 +392,11 @@ MUSIC_PICKER_PLAYLIST_DOC = os.getenv(
     'MUSIC_PICKER_PLAYLIST_DOC',
     str(PROJECT_ROOT / 'docs' / 'music.md'),
 )
+# Appended to the crisis-safety fallback message (api/safety.py) when free-text
+# input matches self-harm/suicide language. Left empty by default -- a wrong or
+# outdated hotline is worse than none, so this must be set to a verified, current
+# resource for your deployment's region before relying on it in front of real users.
+CRISIS_HOTLINE_TEXT = os.getenv('CRISIS_HOTLINE_TEXT', '')
 MUSIC_PICKER_EMOTION_SEED_TRACK_LIMIT = env_int(
     'MUSIC_PICKER_EMOTION_SEED_TRACK_LIMIT',
     10,

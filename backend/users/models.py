@@ -1,5 +1,10 @@
+import secrets
+from datetime import timedelta
+
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
 
 
 EMOTION_CHOICES = [
@@ -13,6 +18,10 @@ EMOTION_CHOICES = [
 
 class User(AbstractUser):
     """Extended user model for EmoTune"""
+    # Sign-in is by email, so `username` is only the display name the app
+    # greets people with. Drop AbstractUser's handle rules: "Maria Santos" has
+    # a space, and two people can both be called Maria.
+    username = models.CharField(max_length=150)
     email = models.EmailField(unique=True)
     terms_accepted_at = models.DateTimeField(blank=True, null=True)
     personalization_opt_in = models.BooleanField(default=True)
@@ -125,3 +134,71 @@ class ListeningSession(models.Model):
     class Meta:
         db_table = 'listening_sessions'
         ordering = ['-created_at']
+
+
+class PasswordResetCode(models.Model):
+    """A short-lived one-time code emailed to someone who forgot their password.
+
+    Only the hash is kept. A six-digit code is small enough to brute force from
+    a database dump if it were stored in the clear, and the whole point of the
+    code is that holding it proves control of the mailbox.
+    """
+
+    CODE_LENGTH = 6
+    LIFETIME = timedelta(minutes=10)
+    # Five wrong guesses kills the code, so 10 minutes of grinding cannot walk
+    # the million-wide keyspace even if the throttles were somehow bypassed.
+    MAX_ATTEMPTS = 5
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='password_reset_codes',
+    )
+    code_hash = models.CharField(max_length=128)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveIntegerField(default=0)
+    used_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'password_reset_codes'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.email} - reset code - {self.created_at}"
+
+    @classmethod
+    def issue(cls, user):
+        """Drop any outstanding code for this user and mint a fresh one.
+
+        Returns the record and the plaintext code, which is the only moment the
+        code exists in readable form -- hand it straight to the mailer.
+        """
+        cls.objects.filter(user=user, used_at__isnull=True).delete()
+        code = f'{secrets.randbelow(10 ** cls.CODE_LENGTH):0{cls.CODE_LENGTH}d}'
+        record = cls.objects.create(
+            user=user,
+            code_hash=make_password(code),
+            expires_at=timezone.now() + cls.LIFETIME,
+        )
+        return record, code
+
+    @property
+    def is_expired(self):
+        return timezone.now() >= self.expires_at
+
+    @property
+    def is_usable(self):
+        return (
+            self.used_at is None
+            and not self.is_expired
+            and self.attempts < self.MAX_ATTEMPTS
+        )
+
+    @property
+    def attempts_remaining(self):
+        return max(self.MAX_ATTEMPTS - self.attempts, 0)
+
+    def matches(self, code):
+        return check_password(str(code or '').strip(), self.code_hash)
