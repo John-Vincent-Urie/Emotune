@@ -54,7 +54,6 @@ if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
 from ml.emotion_labels import (  # noqa: E402
-    GOEMOTIONS_LABEL_MAP,
     LABEL2ID,
     call_huggingface_loader as _call_huggingface_loader,
 )
@@ -124,13 +123,18 @@ class TrainingConfig:
         num_epochs = _env_int("EMOTUNE_NUM_EPOCHS", 5)
         return cls(
             model_name=os.getenv("EMOTUNE_MODEL_NAME", "bert-base-uncased"),
-            output_dir=(
-                Path(__file__).resolve().parent.parent
-                / "backend"
-                / "ml"
-                / "models"
-                / "bert_emotion_model"
-            ),
+            # Overridable so a candidate run can be trained and compared without
+            # replacing the model the backend currently serves.
+            output_dir=Path(
+                os.getenv(
+                    "EMOTUNE_OUTPUT_DIR",
+                    Path(__file__).resolve().parent.parent
+                    / "backend"
+                    / "ml"
+                    / "models"
+                    / "bert_emotion_model",
+                )
+            ).resolve(),
             num_labels=13,
             max_length=_env_int("EMOTUNE_MAX_LENGTH", 128),
             batch_size=_env_int("EMOTUNE_BATCH_SIZE", 16),
@@ -180,6 +184,14 @@ CUSTOM_STAGE_EPOCHS = CONFIG.custom_stage_epochs
 
 RESUME = CONFIG.resume
 
+# Produced by ml_model/clean_goemotions_dataset.py. Training reads this rather
+# than the raw HF dataset because the shared GOEMOTIONS_LABEL_MAP is too loose
+# for training labels (love -> romantic, approval -> motivational, ...); the
+# cleaner applies a stricter training-only map and drops ambiguous rows.
+GOEMOTIONS_DATASET_PATH = (
+    Path(__file__).resolve().parent.parent / "dataset" / "goemotions.cleaned.csv"
+)
+
 # Produced by ml_model/clean_text_emotion_dataset.py from the raw
 # "Text Emotion Classification 150k" CSV. It is a pre-training stage, never the
 # final one: it can only teach 7 of the 13 labels (it has no sad, stressed,
@@ -189,8 +201,8 @@ TEXT_EMOTION_DATASET_PATH = (
     Path(__file__).resolve().parent.parent / "dataset" / "text_emotion_classification.cleaned.csv"
 )
 
-# LABEL2ID and the GoEmotions mapping are the same schema the runtime classifier
-# (backend/ml/emotion_classifier.py) uses at inference time, so both are imported
+# LABEL2ID is the same schema the runtime classifier
+# (backend/ml/emotion_classifier.py) uses at inference time, so it is imported
 # from the shared backend/ml/emotion_labels.py module above rather than duplicated
 # here. LABEL2ID's key order is baked into any already-saved model checkpoint's
 # id2label config, so it must stay exactly as it was (verified identical).
@@ -435,22 +447,45 @@ class StageDataPreparer:
         return stages, custom_test_df
 
     def prepare_goemotions_stage(self) -> PreparedStage | None:
-        print("Loading GoEmotions dataset...")
-        try:
-            dataset = load_dataset("go_emotions", "simplified")
-        except Exception as error:
-            print(f"Could not load GoEmotions: {error}")
+        dataset_path = GOEMOTIONS_DATASET_PATH
+        if not dataset_path.exists():
+            print(
+                f"Cleaned GoEmotions dataset not found at {dataset_path}. "
+                "Run ml_model/clean_goemotions_dataset.py first. Skipping stage."
+            )
             return None
 
-        label_names = dataset["train"].features["labels"].feature.names
-        train_texts, train_labels = self._split_goemotions_split(dataset["train"], label_names)
-        eval_texts, eval_labels = self._split_goemotions_split(dataset["validation"], label_names)
+        print(f"Loading cleaned GoEmotions dataset from {dataset_path.name}...")
+        try:
+            raw_df = pd.read_csv(dataset_path)
+        except Exception as error:
+            print(f"Could not read {dataset_path.name}: {error}")
+            return None
 
-        train_df = self._cap_per_class(_build_text_label_df(train_texts, train_labels), self.config.max_samples_per_class)
-        eval_df = self._cap_per_class(_build_text_label_df(eval_texts, eval_labels), self.config.max_samples_per_class)
+        if not {"text", "emotion", "split"} <= set(raw_df.columns):
+            print(f"{dataset_path.name} must have 'text', 'emotion' and 'split' columns. Skipping stage.")
+            return None
 
-        print(f"Loaded {len(train_df)} GoEmotions training samples after mapping/capping")
-        print(f"Loaded {len(eval_df)} GoEmotions validation samples after mapping/capping")
+        raw_df = raw_df.dropna(subset=["text", "emotion"])
+        raw_df = raw_df[raw_df["emotion"].isin(LABEL2ID)]
+
+        def split_frame(split: str) -> pd.DataFrame:
+            rows = raw_df[raw_df["split"] == split]
+            return _build_text_label_df(
+                rows["text"].astype(str).tolist(),
+                _to_label_ids(rows["emotion"].astype(str).tolist()),
+            )
+
+        # GoEmotions' own test split is left unused, as before: the final
+        # evaluation is always the EmoTune holdout.
+        train_df = self._cap_per_class(split_frame("train"), self.config.max_samples_per_class)
+        eval_df = self._cap_per_class(split_frame("validation"), self.config.max_samples_per_class)
+        if train_df.empty:
+            print("Cleaned GoEmotions dataset has no usable training rows. Skipping stage.")
+            return None
+
+        print(f"Loaded {len(train_df)} GoEmotions training samples after capping")
+        print(f"Loaded {len(eval_df)} GoEmotions validation samples after capping")
 
         return PreparedStage(
             name="goemotions",
@@ -461,32 +496,11 @@ class StageDataPreparer:
             eval_texts=eval_df["text"].tolist(),
             eval_labels=eval_df["label"].astype(int).tolist(),
             metadata={
-                "source_dataset": "go_emotions/simplified",
+                "source_dataset": dataset_path.name,
                 "train_label_distribution": _label_distribution(train_df["label"].astype(int).tolist()),
                 "eval_label_distribution": _label_distribution(eval_df["label"].astype(int).tolist()),
             },
         )
-
-    @staticmethod
-    def _split_goemotions_split(split, label_names: list[str]) -> tuple[list[str], list[int]]:
-        texts: list[str] = []
-        labels: list[int] = []
-
-        for item in split:
-            mapped_label = None
-            for label_id in item["labels"]:
-                candidate = GOEMOTIONS_LABEL_MAP.get(label_names[label_id])
-                if candidate:
-                    mapped_label = candidate
-                    break
-
-            if not mapped_label:
-                continue
-
-            texts.append(item["text"])
-            labels.append(LABEL2ID[mapped_label])
-
-        return texts, labels
 
     def prepare_dair_stage(self) -> PreparedStage | None:
         print("Loading dair-ai/emotion dataset...")
@@ -856,7 +870,14 @@ class BertEmotionTrainer:
         if resume_checkpoint:
             print(f"Resuming from checkpoint: {resume_checkpoint}")
 
-        train_output = trainer.train(resume_from_checkpoint=resume_checkpoint)
+        # torch >= 2.6 loads with weights_only=True, and transformers 4.40 does
+        # not allowlist the numpy RNG state it saves in rng_state.pth, so every
+        # resume died on an UnpicklingError. Allow exactly those numpy types,
+        # only while resuming from a checkpoint this script wrote itself.
+        with torch.serialization.safe_globals(
+            [np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.UInt32DType]
+        ):
+            train_output = trainer.train(resume_from_checkpoint=resume_checkpoint)
         eval_metrics = trainer.evaluate()
         stage_summary = {
             "stage": stage.name,

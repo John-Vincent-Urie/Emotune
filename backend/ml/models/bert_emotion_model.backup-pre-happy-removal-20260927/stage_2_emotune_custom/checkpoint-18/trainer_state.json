@@ -1,0 +1,34 @@
+{
+  "best_metric": 0.10416666666666667,
+  "best_model_checkpoint": "/home/uriediska/Documents/Capstone/EmoTune-Capstone_project/backend/ml/models/bert_emotion_model/stage_2_emotune_custom/checkpoint-18",
+  "epoch": 1.0,
+  "eval_steps": 500,
+  "global_step": 18,
+  "is_hyper_param_search": false,
+  "is_local_process_zero": true,
+  "is_world_process_zero": true,
+  "log_history": [
+    {
+      "epoch": 1.0,
+      "eval_accuracy": 0.16666666666666666,
+      "eval_f1": 0.10416666666666667,
+      "eval_loss": 2.546355962753296,
+      "eval_macro_f1": 0.11363636363636363,
+      "eval_precision": 0.09523809523809523,
+      "eval_recall": 0.16666666666666666,
+      "eval_runtime": 5.6876,
+      "eval_samples_per_second": 2.11,
+      "eval_steps_per_second": 0.352,
+      "step": 18
+    }
+  ],
+  "logging_steps": 50,
+  "max_steps": 18,
+  "num_input_tokens_seen": 0,
+  "num_train_epochs": 1,
+  "save_steps": 500,
+  "total_flos": 9144012188928.0,
+  "train_batch_size": 8,
+  "trial_name": null,
+  "trial_params": null
+}

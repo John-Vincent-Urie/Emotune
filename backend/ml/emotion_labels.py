@@ -32,35 +32,49 @@ ID2LABEL = {index: label for index, label in enumerate(EMOTIONS)}
 # copies in ml_model/train_bert.py (GOEMOTIONS_MAP) and
 # backend/ml/emotion_classifier.py (GOEMOTIONS_LABEL_MAP) before merging.
 GOEMOTIONS_LABEL_MAP = {
-    'admiration': 'happy',
-    'amusement': 'happy',
-    'anger': 'angry',
-    'annoyance': 'angry',
-    'approval': 'happy',
-    'boredom': 'mixed',
-    'caring': 'romantic',
-    'confusion': 'mixed',
-    'curiosity': 'surprising',
-    'desire': 'romantic',
-    'disappointment': 'sad',
-    'disapproval': 'angry',
-    'disgust': 'angry',
-    'embarrassment': 'sad',
-    'excitement': 'happy',
-    'fear': 'fear',
-    'gratitude': 'happy',
-    'grief': 'sad',
-    'joy': 'happy',
-    'love': 'romantic',
-    'neutral': 'calm',
-    'nervousness': 'fear',
-    'optimism': 'motivational',
-    'pride': 'motivational',
-    'realization': 'surprising',
-    'relief': 'calm',
-    'remorse': 'sad',
-    'sadness': 'sad',
-    'surprise': 'surprising',
+    # Happy
+    "joy": "happy",
+    "amusement": "happy",
+    "excitement": "happy",
+    "gratitude": "happy",
+    "admiration": "happy",
+
+    # Sad
+    "sadness": "sad",
+    "grief": "sad",
+    "disappointment": "sad",
+    "remorse": "sad",
+
+    # Angry
+    "anger": "angry",
+    "annoyance": "angry",
+    "disapproval": "angry",
+    "disgust": "angry",
+
+    # Fear
+    "fear": "fear",
+    "nervousness": "fear",
+
+    # Romantic
+    "love": "romantic",
+    "desire": "romantic",
+    "caring": "romantic",
+
+    # Motivational
+    "optimism": "motivational",
+    "pride": "motivational",
+    "approval": "motivational",
+
+    # Calm
+    "relief": "calm",
+
+    # Surprising
+    "surprise": "surprising",
+    "realization": "surprising",
+
+    # Stressed
+    "confusion": "stressed",
+    "embarrassment": "stressed"
 }
 
 HF_RESUME_DOWNLOAD_WARNING = (

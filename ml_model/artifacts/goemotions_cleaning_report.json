@@ -1,0 +1,77 @@
+{
+  "source_dataset": "go_emotions/simplified",
+  "rows_read": 54263,
+  "rows_kept": 24420,
+  "dropped": {
+    "ambiguous_multilabel": 1506,
+    "conflicting_label": 63,
+    "desire_not_romantic": 571,
+    "duplicate": 247,
+    "low_alpha": 60,
+    "religion_placeholder": 121,
+    "too_short": 1307,
+    "unmapped_label": 25968
+  },
+  "split_distribution": {
+    "test": 2442,
+    "validation": 2406,
+    "train": 19572
+  },
+  "source_label_distribution": {
+    "neutral": 17772,
+    "admiration": 5122,
+    "approval": 3687,
+    "gratitude": 3372,
+    "annoyance": 3093,
+    "amusement": 2895,
+    "curiosity": 2723,
+    "disapproval": 2581,
+    "love": 2576,
+    "optimism": 1976,
+    "anger": 1960,
+    "joy": 1785,
+    "confusion": 1673,
+    "sadness": 1625,
+    "disappointment": 1583,
+    "realization": 1382,
+    "caring": 1375,
+    "surprise": 1330,
+    "excitement": 1052,
+    "disgust": 1013,
+    "desire": 801,
+    "fear": 764,
+    "remorse": 669,
+    "embarrassment": 375,
+    "nervousness": 208,
+    "relief": 182,
+    "pride": 142,
+    "grief": 96
+  },
+  "label_distribution": {
+    "happy": 13461,
+    "angry": 4844,
+    "sad": 2552,
+    "motivational": 1559,
+    "surprising": 1047,
+    "fear": 767,
+    "calm": 136,
+    "romantic": 54
+  },
+  "labels_present": [
+    "angry",
+    "calm",
+    "fear",
+    "happy",
+    "motivational",
+    "romantic",
+    "sad",
+    "surprising"
+  ],
+  "labels_missing_from_schema": [
+    "depressing",
+    "lonely",
+    "mixed",
+    "nostalgic",
+    "stressed"
+  ]
+}

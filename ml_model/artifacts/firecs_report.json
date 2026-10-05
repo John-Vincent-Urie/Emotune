@@ -1,0 +1,23 @@
+{
+  "source": "https://huggingface.co/datasets/ccosme/FiReCS",
+  "license": "CC-BY-4.0",
+  "total_rows": 10487,
+  "counts_by_split": {
+    "train": {
+      "negative": 2381,
+      "neutral": 2549,
+      "positive": 2410
+    },
+    "test": {
+      "neutral": 1087,
+      "positive": 1033,
+      "negative": 1027
+    }
+  },
+  "schema": "text,sentiment,split -- NOT EmoTune's text,emotion schema",
+  "not_merged_into_emotune_combined_csv_because": [
+    "Domain: Lazada product/service reviews, not mood/feeling statements.",
+    "Granularity: 3-class sentiment, not EmoTune's 13-class emotion.",
+    "A silent sentiment->emotion mapping would inject unvalidated labels into the data that also underpins crisis-safety behavior."
+  ]
+}

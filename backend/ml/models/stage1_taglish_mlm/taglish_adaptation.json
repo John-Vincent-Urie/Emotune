@@ -1,0 +1,22 @@
+{
+  "source_model": "backend/ml/models/stage1_textemotion_retrain.fallback",
+  "mlm_head_model": "bert-base-uncased",
+  "dataset": "dataset/firecs_taglish_reviews.csv",
+  "labels_used": false,
+  "train_texts": 7338,
+  "eval_texts": 3143,
+  "epochs": 2.0,
+  "learning_rate": 3e-05,
+  "max_length": 96,
+  "mlm_probability": 0.15,
+  "eval_perplexity_before": 986.3460001352122,
+  "eval_perplexity_after": 20.50226707501924,
+  "train_metrics": {
+    "train_runtime": 3120.2918,
+    "train_samples_per_second": 4.703,
+    "train_steps_per_second": 0.294,
+    "total_flos": 326769803235000.0,
+    "train_loss": 3.5230797786338655,
+    "epoch": 2.0
+  }
+}

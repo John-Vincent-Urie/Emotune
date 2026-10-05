@@ -1,0 +1,1001 @@
+﻿id,text,emotion
+1,"I feel like I am falling behind, and i don't feel excited about anything.",depression
+2,"I've started feeling like nothing is going right, and i wish I could take a break from everything.",depression
+3,"Recently, I feel down, and i feel emotionally exhausted.",depression
+4,"Lately, I feel sad, and i don't enjoy things the way I used to.",depression
+5,"Right now, I feel lonely, and i don't feel like talking to anyone.",depression
+6,"Lately, I feel like nothing is going right, and i wish I could take a break from everything.",depression
+7,"I feel disconnected, and i have been keeping everything to myself.",depression
+8,"I've started feeling like I am stuck, and i feel emotionally exhausted.",depression
+9,"I've started feeling tired, and i wish I could take a break from everything.",depression
+10,"Sometimes I feel disconnected, and i feel like I am just going through the day.",depression
+11,"Recently, I feel empty, and i don't feel motivated to do anything.",depression
+12,"I've started feeling empty, and i feel emotionally exhausted.",depression
+13,"I often feel down, and i have been keeping everything to myself.",depression
+14,"Recently, I feel like I am falling behind, and i feel disconnected from the people around me.",depression
+15,"I've started feeling disconnected, and i don't know how to explain what I am feeling.",depression
+16,"These days, I feel sad, and i have trouble getting started with my work.",depression
+17,I don't feel hopeful about coding.,depression
+18,"Lately, I feel like I have lost my motivation, and even simple tasks feel difficult.",depression
+19,"I feel unmotivated, and i feel disconnected from the people around me.",depression
+20,"Recently, I feel lost, and i don't feel motivated to do anything.",depression
+21,"I've started feeling hopeless, and i have trouble getting started with my work.",depression
+22,"I've been feeling down, and i don't feel like talking to anyone.",depression
+23,I feel discouraged whenever I think about group project.,depression
+24,"I've been feeling empty, and i feel emotionally exhausted.",depression
+25,"These days, I feel emotionally drained, and i don't feel like talking to anyone.",depression
+26,"Sometimes I feel disconnected, and i struggle to find the energy to study.",depression
+27,"I often feel lonely, and i don't enjoy things the way I used to.",depression
+28,"I honestly feel empty, and i struggle to find the energy to study.",depression
+29,"I often feel unmotivated, and i feel emotionally exhausted.",depression
+30,I have been avoiding group project because I don't have the energy.,depression
+31,"I often feel sad, and i don't enjoy things the way I used to.",depression
+32,"I often feel lost, and i don't enjoy things the way I used to.",depression
+33,"I feel empty, and i feel disconnected from the people around me.",depression
+34,"These days, I feel like I am stuck, and i wish I could take a break from everything.",depression
+35,"I honestly feel lonely, and i feel like I am just going through the day.",depression
+36,"I've started feeling like I have lost my motivation, and even simple tasks feel difficult.",depression
+37,"I often feel like I am stuck, and i don't feel like talking to anyone.",depression
+38,"Lately, I feel empty, and i don't feel excited about anything.",depression
+39,"I often feel emotionally drained, and i feel disconnected from the people around me.",depression
+40,"I've been feeling tired, and even simple tasks feel difficult.",depression
+41,"Lately, I feel like I am alone in this, and i struggle to find the energy to study.",depression
+42,"I often feel like I am stuck, and i find it hard to focus on my studies.",depression
+43,"Right now, I feel emotionally drained, and i don't feel excited about anything.",depression
+44,"Right now, I feel like I am stuck, and i feel like I am just going through the day.",depression
+45,"Right now, I feel sad, and i don't feel motivated to do anything.",depression
+46,"Recently, I feel unmotivated, and i feel like I am just going through the day.",depression
+47,"These days, I feel hopeless, and i struggle to find the energy to study.",depression
+48,I don't feel proud of myself when I think about final project.,depression
+49,"Right now, I feel like nothing is going right, and i feel disconnected from the people around me.",depression
+50,"Right now, I feel like nothing is going right, and i don't enjoy things the way I used to.",depression
+51,"These days, I feel disconnected, and i struggle to find the energy to study.",depression
+52,"I've started feeling tired, and even simple tasks feel difficult.",depression
+53,"I often feel down, and i struggle to find the energy to study.",depression
+54,"These days, I feel like I am not good enough, and i have trouble getting started with my work.",depression
+55,"Sometimes I feel disconnected, and i don't feel excited about anything.",depression
+56,"Lately, I feel emotionally drained, and i don't feel like talking to anyone.",depression
+57,"Right now, I feel unmotivated, and i don't enjoy things the way I used to.",depression
+58,"Right now, I feel unmotivated, and i have trouble getting started with my work.",depression
+59,"I've started feeling lost, and i feel disconnected from the people around me.",depression
+60,"I feel like I have lost my motivation, and i don't know how to explain what I am feeling.",depression
+61,I keep feeling down whenever I work on school.,depression
+62,"I've started feeling emotionally drained, and i don't enjoy things the way I used to.",depression
+63,"I feel like I am stuck, and i wish I could take a break from everything.",depression
+64,"Right now, I feel hopeless, and i feel like I am just going through the day.",depression
+65,"I've started feeling lonely, and i don't feel like talking to anyone.",depression
+66,"Recently, I feel lonely, and i feel like I am just going through the day.",depression
+67,"Sometimes I feel empty, and i feel like I am just going through the day.",depression
+68,"I often feel like I am not good enough, and i don't feel like talking to anyone.",depression
+69,"Lately, I feel like I am falling behind, and i don't feel like talking to anyone.",depression
+70,"These days, I feel hopeless, and i don't feel excited about anything.",depression
+71,"Sometimes I feel like I am not good enough, and even simple tasks feel difficult.",depression
+72,"Lately, I feel like I am stuck, and i feel like I am just going through the day.",depression
+73,"I've started feeling like I have lost my motivation, and i find it hard to focus on my studies.",depression
+74,"Recently, I feel disconnected, and i feel like I am just going through the day.",depression
+75,"Recently, I feel hopeless, and i feel disconnected from the people around me.",depression
+76,"Right now, I feel lost, and i wish I could take a break from everything.",depression
+77,"Lately, I feel empty, and i wish I could take a break from everything.",depression
+78,"I've started feeling like I am stuck, and i don't know how to explain what I am feeling.",depression
+79,"I honestly feel like I am not good enough, and even simple tasks feel difficult.",depression
+80,I feel like I am only forcing myself to continue with classes.,depression
+81,"I've started feeling lost, and i don't know how to explain what I am feeling.",depression
+82,"I often feel hopeless, and i have trouble getting started with my work.",depression
+83,"Right now, I feel like I am alone in this, and i don't feel excited about anything.",depression
+84,"I've been feeling like I am falling behind, and i feel like I am just going through the day.",depression
+85,"Recently, I feel unmotivated, and i feel emotionally exhausted.",depression
+86,"I've started feeling disconnected, and i feel disconnected from the people around me.",depression
+87,I feel like I have lost my interest in my academic work.,depression
+88,"I've started feeling like nothing is going right, and i don't enjoy things the way I used to.",depression
+89,I don't feel the same happiness when I work on school requirements.,depression
+90,I feel really down.,depression
+91,"I've started feeling like I am falling behind, and i wish I could take a break from everything.",depression
+92,"I've been feeling down, and i don't feel motivated to do anything.",depression
+93,"I've been feeling lost, and i don't know how to explain what I am feeling.",depression
+94,"I often feel like nothing is going right, and i find it hard to focus on my studies.",depression
+95,"Recently, I feel sad, and i don't know how to explain what I am feeling.",depression
+96,"These days, I feel like I am alone in this, and i have trouble getting started with my work.",depression
+97,I keep feeling down whenever I work on thesis.,depression
+98,"I've started feeling like I am not good enough, and even simple tasks feel difficult.",depression
+99,"I honestly feel like nothing is going right, and i don't enjoy things the way I used to.",depression
+100,"Sometimes I feel like I am not good enough, and i struggle to find the energy to study.",depression
+101,"I've been feeling emotionally drained, and i don't know how to explain what I am feeling.",depression
+102,"Sometimes I feel like I am alone in this, and i wish I could take a break from everything.",depression
+103,Thinking about research makes me feel emotionally tired.,depression
+104,"I often feel like I am not good enough, and i have trouble getting started with my work.",depression
+105,"I feel like nothing is going right, and i don't feel motivated to do anything.",depression
+106,I feel like I am just completing tasks without enjoying anything.,depression
+107,"Recently, I feel hopeless, and i struggle to find the energy to study.",depression
+108,"Sometimes I feel like I am not good enough, and i don't feel excited about anything.",depression
+109,"I honestly feel sad, and i don't feel like talking to anyone.",depression
+110,"Sometimes I feel like I am alone in this, and i don't feel excited about anything.",depression
+111,"I've been feeling like nothing is going right, and i feel disconnected from the people around me.",depression
+112,"Sometimes I feel hopeless, and i don't feel motivated to do anything.",depression
+113,"I've been feeling emotionally drained, and i wish I could take a break from everything.",depression
+114,"Sometimes I feel down, and i don't enjoy things the way I used to.",depression
+115,"I feel like I am stuck, and i don't feel motivated to do anything.",depression
+116,"These days, I feel tired, and i don't feel excited about anything.",depression
+117,"I honestly feel like I am alone in this, and i feel disconnected from the people around me.",depression
+118,"I honestly feel disconnected, and even simple tasks feel difficult.",depression
+119,I feel emotionally tired whenever I think about my requirements.,depression
+120,"I often feel disconnected, and i feel like I am just going through the day.",depression
+121,I have been losing motivation for final project.,depression
+122,"Lately, I feel like I am not good enough, and i don't feel excited about anything.",depression
+123,I feel like I have lost my interest in capstone.,depression
+124,"Right now, I feel disconnected, and i feel emotionally exhausted.",depression
+125,"I've been feeling sad, and i feel disconnected from the people around me.",depression
+126,"Right now, I feel lost, and even simple tasks feel difficult.",depression
+127,"I've been feeling lonely, and i wish I could take a break from everything.",depression
+128,"These days, I feel like I have lost my motivation, and i feel disconnected from the people around me.",depression
+129,"I've started feeling like I am alone in this, and i have trouble getting started with my work.",depression
+130,"I honestly feel emotionally drained, and i have been keeping everything to myself.",depression
+131,Wala akong gana mag-code ngayon.,depression
+132,"I feel like I am alone in this, and i feel emotionally exhausted.",depression
+133,"These days, I feel like I am alone in this, and i don't feel motivated to do anything.",depression
+134,"I've started feeling like I am not good enough, and i feel like I am just going through the day.",depression
+135,"Right now, I feel like I have lost my motivation, and i don't know how to explain what I am feeling.",depression
+136,Nakakapagod na parang paulit-ulit lang bawat araw.,depression
+137,"I've started feeling like nothing is going right, and i don't feel motivated to do anything.",depression
+138,"Right now, I feel down, and i have trouble getting started with my work.",depression
+139,"I've been feeling like I am not good enough, and i don't know how to explain what I am feeling.",depression
+140,"I feel hopeless, and i have trouble getting started with my work.",depression
+141,"I've been feeling like I am falling behind, and i have been keeping everything to myself.",depression
+142,"I've started feeling unmotivated, and i feel emotionally exhausted.",depression
+143,"Sometimes I feel disconnected, and i find it hard to focus on my studies.",depression
+144,"Sometimes I feel lost, and i don't feel excited about anything.",depression
+145,"Sometimes I feel sad, and i find it hard to focus on my studies.",depression
+146,"I feel like I am not good enough, and i feel like I am just going through the day.",depression
+147,"Lately, I feel like nothing is going right, and i feel emotionally exhausted.",depression
+148,"I feel like I have lost my motivation, and i have been keeping everything to myself.",depression
+149,"I've been feeling sad, and i don't feel like talking to anyone.",depression
+150,"Recently, I feel emotionally drained, and i don't know how to explain what I am feeling.",depression
+151,"I often feel like nothing is going right, and even simple tasks feel difficult.",depression
+152,"I feel unmotivated, and i wish I could take a break from everything.",depression
+153,"Right now, I feel lonely, and i feel emotionally exhausted.",depression
+154,"Lately, I feel like I am alone in this, and i have been keeping everything to myself.",depression
+155,"I often feel tired, and i don't feel excited about anything.",depression
+156,I feel discouraged whenever I think about my project.,depression
+157,Thinking about school makes me feel emotionally tired.,depression
+158,"Sometimes I feel like I am stuck, and even simple tasks feel difficult.",depression
+159,I feel discouraged whenever I think about assignments.,depression
+160,"Lately, I feel like I am not good enough, and i don't know how to explain what I am feeling.",depression
+161,"I honestly feel tired, and i struggle to find the energy to study.",depression
+162,"I've started feeling hopeless, and i feel like I am just going through the day.",depression
+163,"I feel tired, and i struggle to find the energy to study.",depression
+164,"I've been feeling like I am falling behind, and i don't enjoy things the way I used to.",depression
+165,"Sometimes I feel disconnected, and i feel emotionally exhausted.",depression
+166,"I often feel like I am falling behind, and even simple tasks feel difficult.",depression
+167,"Lately, I feel down, and i have been keeping everything to myself.",depression
+168,I feel disconnected from my group even when we work together.,depression
+169,I have trouble concentrating on my assignments lately.,depression
+170,"Lately, I feel down, and i don't enjoy things the way I used to.",depression
+171,"Sometimes I feel tired, and i have been keeping everything to myself.",depression
+172,"I feel hopeless, and i feel emotionally exhausted.",depression
+173,"I've been feeling emotionally drained, and i don't feel excited about anything.",depression
+174,"These days, I feel like I am alone in this, and i feel like I am just going through the day.",depression
+175,"Recently, I feel like I am falling behind, and i don't feel motivated to do anything.",depression
+176,I keep feeling down whenever I work on final project.,depression
+177,I don't feel like doing anything.,depression
+178,"Recently, I feel like I am not good enough, and i struggle to find the energy to study.",depression
+179,"I've been feeling unmotivated, and i have been keeping everything to myself.",depression
+180,"Sometimes I feel hopeless, and i have been keeping everything to myself.",depression
+181,"I often feel tired, and i find it hard to focus on my studies.",depression
+182,"Lately, I feel lost, and i find it hard to focus on my studies.",depression
+183,"Sometimes I feel lost, and i don't feel motivated to do anything.",depression
+184,"I've been feeling like I am stuck, and i struggle to find the energy to study.",depression
+185,"Right now, I feel like I am stuck, and i have trouble getting started with my work.",depression
+186,"Lately, I feel like nothing is going right, and i don't feel excited about anything.",depression
+187,"Right now, I feel like I am alone in this, and i don't feel like talking to anyone.",depression
+188,"I honestly feel down, and even simple tasks feel difficult.",depression
+189,"I've been feeling like I have lost my motivation, and i don't feel like talking to anyone.",depression
+190,"Lately, I feel down, and i find it hard to focus on my studies.",depression
+191,"These days, I feel empty, and i feel like I am just going through the day.",depression
+192,"I've started feeling sad, and i feel emotionally exhausted.",depression
+193,"I've been feeling empty, and i have been keeping everything to myself.",depression
+194,"I honestly feel tired, and i wish I could take a break from everything.",depression
+195,"Lately, I feel like I am falling behind, and i wish I could take a break from everything.",depression
+196,"Recently, I feel lonely, and i don't know how to explain what I am feeling.",depression
+197,"I've started feeling unmotivated, and i wish I could take a break from everything.",depression
+198,I feel lonely while working on thesis.,depression
+199,"Lately, I feel sad, and i feel disconnected from the people around me.",depression
+200,"I feel empty, and i don't enjoy things the way I used to.",depression
+201,"I honestly feel tired, and i feel like I am just going through the day.",depression
+202,I don't feel proud of myself when I think about classes.,depression
+203,I don't feel proud of myself when I think about school.,depression
+204,"Lately, I feel unmotivated, and even simple tasks feel difficult.",depression
+205,"Lately, I feel like I am alone in this, and i feel disconnected from the people around me.",depression
+206,"I honestly feel like I am stuck, and i find it hard to focus on my studies.",depression
+207,"I often feel lost, and i feel like I am just going through the day.",depression
+208,"Sometimes I feel like nothing is going right, and i don't feel motivated to do anything.",depression
+209,"Right now, I feel emotionally drained, and i have trouble getting started with my work.",depression
+210,"Lately, I feel like I am alone in this, and i don't feel motivated to do anything.",depression
+211,"Right now, I feel like I am stuck, and i wish I could take a break from everything.",depression
+212,"These days, I feel lost, and i feel disconnected from the people around me.",depression
+213,"I feel unmotivated, and i don't feel like talking to anyone.",depression
+214,"I honestly feel lost, and i don't feel excited about anything.",depression
+215,"Recently, I feel empty, and i feel disconnected from the people around me.",depression
+216,"Right now, I feel lost, and i feel disconnected from the people around me.",depression
+217,"Lately, I feel like I am falling behind, and i struggle to find the energy to study.",depression
+218,"Lately, I feel like I am falling behind, and i don't know how to explain what I am feeling.",depression
+219,"Sometimes I feel sad, and i don't feel like talking to anyone.",depression
+220,I feel discouraged whenever I think about programming.,depression
+221,"Recently, I feel hopeless, and i find it hard to focus on my studies.",depression
+222,"Sometimes I feel sad, and i struggle to find the energy to study.",depression
+223,"Sometimes I feel like I am falling behind, and even simple tasks feel difficult.",depression
+224,"Lately, I feel lonely, and i feel disconnected from the people around me.",depression
+225,"Lately, I feel hopeless, and i don't feel like talking to anyone.",depression
+226,I feel emotionally exhausted because of group project.,depression
+227,"I feel like I am stuck, and i feel like I am just going through the day.",depression
+228,Thinking about college makes me feel emotionally tired.,depression
+229,I have been avoiding final project because I don't have the energy.,depression
+230,"I've been feeling hopeless, and even simple tasks feel difficult.",depression
+231,"I feel hopeless, and even simple tasks feel difficult.",depression
+232,I feel discouraged whenever I think about school.,depression
+233,"Sometimes I feel unmotivated, and i don't feel excited about anything.",depression
+234,"These days, I feel like I am alone in this, and i feel emotionally exhausted.",depression
+235,"Right now, I feel like I am not good enough, and i feel like I am just going through the day.",depression
+236,"I've started feeling unmotivated, and i don't feel motivated to do anything.",depression
+237,"I feel like I am falling behind, and i have been keeping everything to myself.",depression
+238,"I've started feeling disconnected, and i find it hard to focus on my studies.",depression
+239,"I honestly feel like I am not good enough, and i don't feel excited about anything.",depression
+240,"Recently, I feel emotionally drained, and i find it hard to focus on my studies.",depression
+241,"Recently, I feel like nothing is going right, and i feel like I am just going through the day.",depression
+242,"I often feel like I am not good enough, and even simple tasks feel difficult.",depression
+243,"Lately, I feel like nothing is going right, and i don't feel like talking to anyone.",depression
+244,"I feel like I am alone in this, and i feel disconnected from the people around me.",depression
+245,"These days, I feel like nothing is going right, and i don't feel motivated to do anything.",depression
+246,"I've been feeling emotionally drained, and even simple tasks feel difficult.",depression
+247,I feel discouraged whenever I think about exams.,depression
+248,"Lately, I feel hopeless, and i don't feel excited about anything.",depression
+249,I feel emotionally exhausted because of research.,depression
+250,"I've started feeling like I am falling behind, and i don't feel like talking to anyone.",depression
+251,"I often feel like I am not good enough, and i don't enjoy things the way I used to.",depression
+252,"I've started feeling empty, and even simple tasks feel difficult.",depression
+253,"I feel lost, and i don't know how to explain what I am feeling.",depression
+254,I don't feel the same happiness when I work on programming.,depression
+255,"These days, I feel like I have lost my motivation, and i struggle to find the energy to study.",depression
+256,I don't feel the same happiness when I work on classes.,depression
+257,"I've been feeling like I have lost my motivation, and even simple tasks feel difficult.",depression
+258,"I've been feeling like I am stuck, and i feel like I am just going through the day.",depression
+259,"I've started feeling hopeless, and i don't feel like talking to anyone.",depression
+260,"I've started feeling disconnected, and i don't feel motivated to do anything.",depression
+261,"I often feel empty, and i struggle to find the energy to study.",depression
+262,"I honestly feel like I am falling behind, and i don't know how to explain what I am feeling.",depression
+263,"Sometimes I feel down, and i don't feel excited about anything.",depression
+264,"I honestly feel disconnected, and i don't feel excited about anything.",depression
+265,"I've started feeling like I am stuck, and i feel disconnected from the people around me.",depression
+266,"I've started feeling down, and i struggle to find the energy to study.",depression
+267,"Right now, I feel like I am not good enough, and i have been keeping everything to myself.",depression
+268,"I feel lost, and i wish I could take a break from everything.",depression
+269,"Recently, I feel tired, and i don't feel like talking to anyone.",depression
+270,"I honestly feel emotionally drained, and i don't feel motivated to do anything.",depression
+271,"Right now, I feel like I am falling behind, and i feel disconnected from the people around me.",depression
+272,"I've been feeling lost, and i have trouble getting started with my work.",depression
+273,"I honestly feel disconnected, and i have trouble getting started with my work.",depression
+274,"I honestly feel like I have lost my motivation, and i don't feel like talking to anyone.",depression
+275,"Recently, I feel down, and i don't feel like talking to anyone.",depression
+276,"I often feel tired, and i feel emotionally exhausted.",depression
+277,I feel like I am disappointing everyone with my performance.,depression
+278,"Lately, I feel unmotivated, and i have trouble getting started with my work.",depression
+279,"I've been feeling unmotivated, and i have trouble getting started with my work.",depression
+280,"I've been feeling tired, and i don't know how to explain what I am feeling.",depression
+281,"Right now, I feel lost, and i don't feel like talking to anyone.",depression
+282,"I've been feeling unmotivated, and i wish I could take a break from everything.",depression
+283,"I honestly feel hopeless, and i have been keeping everything to myself.",depression
+284,"I've been feeling hopeless, and i wish I could take a break from everything.",depression
+285,"Lately, I feel emotionally drained, and even simple tasks feel difficult.",depression
+286,"Recently, I feel like I am not good enough, and i don't enjoy things the way I used to.",depression
+287,"I've been feeling like I am not good enough, and i don't feel like talking to anyone.",depression
+288,"I feel hopeless, and i don't feel excited about anything.",depression
+289,"I've started feeling like I am alone in this, and even simple tasks feel difficult.",depression
+290,"I honestly feel lonely, and even simple tasks feel difficult.",depression
+291,Thinking about my academic work makes me feel emotionally tired.,depression
+292,"These days, I feel hopeless, and even simple tasks feel difficult.",depression
+293,"I've been feeling sad, and i wish I could take a break from everything.",depression
+294,"These days, I feel like I am not good enough, and i don't know how to explain what I am feeling.",depression
+295,"I feel unmotivated, and i have trouble getting started with my work.",depression
+296,"I've started feeling like I am stuck, and i have trouble getting started with my work.",depression
+297,"I've been feeling lonely, and i feel like I am just going through the day.",depression
+298,"Lately, I feel unmotivated, and i wish I could take a break from everything.",depression
+299,I feel empty.,depression
+300,"These days, I feel empty, and i don't feel excited about anything.",depression
+301,"Sometimes I feel like I am not good enough, and i don't feel motivated to do anything.",depression
+302,"These days, I feel sad, and i don't know how to explain what I am feeling.",depression
+303,"I've been feeling disconnected, and i don't feel excited about anything.",depression
+304,"Right now, I feel lonely, and i don't feel excited about anything.",depression
+305,"I often feel sad, and i don't know how to explain what I am feeling.",depression
+306,"Right now, I feel tired, and i find it hard to focus on my studies.",depression
+307,"Lately, I feel hopeless, and even simple tasks feel difficult.",depression
+308,"I feel disconnected, and i don't enjoy things the way I used to.",depression
+309,"Recently, I feel like I have lost my motivation, and i feel like I am just going through the day.",depression
+310,"Right now, I feel like I have lost my motivation, and i don't enjoy things the way I used to.",depression
+311,"Lately, I feel down, and i struggle to find the energy to study.",depression
+312,I don't feel hopeful about school requirements.,depression
+313,"I honestly feel like I have lost my motivation, and i feel disconnected from the people around me.",depression
+314,"These days, I feel hopeless, and i feel emotionally exhausted.",depression
+315,"These days, I feel like I am falling behind, and i have been keeping everything to myself.",depression
+316,I feel disconnected from exams lately.,depression
+317,"I feel like I am alone in this, and i don't know how to explain what I am feeling.",depression
+318,I feel lonely while working on my future.,depression
+319,"Lately, I feel like I am alone in this, and i find it hard to focus on my studies.",depression
+320,"I feel like I have lost my motivation, and i wish I could take a break from everything.",depression
+321,"Right now, I feel like nothing is going right, and i find it hard to focus on my studies.",depression
+322,"Lately, I feel down, and i don't feel like talking to anyone.",depression
+323,"Recently, I feel like I have lost my motivation, and i feel disconnected from the people around me.",depression
+324,"These days, I feel like I am alone in this, and i feel disconnected from the people around me.",depression
+325,"Lately, I feel like I am falling behind, and i feel emotionally exhausted.",depression
+326,"I honestly feel disconnected, and i don't know how to explain what I am feeling.",depression
+327,"These days, I feel lost, and even simple tasks feel difficult.",depression
+328,"Sometimes I feel like I am falling behind, and i feel disconnected from the people around me.",depression
+329,"These days, I feel down, and i don't feel like talking to anyone.",depression
+330,I don't feel proud of myself when I think about programming.,depression
+331,"Recently, I feel lost, and i feel like I am just going through the day.",depression
+332,"I honestly feel down, and i don't feel like talking to anyone.",depression
+333,"These days, I feel lonely, and i don't feel motivated to do anything.",depression
+334,"Recently, I feel unmotivated, and i have been keeping everything to myself.",depression
+335,"I honestly feel lonely, and i have been keeping everything to myself.",depression
+336,"I often feel hopeless, and i don't know how to explain what I am feeling.",depression
+337,"Sometimes I feel lonely, and i don't feel like talking to anyone.",depression
+338,"These days, I feel like I am not good enough, and i don't feel motivated to do anything.",depression
+339,Parang wala na akong energy para sa capstone.,depression
+340,I feel like I am only forcing myself to continue with college life.,depression
+341,"Sometimes I feel like I am alone in this, and i feel disconnected from the people around me.",depression
+342,"I feel like I am not good enough, and i don't feel excited about anything.",depression
+343,"I honestly feel tired, and i don't enjoy things the way I used to.",depression
+344,"Right now, I feel lonely, and i feel disconnected from the people around me.",depression
+345,"I've been feeling like I am alone in this, and i don't feel excited about anything.",depression
+346,"Right now, I feel like I am falling behind, and i don't know how to explain what I am feeling.",depression
+347,"I often feel sad, and i find it hard to focus on my studies.",depression
+348,"I've started feeling like I am not good enough, and i feel disconnected from the people around me.",depression
+349,"Lately, I feel like I am stuck, and even simple tasks feel difficult.",depression
+350,"Recently, I feel emotionally drained, and i feel like I am just going through the day.",depression
+351,"I've started feeling sad, and i have trouble getting started with my work.",depression
+352,"Lately, I feel unmotivated, and i don't enjoy things the way I used to.",depression
+353,"These days, I feel like I am not good enough, and i feel like I am just going through the day.",depression
+354,"These days, I feel unmotivated, and i feel emotionally exhausted.",depression
+355,"I've been feeling lost, and i feel like I am just going through the day.",depression
+356,"Lately, I feel like I am falling behind, and i don't feel motivated to do anything.",depression
+357,"I often feel disconnected, and i feel disconnected from the people around me.",depression
+358,"I honestly feel emotionally drained, and i struggle to find the energy to study.",depression
+359,"I honestly feel tired, and i have been keeping everything to myself.",depression
+360,"Right now, I feel like nothing is going right, and i don't know how to explain what I am feeling.",depression
+361,"Sometimes I feel sad, and i feel emotionally exhausted.",depression
+362,"Right now, I feel sad, and i don't feel like talking to anyone.",depression
+363,I don't feel excited about finishing my project anymore.,depression
+364,I feel like I am only forcing myself to continue with my academic work.,depression
+365,"I've started feeling hopeless, and i don't feel motivated to do anything.",depression
+366,"I honestly feel sad, and i don't feel excited about anything.",depression
+367,"I often feel down, and i don't feel motivated to do anything.",depression
+368,"Recently, I feel disconnected, and i don't know how to explain what I am feeling.",depression
+369,"Sometimes I feel like I am falling behind, and i wish I could take a break from everything.",depression
+370,"These days, I feel unmotivated, and i have trouble getting started with my work.",depression
+371,"I've started feeling lost, and i feel emotionally exhausted.",depression
+372,"Lately, I feel like I am alone in this, and i don't feel excited about anything.",depression
+373,"Lately, I feel like I am falling behind, and i have trouble getting started with my work.",depression
+374,"I often feel hopeless, and i find it hard to focus on my studies.",depression
+375,"I often feel lonely, and i struggle to find the energy to study.",depression
+376,"I often feel like I have lost my motivation, and i wish I could take a break from everything.",depression
+377,"I've started feeling down, and even simple tasks feel difficult.",depression
+378,"Sometimes I feel lost, and i don't feel like talking to anyone.",depression
+379,"I often feel like I am falling behind, and i find it hard to focus on my studies.",depression
+380,"I've been feeling tired, and i don't enjoy things the way I used to.",depression
+381,"I've started feeling hopeless, and i don't enjoy things the way I used to.",depression
+382,"I feel lost, and i feel emotionally exhausted.",depression
+383,"I feel hopeless, and i don't know how to explain what I am feeling.",depression
+384,"Sometimes I feel like nothing is going right, and i don't feel excited about anything.",depression
+385,"These days, I feel lost, and i feel like I am just going through the day.",depression
+386,"Lately, I feel hopeless, and i feel disconnected from the people around me.",depression
+387,Thinking about final project makes me feel emotionally tired.,depression
+388,"I feel tired, and i feel like I am just going through the day.",depression
+389,"I honestly feel lonely, and i don't feel excited about anything.",depression
+390,"Recently, I feel down, and i feel disconnected from the people around me.",depression
+391,"Recently, I feel like I am not good enough, and even simple tasks feel difficult.",depression
+392,I have no motivation today.,depression
+393,"I feel down, and i struggle to find the energy to study.",depression
+394,"Sometimes I feel like I am stuck, and i feel disconnected from the people around me.",depression
+395,"Right now, I feel unmotivated, and i don't feel excited about anything.",depression
+396,"I feel like I am stuck, and i feel emotionally exhausted.",depression
+397,"These days, I feel like I am falling behind, and i have trouble getting started with my work.",depression
+398,"I often feel down, and i feel emotionally exhausted.",depression
+399,"I honestly feel like nothing is going right, and i have been keeping everything to myself.",depression
+400,"Recently, I feel lost, and i don't feel like talking to anyone.",depression
+401,"I've been feeling lost, and even simple tasks feel difficult.",depression
+402,"Lately, I feel like I am not good enough, and i wish I could take a break from everything.",depression
+403,"I've started feeling like I am not good enough, and i don't feel motivated to do anything.",depression
+404,"I honestly feel unmotivated, and i feel like I am just going through the day.",depression
+405,"I feel lonely, and i don't enjoy things the way I used to.",depression
+406,I feel discouraged whenever I think about capstone.,depression
+407,I keep thinking about my failures instead of my progress.,depression
+408,"Lately, I feel like I am stuck, and i don't feel motivated to do anything.",depression
+409,"I've started feeling like I am stuck, and i struggle to find the energy to study.",depression
+410,"I often feel like I am stuck, and i have trouble getting started with my work.",depression
+411,"These days, I feel lonely, and i wish I could take a break from everything.",depression
+412,"Lately, I feel like I am not good enough, and i have been keeping everything to myself.",depression
+413,"Sometimes I feel like I have lost my motivation, and i feel emotionally exhausted.",depression
+414,"I feel lonely, and i don't feel motivated to do anything.",depression
+415,"Sometimes I feel disconnected, and i don't enjoy things the way I used to.",depression
+416,"I feel unmotivated, and i feel emotionally exhausted.",depression
+417,"I've been feeling like I am alone in this, and i don't feel like talking to anyone.",depression
+418,"I often feel sad, and i have been keeping everything to myself.",depression
+419,"Right now, I feel tired, and i have trouble getting started with my work.",depression
+420,"I've been feeling lonely, and i have trouble getting started with my work.",depression
+421,"I've started feeling like I am falling behind, and i don't feel motivated to do anything.",depression
+422,"Recently, I feel sad, and i don't feel excited about anything.",depression
+423,"Right now, I feel disconnected, and i don't know how to explain what I am feeling.",depression
+424,"Right now, I feel like I am falling behind, and i have been keeping everything to myself.",depression
+425,"I've started feeling lonely, and i don't feel excited about anything.",depression
+426,"Lately, I feel emotionally drained, and i struggle to find the energy to study.",depression
+427,"I feel like I am alone in this, and i don't feel like talking to anyone.",depression
+428,"These days, I feel like I am not good enough, and i wish I could take a break from everything.",depression
+429,"I've been feeling like I am alone in this, and i don't know how to explain what I am feeling.",depression
+430,"I feel sad, and i feel disconnected from the people around me.",depression
+431,"These days, I feel like I am not good enough, and i don't enjoy things the way I used to.",depression
+432,"I've been feeling lonely, and i find it hard to focus on my studies.",depression
+433,I have been avoiding my studies because I don't have the energy.,depression
+434,"Sometimes I feel like I am stuck, and i wish I could take a break from everything.",depression
+435,"Right now, I feel emotionally drained, and i struggle to find the energy to study.",depression
+436,I feel emotionally exhausted because of thesis.,depression
+437,"I often feel disconnected, and even simple tasks feel difficult.",depression
+438,"Sometimes I feel unmotivated, and i wish I could take a break from everything.",depression
+439,"I've been feeling hopeless, and i find it hard to focus on my studies.",depression
+440,I don't feel the same happiness when I work on capstone.,depression
+441,"I feel like I am falling behind, and i don't feel motivated to do anything.",depression
+442,I have been losing motivation for assignments.,depression
+443,"Lately, I feel empty, and i don't feel like talking to anyone.",depression
+444,"Right now, I feel empty, and i have been keeping everything to myself.",depression
+445,"Right now, I feel like I am falling behind, and even simple tasks feel difficult.",depression
+446,"I've started feeling lost, and i wish I could take a break from everything.",depression
+447,"I feel empty, and i struggle to find the energy to study.",depression
+448,"I've been feeling like I am alone in this, and i have been keeping everything to myself.",depression
+449,"I've started feeling like I have lost my motivation, and i have trouble getting started with my work.",depression
+450,"I've been feeling like I am falling behind, and i find it hard to focus on my studies.",depression
+451,"Recently, I feel emotionally drained, and i don't feel excited about anything.",depression
+452,"I feel empty, and i find it hard to focus on my studies.",depression
+453,"Sometimes I feel like I am stuck, and i feel emotionally exhausted.",depression
+454,I have been losing motivation for programming.,depression
+455,"I feel like nothing is going right, and i feel like I am just going through the day.",depression
+456,"I've started feeling like I am alone in this, and i don't know how to explain what I am feeling.",depression
+457,"I feel like nothing is going right, and i have been keeping everything to myself.",depression
+458,"These days, I feel unmotivated, and i don't enjoy things the way I used to.",depression
+459,"I honestly feel down, and i don't know how to explain what I am feeling.",depression
+460,"I feel lonely, and i have trouble getting started with my work.",depression
+461,"Right now, I feel empty, and i don't feel excited about anything.",depression
+462,"I honestly feel like I am alone in this, and i don't feel motivated to do anything.",depression
+463,"Lately, I feel lost, and i don't enjoy things the way I used to.",depression
+464,"Right now, I feel like I am not good enough, and i don't feel motivated to do anything.",depression
+465,I have been avoiding research because I don't have the energy.,depression
+466,"I've started feeling unmotivated, and i have been keeping everything to myself.",depression
+467,I don't feel proud of myself when I think about exams.,depression
+468,"Right now, I feel like nothing is going right, and even simple tasks feel difficult.",depression
+469,"I've started feeling sad, and i feel disconnected from the people around me.",depression
+470,"Lately, I feel empty, and i don't feel motivated to do anything.",depression
+471,"I feel like I have lost my motivation, and even simple tasks feel difficult.",depression
+472,"Sometimes I feel like I am stuck, and i don't feel motivated to do anything.",depression
+473,"Right now, I feel like I am not good enough, and i have trouble getting started with my work.",depression
+474,"I've been feeling emotionally drained, and i don't feel motivated to do anything.",depression
+475,"I honestly feel like I am alone in this, and i struggle to find the energy to study.",depression
+476,"I honestly feel disconnected, and i don't feel motivated to do anything.",depression
+477,"These days, I feel emotionally drained, and i find it hard to focus on my studies.",depression
+478,"These days, I feel disconnected, and i feel like I am just going through the day.",depression
+479,"Recently, I feel sad, and i don't feel like talking to anyone.",depression
+480,"Right now, I feel emotionally drained, and even simple tasks feel difficult.",depression
+481,"Sometimes I feel hopeless, and i don't know how to explain what I am feeling.",depression
+482,"I feel lost, and i don't feel motivated to do anything.",depression
+483,"Recently, I feel tired, and i struggle to find the energy to study.",depression
+484,"I've started feeling down, and i feel disconnected from the people around me.",depression
+485,"Sometimes I feel down, and i struggle to find the energy to study.",depression
+486,"I've started feeling empty, and i don't know how to explain what I am feeling.",depression
+487,"Lately, I feel sad, and i don't know how to explain what I am feeling.",depression
+488,"Lately, I feel like I have lost my motivation, and i have been keeping everything to myself.",depression
+489,"I've been feeling like I am not good enough, and i struggle to find the energy to study.",depression
+490,"Right now, I feel emotionally drained, and i find it hard to focus on my studies.",depression
+491,"Lately, I feel sad, and i feel like I am just going through the day.",depression
+492,"Recently, I feel like nothing is going right, and i feel emotionally exhausted.",depression
+493,"I honestly feel like nothing is going right, and i feel like I am just going through the day.",depression
+494,"I've been feeling like I have lost my motivation, and i don't feel motivated to do anything.",depression
+495,"Sometimes I feel like I have lost my motivation, and i don't feel excited about anything.",depression
+496,"Sometimes I feel empty, and i don't enjoy things the way I used to.",depression
+497,"I often feel like I am not good enough, and i feel like I am just going through the day.",depression
+498,I don't feel proud of myself when I think about thesis.,depression
+499,Thinking about my project makes me feel emotionally tired.,depression
+500,"Right now, I feel like I am alone in this, and i don't enjoy things the way I used to.",depression
+501,"I often feel disconnected, and i don't feel excited about anything.",depression
+502,I feel like I am only forcing myself to continue with IT studies.,depression
+503,"Right now, I feel lonely, and i have trouble getting started with my work.",depression
+504,"I've been feeling lost, and i feel disconnected from the people around me.",depression
+505,"Sometimes I feel like I have lost my motivation, and i find it hard to focus on my studies.",depression
+506,"I honestly feel like I am stuck, and i have trouble getting started with my work.",depression
+507,"Sometimes I feel hopeless, and i don't feel like talking to anyone.",depression
+508,"I often feel empty, and i have trouble getting started with my work.",depression
+509,"Right now, I feel down, and i feel disconnected from the people around me.",depression
+510,"I've been feeling disconnected, and i have been keeping everything to myself.",depression
+511,"I often feel disconnected, and i find it hard to focus on my studies.",depression
+512,"I've been feeling like nothing is going right, and even simple tasks feel difficult.",depression
+513,"I've started feeling like I am not good enough, and i have been keeping everything to myself.",depression
+514,"I've started feeling empty, and i struggle to find the energy to study.",depression
+515,"I've started feeling unmotivated, and i have trouble getting started with my work.",depression
+516,"Right now, I feel like I am alone in this, and i don't feel motivated to do anything.",depression
+517,Nakakalungkot kasi parang hindi ako umuusad.,depression
+518,"I've been feeling like I am alone in this, and i don't enjoy things the way I used to.",depression
+519,"I often feel like I am not good enough, and i feel disconnected from the people around me.",depression
+520,"I've started feeling emotionally drained, and i struggle to find the energy to study.",depression
+521,"Lately, I feel hopeless, and i struggle to find the energy to study.",depression
+522,"These days, I feel like I am alone in this, and i don't feel like talking to anyone.",depression
+523,"I honestly feel down, and i feel disconnected from the people around me.",depression
+524,"I feel like I am not good enough, and i don't know how to explain what I am feeling.",depression
+525,"These days, I feel disconnected, and i have been keeping everything to myself.",depression
+526,"I've started feeling like I am alone in this, and i have been keeping everything to myself.",depression
+527,"I feel hopeless, and i feel disconnected from the people around me.",depression
+528,"Right now, I feel tired, and i don't enjoy things the way I used to.",depression
+529,I don't feel the same happiness when I work on exams.,depression
+530,"Lately, I feel disconnected, and i don't enjoy things the way I used to.",depression
+531,I feel alone.,depression
+532,"Right now, I feel like I have lost my motivation, and even simple tasks feel difficult.",depression
+533,"I've been feeling disconnected, and i don't feel motivated to do anything.",depression
+534,"Recently, I feel disconnected, and i don't feel excited about anything.",depression
+535,"I've started feeling like nothing is going right, and i feel emotionally exhausted.",depression
+536,"I often feel like I am alone in this, and i find it hard to focus on my studies.",depression
+537,"I've started feeling emotionally drained, and i find it hard to focus on my studies.",depression
+538,I feel emotionally exhausted because of college.,depression
+539,"I've started feeling unmotivated, and i don't enjoy things the way I used to.",depression
+540,"I often feel like I have lost my motivation, and i have trouble getting started with my work.",depression
+541,"I've started feeling down, and i feel like I am just going through the day.",depression
+542,"I've been feeling like I am stuck, and i feel disconnected from the people around me.",depression
+543,"Lately, I feel hopeless, and i have been keeping everything to myself.",depression
+544,"I often feel down, and i feel disconnected from the people around me.",depression
+545,"I feel disconnected, and i feel like I am just going through the day.",depression
+546,I feel alone even when I am surrounded by classmates.,depression
+547,"Recently, I feel like I have lost my motivation, and i find it hard to focus on my studies.",depression
+548,"I feel like I am falling behind, and i don't know how to explain what I am feeling.",depression
+549,"I feel lonely, and i feel emotionally exhausted.",depression
+550,"Right now, I feel empty, and i don't enjoy things the way I used to.",depression
+551,I feel disconnected from thesis lately.,depression
+552,"Right now, I feel lost, and i feel emotionally exhausted.",depression
+553,"I've been feeling hopeless, and i don't know how to explain what I am feeling.",depression
+554,I feel exhausted even when I have not done much.,depression
+555,"I honestly feel emotionally drained, and i feel like I am just going through the day.",depression
+556,"I've been feeling emotionally drained, and i have trouble getting started with my work.",depression
+557,"Right now, I feel empty, and i find it hard to focus on my studies.",depression
+558,"I've started feeling down, and i don't feel motivated to do anything.",depression
+559,"I've started feeling like I am not good enough, and i have trouble getting started with my work.",depression
+560,"I feel sad, and i struggle to find the energy to study.",depression
+561,"I feel lonely, and i feel disconnected from the people around me.",depression
+562,"I often feel disconnected, and i have been keeping everything to myself.",depression
+563,"I honestly feel like I am stuck, and i wish I could take a break from everything.",depression
+564,I feel emotionally exhausted because of assignments.,depression
+565,"Recently, I feel empty, and i have trouble getting started with my work.",depression
+566,"Sometimes I feel down, and i feel emotionally exhausted.",depression
+567,"These days, I feel hopeless, and i wish I could take a break from everything.",depression
+568,"Right now, I feel hopeless, and i don't feel excited about anything.",depression
+569,"I feel like I am alone in this, and i wish I could take a break from everything.",depression
+570,"Sometimes I feel lost, and i struggle to find the energy to study.",depression
+571,"These days, I feel like I have lost my motivation, and i don't know how to explain what I am feeling.",depression
+572,"I've been feeling disconnected, and i find it hard to focus on my studies.",depression
+573,"I honestly feel like I have lost my motivation, and i feel emotionally exhausted.",depression
+574,"These days, I feel like I am stuck, and i find it hard to focus on my studies.",depression
+575,"Sometimes I feel unmotivated, and i feel like I am just going through the day.",depression
+576,"Recently, I feel like I am alone in this, and i feel like I am just going through the day.",depression
+577,I don't know if I am good enough to finish this course.,depression
+578,"I've been feeling disconnected, and i wish I could take a break from everything.",depression
+579,"Recently, I feel like I have lost my motivation, and even simple tasks feel difficult.",depression
+580,"I honestly feel disconnected, and i feel like I am just going through the day.",depression
+581,"These days, I feel tired, and i wish I could take a break from everything.",depression
+582,"I honestly feel disconnected, and i find it hard to focus on my studies.",depression
+583,I don't feel like participating in class anymore.,depression
+584,"I honestly feel like I have lost my motivation, and i don't feel motivated to do anything.",depression
+585,I don't feel the same happiness when I work on my future.,depression
+586,"I've started feeling like I have lost my motivation, and i wish I could take a break from everything.",depression
+587,"Sometimes I feel empty, and i don't feel excited about anything.",depression
+588,"Lately, I feel lonely, and i don't feel excited about anything.",depression
+589,I feel disconnected from college life lately.,depression
+590,"I've started feeling like I am alone in this, and i feel like I am just going through the day.",depression
+591,I don't feel hopeful about how things will turn out.,depression
+592,"I feel down, and i don't feel excited about anything.",depression
+593,I feel like my academic life has become emotionally exhausting.,depression
+594,"I honestly feel like I am falling behind, and i don't feel excited about anything.",depression
+595,I don't feel proud of myself when I think about IT studies.,depression
+596,"These days, I feel disconnected, and i don't know how to explain what I am feeling.",depression
+597,"I've been feeling tired, and i feel disconnected from the people around me.",depression
+598,I don't feel the same happiness when I work on research.,depression
+599,"These days, I feel like I am falling behind, and i don't know how to explain what I am feeling.",depression
+600,"These days, I feel lost, and i don't feel motivated to do anything.",depression
+601,"I feel like nothing is going right, and i don't know how to explain what I am feeling.",depression
+602,"Recently, I feel emotionally drained, and i struggle to find the energy to study.",depression
+603,"Sometimes I feel like I am falling behind, and i don't feel excited about anything.",depression
+604,"Lately, I feel like nothing is going right, and i have been keeping everything to myself.",depression
+605,"I honestly feel unmotivated, and i wish I could take a break from everything.",depression
+606,"Recently, I feel like I am alone in this, and i feel emotionally exhausted.",depression
+607,I feel discouraged whenever I think about my future.,depression
+608,"Sometimes I feel lost, and i feel disconnected from the people around me.",depression
+609,"Lately, I feel unmotivated, and i don't know how to explain what I am feeling.",depression
+610,"Recently, I feel lonely, and i have trouble getting started with my work.",depression
+611,"Lately, I feel lonely, and i wish I could take a break from everything.",depression
+612,"These days, I feel lonely, and i feel disconnected from the people around me.",depression
+613,"Recently, I feel unmotivated, and i don't feel like talking to anyone.",depression
+614,"These days, I feel tired, and i find it hard to focus on my studies.",depression
+615,"I've been feeling lonely, and i feel disconnected from the people around me.",depression
+616,"I feel sad, and i feel like I am just going through the day.",depression
+617,"Recently, I feel like I am stuck, and i don't enjoy things the way I used to.",depression
+618,"These days, I feel unmotivated, and i wish I could take a break from everything.",depression
+619,"I honestly feel sad, and i don't enjoy things the way I used to.",depression
+620,"I feel tired, and i have trouble getting started with my work.",depression
+621,"Sometimes I feel tired, and i wish I could take a break from everything.",depression
+622,"I honestly feel like nothing is going right, and i find it hard to focus on my studies.",depression
+623,"Right now, I feel hopeless, and i find it hard to focus on my studies.",depression
+624,"I've been feeling like I am stuck, and i don't feel motivated to do anything.",depression
+625,"Sometimes I feel like I am falling behind, and i have trouble getting started with my work.",depression
+626,"Lately, I feel like I am stuck, and i don't know how to explain what I am feeling.",depression
+627,"Recently, I feel like I am stuck, and i struggle to find the energy to study.",depression
+628,"Recently, I feel like I am stuck, and i don't know how to explain what I am feeling.",depression
+629,"I honestly feel lost, and i feel disconnected from the people around me.",depression
+630,"Right now, I feel disconnected, and i have been keeping everything to myself.",depression
+631,Hindi ko alam kung bakit ang lungkot ko lately.,depression
+632,"These days, I feel like I am falling behind, and i don't feel excited about anything.",depression
+633,"Recently, I feel down, and i find it hard to focus on my studies.",depression
+634,"Lately, I feel like I am alone in this, and i don't feel like talking to anyone.",depression
+635,I feel disconnected from coding lately.,depression
+636,"I've started feeling empty, and i feel like I am just going through the day.",depression
+637,"I've been feeling sad, and i don't enjoy things the way I used to.",depression
+638,"I honestly feel emotionally drained, and i don't feel excited about anything.",depression
+639,"Sometimes I feel disconnected, and i don't feel like talking to anyone.",depression
+640,"I feel down, and i have been keeping everything to myself.",depression
+641,"Right now, I feel disconnected, and i feel like I am just going through the day.",depression
+642,"These days, I feel empty, and i don't know how to explain what I am feeling.",depression
+643,"Lately, I feel lost, and i struggle to find the energy to study.",depression
+644,"Lately, I feel like nothing is going right, and i find it hard to focus on my studies.",depression
+645,"I honestly feel empty, and i have been keeping everything to myself.",depression
+646,"Right now, I feel hopeless, and i feel disconnected from the people around me.",depression
+647,"These days, I feel unmotivated, and i have been keeping everything to myself.",depression
+648,"Recently, I feel hopeless, and i don't feel like talking to anyone.",depression
+649,I feel discouraged whenever I think about college.,depression
+650,"Right now, I feel like I am falling behind, and i have trouble getting started with my work.",depression
+651,"Sometimes I feel like I am stuck, and i struggle to find the energy to study.",depression
+652,I don't feel the same happiness when I work on my academic work.,depression
+653,"I feel lost, and i struggle to find the energy to study.",depression
+654,"I feel down, and i don't feel motivated to do anything.",depression
+655,I feel discouraged whenever I think about school requirements.,depression
+656,I don't feel hopeful about capstone.,depression
+657,I don't feel hopeful about school.,depression
+658,"I've started feeling empty, and i feel disconnected from the people around me.",depression
+659,"These days, I feel lonely, and i have trouble getting started with my work.",depression
+660,"I feel like I am alone in this, and i find it hard to focus on my studies.",depression
+661,I feel emotionally exhausted because of exams.,depression
+662,"Lately, I feel unmotivated, and i feel emotionally exhausted.",depression
+663,"I've been feeling like I am stuck, and i have trouble getting started with my work.",depression
+664,I feel lonely while working on programming.,depression
+665,"Lately, I feel like I have lost my motivation, and i feel emotionally exhausted.",depression
+666,"Recently, I feel like I am alone in this, and i have trouble getting started with my work.",depression
+667,"Recently, I feel like I have lost my motivation, and i don't enjoy things the way I used to.",depression
+668,"These days, I feel down, and even simple tasks feel difficult.",depression
+669,I keep feeling down whenever I work on research.,depression
+670,"Lately, I feel like nothing is going right, and i feel like I am just going through the day.",depression
+671,"Sometimes I feel tired, and i have trouble getting started with my work.",depression
+672,"Sometimes I feel like nothing is going right, and i feel like I am just going through the day.",depression
+673,"I've started feeling sad, and i don't feel like talking to anyone.",depression
+674,"Right now, I feel unmotivated, and i don't know how to explain what I am feeling.",depression
+675,"These days, I feel like I am stuck, and i feel emotionally exhausted.",depression
+676,"Recently, I feel lonely, and even simple tasks feel difficult.",depression
+677,I keep feeling down whenever I work on capstone.,depression
+678,"Lately, I feel tired, and i don't know how to explain what I am feeling.",depression
+679,"I often feel disconnected, and i don't feel motivated to do anything.",depression
+680,"I often feel tired, and i have been keeping everything to myself.",depression
+681,I feel like I have lost my interest in coding.,depression
+682,Thinking about classes makes me feel emotionally tired.,depression
+683,"I've started feeling unmotivated, and i struggle to find the energy to study.",depression
+684,"I honestly feel like I am alone in this, and i wish I could take a break from everything.",depression
+685,"I often feel unmotivated, and i feel like I am just going through the day.",depression
+686,I have been avoiding school because I don't have the energy.,depression
+687,"Sometimes I feel lonely, and i don't feel excited about anything.",depression
+688,"I honestly feel unmotivated, and i have been keeping everything to myself.",depression
+689,"Right now, I feel down, and i have been keeping everything to myself.",depression
+690,I feel like everyone is moving forward while I am stuck.,depression
+691,"Right now, I feel like I am not good enough, and i don't enjoy things the way I used to.",depression
+692,"I've been feeling sad, and i struggle to find the energy to study.",depression
+693,"I've been feeling like I have lost my motivation, and i struggle to find the energy to study.",depression
+694,"I often feel emotionally drained, and i don't know how to explain what I am feeling.",depression
+695,"Recently, I feel hopeless, and i feel like I am just going through the day.",depression
+696,"Right now, I feel unmotivated, and i find it hard to focus on my studies.",depression
+697,"These days, I feel like I am falling behind, and i struggle to find the energy to study.",depression
+698,"Recently, I feel lonely, and i have been keeping everything to myself.",depression
+699,I feel like I am only forcing myself to continue with my project.,depression
+700,"Right now, I feel like I am stuck, and i have been keeping everything to myself.",depression
+701,"Sometimes I feel like I am not good enough, and i have trouble getting started with my work.",depression
+702,"Sometimes I feel down, and i don't feel like talking to anyone.",depression
+703,"I often feel sad, and i don't feel excited about anything.",depression
+704,"I honestly feel like I am not good enough, and i wish I could take a break from everything.",depression
+705,"I often feel tired, and i feel disconnected from the people around me.",depression
+706,"Sometimes I feel lost, and even simple tasks feel difficult.",depression
+707,"I often feel sad, and i have trouble getting started with my work.",depression
+708,"I feel emotionally drained, and i don't enjoy things the way I used to.",depression
+709,"I honestly feel like I am not good enough, and i don't enjoy things the way I used to.",depression
+710,"I often feel empty, and i don't feel motivated to do anything.",depression
+711,"Recently, I feel lost, and i don't enjoy things the way I used to.",depression
+712,"I honestly feel tired, and i feel disconnected from the people around me.",depression
+713,"Right now, I feel down, and i feel like I am just going through the day.",depression
+714,"I often feel down, and i don't feel like talking to anyone.",depression
+715,"Lately, I feel disconnected, and i don't feel like talking to anyone.",depression
+716,"Sometimes I feel tired, and i don't feel excited about anything.",depression
+717,"Lately, I feel emotionally drained, and i find it hard to focus on my studies.",depression
+718,"These days, I feel sad, and i find it hard to focus on my studies.",depression
+719,"Lately, I feel hopeless, and i wish I could take a break from everything.",depression
+720,"I honestly feel disconnected, and i feel disconnected from the people around me.",depression
+721,"I feel like I am alone in this, and i don't feel excited about anything.",depression
+722,"Sometimes I feel tired, and i don't know how to explain what I am feeling.",depression
+723,"These days, I feel lost, and i don't know how to explain what I am feeling.",depression
+724,"I often feel like I am alone in this, and i don't enjoy things the way I used to.",depression
+725,"Recently, I feel empty, and i don't feel like talking to anyone.",depression
+726,"Lately, I feel sad, and i feel emotionally exhausted.",depression
+727,"I feel tired, and i feel disconnected from the people around me.",depression
+728,"I've started feeling tired, and i don't feel excited about anything.",depression
+729,"I've started feeling hopeless, and i don't feel excited about anything.",depression
+730,"Sometimes I feel like I am not good enough, and i don't enjoy things the way I used to.",depression
+731,"These days, I feel sad, and i have been keeping everything to myself.",depression
+732,I feel lost.,depression
+733,"I honestly feel lost, and i wish I could take a break from everything.",depression
+734,"Right now, I feel tired, and i feel emotionally exhausted.",depression
+735,"I've been feeling lost, and i don't feel motivated to do anything.",depression
+736,"Right now, I feel like I am alone in this, and i find it hard to focus on my studies.",depression
+737,"Sometimes I feel emotionally drained, and i don't enjoy things the way I used to.",depression
+738,I feel like I have lost my interest in college life.,depression
+739,"Sometimes I feel like I am not good enough, and i feel emotionally exhausted.",depression
+740,"Recently, I feel lost, and i feel disconnected from the people around me.",depression
+741,"I've been feeling like I am alone in this, and i have trouble getting started with my work.",depression
+742,"Right now, I feel like I am falling behind, and i don't feel excited about anything.",depression
+743,"Sometimes I feel tired, and i don't enjoy things the way I used to.",depression
+744,"Sometimes I feel emotionally drained, and i don't feel excited about anything.",depression
+745,"I've been feeling lost, and i struggle to find the energy to study.",depression
+746,"I feel hopeless, and i don't feel motivated to do anything.",depression
+747,"These days, I feel empty, and i feel disconnected from the people around me.",depression
+748,"Right now, I feel emotionally drained, and i wish I could take a break from everything.",depression
+749,"Sometimes I feel like I am alone in this, and i have trouble getting started with my work.",depression
+750,"These days, I feel emotionally drained, and i wish I could take a break from everything.",depression
+751,"I've started feeling like I am not good enough, and i wish I could take a break from everything.",depression
+752,I don't feel hopeful about my project.,depression
+753,"I honestly feel tired, and i have trouble getting started with my work.",depression
+754,"I've started feeling lonely, and i feel disconnected from the people around me.",depression
+755,I feel like I have lost my interest in final project.,depression
+756,I feel like I have lost my interest in exams.,depression
+757,"Sometimes I feel unmotivated, and i struggle to find the energy to study.",depression
+758,"These days, I feel tired, and even simple tasks feel difficult.",depression
+759,"I've started feeling disconnected, and i have trouble getting started with my work.",depression
+760,"I often feel like I have lost my motivation, and i struggle to find the energy to study.",depression
+761,"Recently, I feel emotionally drained, and even simple tasks feel difficult.",depression
+762,"Lately, I feel like I am alone in this, and i feel like I am just going through the day.",depression
+763,"I've started feeling like I am falling behind, and i have trouble getting started with my work.",depression
+764,"I often feel lost, and i don't feel motivated to do anything.",depression
+765,"I've started feeling disconnected, and i don't feel excited about anything.",depression
+766,"Right now, I feel like I am not good enough, and i wish I could take a break from everything.",depression
+767,"Lately, I feel like I have lost my motivation, and i don't enjoy things the way I used to.",depression
+768,"I've started feeling unmotivated, and i don't know how to explain what I am feeling.",depression
+769,"Lately, I feel like I am falling behind, and i don't enjoy things the way I used to.",depression
+770,"Lately, I feel like I am stuck, and i feel disconnected from the people around me.",depression
+771,"I've been feeling like I am falling behind, and i feel emotionally exhausted.",depression
+772,"Recently, I feel like I am stuck, and i feel like I am just going through the day.",depression
+773,"Right now, I feel like I am not good enough, and i feel disconnected from the people around me.",depression
+774,"These days, I feel like I am stuck, and i feel like I am just going through the day.",depression
+775,"Lately, I feel like I am not good enough, and i find it hard to focus on my studies.",depression
+776,"I feel lonely, and i don't know how to explain what I am feeling.",depression
+777,"Right now, I feel disconnected, and i find it hard to focus on my studies.",depression
+778,"I often feel like I have lost my motivation, and i don't enjoy things the way I used to.",depression
+779,"I've started feeling disconnected, and i don't enjoy things the way I used to.",depression
+780,I feel discouraged whenever I think about IT studies.,depression
+781,"I've started feeling unmotivated, and i find it hard to focus on my studies.",depression
+782,"I've started feeling emotionally drained, and i don't know how to explain what I am feeling.",depression
+783,"I've started feeling emotionally drained, and i don't feel like talking to anyone.",depression
+784,I feel disconnected from my academic work lately.,depression
+785,I don't feel proud of myself when I think about college.,depression
+786,"I've been feeling emotionally drained, and i feel disconnected from the people around me.",depression
+787,I have been losing motivation for exams.,depression
+788,I feel emotionally exhausted because of school requirements.,depression
+789,"Sometimes I feel lost, and i feel emotionally exhausted.",depression
+790,"These days, I feel down, and i feel emotionally exhausted.",depression
+791,"Right now, I feel empty, and i feel like I am just going through the day.",depression
+792,"Lately, I feel like I have lost my motivation, and i wish I could take a break from everything.",depression
+793,"I feel lost, and i don't enjoy things the way I used to.",depression
+794,"I honestly feel like I am falling behind, and i don't feel motivated to do anything.",depression
+795,"I've been feeling empty, and i don't feel excited about anything.",depression
+796,I don't feel hopeful about research.,depression
+797,"Lately, I feel sad, and even simple tasks feel difficult.",depression
+798,I feel like I am losing myself in all these requirements.,depression
+799,"I honestly feel sad, and even simple tasks feel difficult.",depression
+800,"Lately, I feel like I am alone in this, and i don't know how to explain what I am feeling.",depression
+801,"I often feel unmotivated, and i have been keeping everything to myself.",depression
+802,"These days, I feel like I am falling behind, and i feel disconnected from the people around me.",depression
+803,I don't feel proud of myself when I think about coding.,depression
+804,"I often feel like I am falling behind, and i feel disconnected from the people around me.",depression
+805,I have been losing motivation for capstone.,depression
+806,"Lately, I feel like I am stuck, and i have trouble getting started with my work.",depression
+807,"I feel like nothing is going right, and i wish I could take a break from everything.",depression
+808,"I've been feeling unmotivated, and i find it hard to focus on my studies.",depression
+809,"I honestly feel like I am stuck, and i feel disconnected from the people around me.",depression
+810,I feel emotionally exhausted because of my studies.,depression
+811,"Right now, I feel lost, and i have been keeping everything to myself.",depression
+812,"Lately, I feel down, and i wish I could take a break from everything.",depression
+813,"I feel like nothing is going right, and i feel emotionally exhausted.",depression
+814,"I feel like I am not good enough, and i have been keeping everything to myself.",depression
+815,"I've started feeling like I have lost my motivation, and i feel like I am just going through the day.",depression
+816,"I've been feeling like I am falling behind, and i struggle to find the energy to study.",depression
+817,I feel disconnected from school requirements lately.,depression
+818,"Right now, I feel like nothing is going right, and i struggle to find the energy to study.",depression
+819,"Recently, I feel tired, and i don't know how to explain what I am feeling.",depression
+820,I feel discouraged whenever I think about coding.,depression
+821,"Recently, I feel empty, and i feel emotionally exhausted.",depression
+822,"I feel like I am not good enough, and i struggle to find the energy to study.",depression
+823,"Lately, I feel empty, and i find it hard to focus on my studies.",depression
+824,"I've been feeling like nothing is going right, and i don't know how to explain what I am feeling.",depression
+825,"I feel emotionally drained, and i feel like I am just going through the day.",depression
+826,"I honestly feel unmotivated, and i have trouble getting started with my work.",depression
+827,"Lately, I feel like I am alone in this, and i don't enjoy things the way I used to.",depression
+828,"These days, I feel emotionally drained, and i feel emotionally exhausted.",depression
+829,"I often feel like I am stuck, and i have been keeping everything to myself.",depression
+830,"Right now, I feel like I am not good enough, and i don't feel like talking to anyone.",depression
+831,"I've been feeling tired, and i find it hard to focus on my studies.",depression
+832,"Right now, I feel lost, and i don't enjoy things the way I used to.",depression
+833,"Lately, I feel empty, and i have trouble getting started with my work.",depression
+834,"Sometimes I feel down, and i find it hard to focus on my studies.",depression
+835,"Sometimes I feel like I have lost my motivation, and i don't feel like talking to anyone.",depression
+836,"Right now, I feel like I am not good enough, and i don't feel excited about anything.",depression
+837,"I often feel empty, and i find it hard to focus on my studies.",depression
+838,"I've started feeling sad, and even simple tasks feel difficult.",depression
+839,"Right now, I feel down, and i find it hard to focus on my studies.",depression
+840,"Lately, I feel emotionally drained, and i have been keeping everything to myself.",depression
+841,"Right now, I feel like I am stuck, and i don't enjoy things the way I used to.",depression
+842,"Recently, I feel disconnected, and i feel emotionally exhausted.",depression
+843,Thinking about assignments makes me feel emotionally tired.,depression
+844,"Right now, I feel unmotivated, and i feel disconnected from the people around me.",depression
+845,Thinking about capstone makes me feel emotionally tired.,depression
+846,"Right now, I feel emotionally drained, and i don't know how to explain what I am feeling.",depression
+847,"Sometimes I feel tired, and i find it hard to focus on my studies.",depression
+848,"Right now, I feel like I am alone in this, and i wish I could take a break from everything.",depression
+849,"Recently, I feel like I am alone in this, and i don't know how to explain what I am feeling.",depression
+850,"I've been feeling sad, and i find it hard to focus on my studies.",depression
+851,"I often feel lost, and i feel disconnected from the people around me.",depression
+852,"I feel down, and i don't feel like talking to anyone.",depression
+853,"I feel like I am stuck, and i don't know how to explain what I am feeling.",depression
+854,"I've been feeling down, and i feel like I am just going through the day.",depression
+855,"I feel like I am alone in this, and i have trouble getting started with my work.",depression
+856,"I often feel like I am stuck, and i don't know how to explain what I am feeling.",depression
+857,"Lately, I feel like I am falling behind, and i find it hard to focus on my studies.",depression
+858,"Lately, I feel disconnected, and i don't feel excited about anything.",depression
+859,"Right now, I feel emotionally drained, and i don't feel like talking to anyone.",depression
+860,"I've started feeling like I am falling behind, and i feel emotionally exhausted.",depression
+861,"I often feel like I am not good enough, and i have been keeping everything to myself.",depression
+862,Sobrang down ko lately.,depression
+863,"Recently, I feel lonely, and i wish I could take a break from everything.",depression
+864,"I've been feeling disconnected, and i have trouble getting started with my work.",depression
+865,"Recently, I feel down, and i don't enjoy things the way I used to.",depression
+866,"I've started feeling like I am falling behind, and i don't know how to explain what I am feeling.",depression
+867,"Lately, I feel like I am not good enough, and i don't enjoy things the way I used to.",depression
+868,"Sometimes I feel like nothing is going right, and i struggle to find the energy to study.",depression
+869,"I often feel like nothing is going right, and i don't enjoy things the way I used to.",depression
+870,"These days, I feel like I am alone in this, and i have been keeping everything to myself.",depression
+871,"I feel sad, and i don't feel motivated to do anything.",depression
+872,"Recently, I feel emotionally drained, and i have been keeping everything to myself.",depression
+873,"I often feel lonely, and i don't feel excited about anything.",depression
+874,"Right now, I feel empty, and i don't feel motivated to do anything.",depression
+875,"I've started feeling tired, and i don't feel motivated to do anything.",depression
+876,"I often feel like I am alone in this, and i have trouble getting started with my work.",depression
+877,I have been avoiding assignments because I don't have the energy.,depression
+878,I don't feel hopeful about IT studies.,depression
+879,I have been going through my school days without feeling much.,depression
+880,"I feel down, and i have trouble getting started with my work.",depression
+881,"Right now, I feel like I am alone in this, and i struggle to find the energy to study.",depression
+882,I feel disconnected from research lately.,depression
+883,"Recently, I feel like I am not good enough, and i don't know how to explain what I am feeling.",depression
+884,"Sometimes I feel lonely, and i find it hard to focus on my studies.",depression
+885,"I've been feeling like I have lost my motivation, and i find it hard to focus on my studies.",depression
+886,"Lately, I feel like I am falling behind, and i feel like I am just going through the day.",depression
+887,"I've started feeling emotionally drained, and even simple tasks feel difficult.",depression
+888,I have been losing motivation for my academic work.,depression
+889,"I feel tired, and i find it hard to focus on my studies.",depression
+890,"Lately, I feel like nothing is going right, and i don't know how to explain what I am feeling.",depression
+891,"I often feel emotionally drained, and even simple tasks feel difficult.",depression
+892,I feel lonely while working on exams.,depression
+893,"Right now, I feel empty, and even simple tasks feel difficult.",depression
+894,"I often feel unmotivated, and i feel disconnected from the people around me.",depression
+895,I don't feel proud of myself when I think about group project.,depression
+896,"I feel unmotivated, and i don't feel excited about anything.",depression
+897,"I've been feeling unmotivated, and i struggle to find the energy to study.",depression
+898,"I've started feeling unmotivated, and i feel like I am just going through the day.",depression
+899,"I feel emotionally drained, and even simple tasks feel difficult.",depression
+900,I feel discouraged whenever I think about final project.,depression
+901,"Right now, I feel like I am falling behind, and i feel like I am just going through the day.",depression
+902,"I feel like I have lost my motivation, and i feel emotionally exhausted.",depression
+903,"I honestly feel like I am alone in this, and i find it hard to focus on my studies.",depression
+904,"I often feel like I am not good enough, and i don't feel excited about anything.",depression
+905,"Lately, I feel down, and i don't feel excited about anything.",depression
+906,"Sometimes I feel sad, and i wish I could take a break from everything.",depression
+907,"I often feel like nothing is going right, and i feel like I am just going through the day.",depression
+908,"Recently, I feel like I am falling behind, and i find it hard to focus on my studies.",depression
+909,"I've been feeling lost, and i feel emotionally exhausted.",depression
+910,"I've started feeling sad, and i don't feel motivated to do anything.",depression
+911,"Sometimes I feel lonely, and i feel disconnected from the people around me.",depression
+912,"I've started feeling tired, and i have been keeping everything to myself.",depression
+913,"I've been feeling like I am stuck, and i don't feel excited about anything.",depression
+914,"Sometimes I feel like I am stuck, and i feel like I am just going through the day.",depression
+915,"Sometimes I feel hopeless, and i don't feel excited about anything.",depression
+916,"Recently, I feel hopeless, and i don't feel motivated to do anything.",depression
+917,"I often feel empty, and even simple tasks feel difficult.",depression
+918,"I often feel like I am falling behind, and i feel emotionally exhausted.",depression
+919,"Right now, I feel sad, and even simple tasks feel difficult.",depression
+920,"Sometimes I feel disconnected, and i have trouble getting started with my work.",depression
+921,"I've been feeling sad, and i don't feel motivated to do anything.",depression
+922,"I honestly feel like I am stuck, and i feel like I am just going through the day.",depression
+923,"I've been feeling like I have lost my motivation, and i don't feel excited about anything.",depression
+924,I keep feeling down whenever I work on college life.,depression
+925,"I've started feeling like nothing is going right, and i don't feel excited about anything.",depression
+926,"Lately, I feel lonely, and i feel like I am just going through the day.",depression
+927,"I honestly feel lost, and i struggle to find the energy to study.",depression
+928,"These days, I feel sad, and i don't feel motivated to do anything.",depression
+929,"Sometimes I feel hopeless, and i struggle to find the energy to study.",depression
+930,"These days, I feel tired, and i have trouble getting started with my work.",depression
+931,"I feel emotionally drained, and i feel disconnected from the people around me.",depression
+932,"I honestly feel sad, and i wish I could take a break from everything.",depression
+933,"These days, I feel emotionally drained, and i don't feel motivated to do anything.",depression
+934,"Right now, I feel hopeless, and i have been keeping everything to myself.",depression
+935,"Lately, I feel unmotivated, and i feel disconnected from the people around me.",depression
+936,"Recently, I feel like I am falling behind, and i feel like I am just going through the day.",depression
+937,"I feel tired, and i don't enjoy things the way I used to.",depression
+938,"I honestly feel like I am stuck, and i have been keeping everything to myself.",depression
+939,"I feel emotionally drained, and i wish I could take a break from everything.",depression
+940,"These days, I feel like I am not good enough, and i have been keeping everything to myself.",depression
+941,"I honestly feel like I am falling behind, and i struggle to find the energy to study.",depression
+942,"These days, I feel like I am alone in this, and i don't enjoy things the way I used to.",depression
+943,I don't feel hopeful about classes.,depression
+944,"I've started feeling like I have lost my motivation, and i feel emotionally exhausted.",depression
+945,"These days, I feel lonely, and i don't know how to explain what I am feeling.",depression
+946,"I often feel lost, and i struggle to find the energy to study.",depression
+947,"I honestly feel like I am stuck, and i don't enjoy things the way I used to.",depression
+948,"Recently, I feel sad, and i struggle to find the energy to study.",depression
+949,"These days, I feel lost, and i struggle to find the energy to study.",depression
+950,"I often feel hopeless, and i have been keeping everything to myself.",depression
+951,"I've been feeling like I have lost my motivation, and i have trouble getting started with my work.",depression
+952,"These days, I feel emotionally drained, and i don't know how to explain what I am feeling.",depression
+953,"I honestly feel empty, and i wish I could take a break from everything.",depression
+954,"I feel down, and i don't enjoy things the way I used to.",depression
+955,"Lately, I feel like I am not good enough, and i don't feel like talking to anyone.",depression
+956,"Sometimes I feel unmotivated, and i have trouble getting started with my work.",depression
+957,"I've been feeling empty, and i have trouble getting started with my work.",depression
+958,"Recently, I feel like I am falling behind, and i feel emotionally exhausted.",depression
+959,"Lately, I feel like I am not good enough, and i feel emotionally exhausted.",depression
+960,"Sometimes I feel like nothing is going right, and i don't know how to explain what I am feeling.",depression
+961,"These days, I feel down, and i struggle to find the energy to study.",depression
+962,"I've started feeling lost, and i have been keeping everything to myself.",depression
+963,"I feel sad, and i wish I could take a break from everything.",depression
+964,I don't feel the same happiness when I work on assignments.,depression
+965,"I honestly feel lost, and i don't enjoy things the way I used to.",depression
+966,"Recently, I feel hopeless, and i don't feel excited about anything.",depression
+967,"Recently, I feel hopeless, and i have been keeping everything to myself.",depression
+968,"Lately, I feel lost, and i have been keeping everything to myself.",depression
+969,I struggle to get started with my schoolwork.,depression
+970,"Recently, I feel unmotivated, and i don't feel excited about anything.",depression
+971,"I feel empty, and i don't know how to explain what I am feeling.",depression
+972,"I often feel like nothing is going right, and i feel disconnected from the people around me.",depression
+973,"Recently, I feel like I am not good enough, and i wish I could take a break from everything.",depression
+974,"Sometimes I feel down, and even simple tasks feel difficult.",depression
+975,"I've been feeling tired, and i have been keeping everything to myself.",depression
+976,"I've been feeling like nothing is going right, and i struggle to find the energy to study.",depression
+977,"Right now, I feel sad, and i don't know how to explain what I am feeling.",depression
+978,"I honestly feel down, and i feel emotionally exhausted.",depression
+979,"I've started feeling like I am falling behind, and i feel like I am just going through the day.",depression
+980,"These days, I feel lonely, and i don't feel like talking to anyone.",depression
+981,"Right now, I feel like I am falling behind, and i don't enjoy things the way I used to.",depression
+982,"I've started feeling like I am not good enough, and i struggle to find the energy to study.",depression
+983,"Sometimes I feel unmotivated, and i don't feel motivated to do anything.",depression
+984,"Right now, I feel like nothing is going right, and i have trouble getting started with my work.",depression
+985,I keep feeling down whenever I work on classes.,depression
+986,"I often feel tired, and i don't feel motivated to do anything.",depression
+987,"Lately, I feel like I am stuck, and i don't feel excited about anything.",depression
+988,"Lately, I feel empty, and i feel disconnected from the people around me.",depression
+989,"I honestly feel lonely, and i don't feel motivated to do anything.",depression
+990,"I've been feeling hopeless, and i have trouble getting started with my work.",depression
+991,"I've been feeling like I am stuck, and i don't enjoy things the way I used to.",depression
+992,"I feel like I am stuck, and i don't enjoy things the way I used to.",depression
+993,"These days, I feel disconnected, and i don't feel like talking to anyone.",depression
+994,"I've started feeling like I am stuck, and i don't feel excited about anything.",depression
+995,"I feel empty, and i have been keeping everything to myself.",depression
+996,"I've started feeling like I am alone in this, and i don't feel like talking to anyone.",depression
+997,"Recently, I feel like nothing is going right, and i don't feel motivated to do anything.",depression
+998,"I feel disconnected, and i don't feel excited about anything.",depression
+999,"These days, I feel like nothing is going right, and i wish I could take a break from everything.",depression
+1000,"I've been feeling like I am stuck, and even simple tasks feel difficult.",depression

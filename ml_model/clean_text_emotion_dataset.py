@@ -1,3 +1,5 @@
+
+
 """
 Clean the "Text Emotion Classification 150k" CSV into EmoTune's 13-label schema.
 
@@ -49,6 +51,7 @@ import argparse
 import csv
 import html
 import json
+import random
 import re
 import sys
 from collections import Counter
@@ -101,6 +104,20 @@ AFFECTION_ROMANTIC_MARKERS = re.compile(
 )
 
 DROPPED_CATEGORIES = {"sadness"}
+
+# This source only ever produces `calm` (from `nature`) and `surprising` (from
+# `surprise`, 66 rows) among these four -- `nostalgic` and `lonely` have no
+# source category here at all. Excluded because those two mapped classes are
+# too thin/off-topic to be worth keeping from this corpus. `happy` is also
+# excluded -- it's this source's largest class by far and floods the combined
+# training set relative to every other label.
+EXCLUDED_LABELS = {"nostalgic", "surprising", "lonely", "calm", "happy"}
+
+# With `happy` gone, `motivational` (achievement + exercise) is ~70% of what is
+# left and swamps romantic/fear/angry. Keep at most this many rows of it, chosen
+# at random; the fixed seed keeps the output reproducible across runs.
+DOWNSAMPLE_LABELS = {"motivational": 5000}
+DOWNSAMPLE_SEED = 42
 
 URL_RE = re.compile(r"https?://\S+|www\.\S+|\ba\s+href\s+http\S*", re.IGNORECASE)
 MENTION_RE = re.compile(r"@\w+")
@@ -216,6 +233,9 @@ def clean(source: Path, *, keep_sadness: bool) -> tuple[list[tuple[str, str]], d
             if emotion not in EMOTIONS:
                 counts["dropped_invalid_label"] += 1
                 continue
+            if emotion in EXCLUDED_LABELS:
+                counts["dropped_excluded_label"] += 1
+                continue
 
             key = dedupe_key(text)
             if not key or key in seen:
@@ -224,7 +244,14 @@ def clean(source: Path, *, keep_sadness: bool) -> tuple[list[tuple[str, str]], d
             seen.add(key)
 
             rows.append((text, emotion))
-            counts["kept"] += 1
+
+    rng = random.Random(DOWNSAMPLE_SEED)
+    for label, keep in DOWNSAMPLE_LABELS.items():
+        indices = [i for i, (_, emotion) in enumerate(rows) if emotion == label]
+        dropped = set(rng.sample(indices, max(len(indices) - keep, 0)))
+        counts[f"dropped_downsampled_{label}"] += len(dropped)
+        rows = [row for i, row in enumerate(rows) if i not in dropped]
+    counts["kept"] = len(rows)
 
     label_distribution = Counter(emotion for _, emotion in rows)
     report = {

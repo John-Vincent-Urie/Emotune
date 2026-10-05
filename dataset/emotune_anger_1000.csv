@@ -1,0 +1,1001 @@
+﻿id,text,emotion
+1,I'm so annoyed because deployment has a bug I cannot find.,anger
+2,I can't believe debugging keeps changing the output.,anger
+3,Puro problema na lang itong networking activity.,anger
+4,I can't believe programming is not working even though I followed the instructions.,anger
+5,It's frustrating that research paper keeps crashing.,anger
+6,This is so annoying because programming keeps giving me the same error.,anger
+7,I'm getting angry because presentation keeps crashing.,anger
+8,This is making me angry because programming is taking forever to finish.,anger
+9,I'm fed up because assignments keeps rejecting my input.,anger
+10,I'm fed up because school requirements is taking forever to finish.,anger
+11,I'm seriously annoyed because server setup keeps failing during testing.,anger
+12,I'm angry because final project was changed without telling me.,anger
+13,I'm so annoyed because group project is taking forever to finish.,anger
+14,I'm getting really irritated because software project was working yesterday but is broken today.,anger
+15,I'm getting angry because coding suddenly stopped working.,anger
+16,I can't believe system project is causing unnecessary problems.,anger
+17,I'm tired of debugging keeps crashing.,anger
+18,I'm angry because exams keeps failing during testing.,anger
+19,I'm so annoyed because final project suddenly stopped working.,anger
+20,I'm tired of web development is not working even though I followed the instructions.,anger
+21,I'm really angry because research paper is causing unnecessary problems.,anger
+22,I'm getting really irritated because exams is taking forever to finish.,anger
+23,This is making me angry because laboratory activity keeps rejecting my input.,anger
+24,I'm seriously annoyed because exams was changed without telling me.,anger
+25,I'm upset because mobile development keeps rejecting my input.,anger
+26,I'm upset because debugging is causing unnecessary problems.,anger
+27,I'm getting really irritated because deployment is taking forever to finish.,anger
+28,I'm fed up because API integration keeps changing the output.,anger
+29,I'm really angry because API integration keeps rejecting my input.,anger
+30,This is making me angry because system project is causing unnecessary problems.,anger
+31,I'm angry because presentation was working yesterday but is broken today.,anger
+32,Hindi ko na matiis itong documentation.,anger
+33,Nakakainis sobra yung server setup.,anger
+34,My groupmates are frustrating me.,anger
+35,It's frustrating that coding is causing unnecessary problems.,anger
+36,Why isn't this working?,anger
+37,I'm angry because deployment suddenly stopped working.,anger
+38,I'm getting really irritated because my group is not following the plan.,anger
+39,I'm frustrated because database is taking forever to finish.,anger
+40,I'm upset because capstone keeps showing an unexpected error.,anger
+41,I'm tired of laboratory activity is preventing me from finishing my work.,anger
+42,I'm fed up because debugging keeps failing during testing.,anger
+43,I'm frustrated because assignments keeps showing an unexpected error.,anger
+44,Sobrang inis ko sa exams.,anger
+45,I can't believe API integration was working yesterday but is broken today.,anger
+46,I'm seriously annoyed because web development is taking forever to finish.,anger
+47,I'm fed up because system project is not working even though I followed the instructions.,anger
+48,I'm irritated because coding was changed without telling me.,anger
+49,It's frustrating that deployment keeps crashing.,anger
+50,I'm tired of final project keeps changing the output.,anger
+51,I'm seriously annoyed because research paper is preventing me from finishing my work.,anger
+52,"Ilang oras na ako sa assignments, pero hindi pa rin gumagana.",anger
+53,I can't believe group project is causing unnecessary problems.,anger
+54,This is making me angry because mobile development keeps giving me the same error.,anger
+55,I'm angry because UI design keeps showing an unexpected error.,anger
+56,I'm irritated because web development keeps showing an unexpected error.,anger
+57,I'm seriously annoyed because system project keeps giving me the same error.,anger
+58,This is making me angry because my groupmates keep making excuses.,anger
+59,It's frustrating that presentation is making me repeat the same work.,anger
+60,I'm tired of coding was working yesterday but is broken today.,anger
+61,I'm tired of documentation is taking forever to finish.,anger
+62,I'm so annoyed because programming keeps showing an unexpected error.,anger
+63,I'm upset because school requirements is not working even though I followed the instructions.,anger
+64,This is so annoying because API integration keeps showing an unexpected error.,anger
+65,I'm upset because research paper keeps giving me the same error.,anger
+66,"Ilang oras na ako sa web development, pero hindi pa rin gumagana.",anger
+67,This is so annoying because API integration is taking forever to finish.,anger
+68,I'm angry because group project is causing unnecessary problems.,anger
+69,I'm seriously annoyed because system project keeps failing during testing.,anger
+70,It's frustrating that system project keeps crashing.,anger
+71,This is making me angry because web development keeps showing an unexpected error.,anger
+72,I'm getting really irritated because final project keeps showing an unexpected error.,anger
+73,It's frustrating that API integration keeps rejecting my input.,anger
+74,I'm upset because laboratory activity is taking forever to finish.,anger
+75,I'm getting angry because networking activity is making me repeat the same work.,anger
+76,I'm irritated because coding suddenly stopped working.,anger
+77,I'm tired of assignments keeps showing an unexpected error.,anger
+78,This is making me angry because system project is making me repeat the same work.,anger
+79,I'm upset because API integration is causing unnecessary problems.,anger
+80,I'm getting angry because mobile development keeps showing an unexpected error.,anger
+81,I'm irritated because school requirements has a bug I cannot find.,anger
+82,Frustrated na ako sa UI design.,anger
+83,Nakakagalit talaga yung capstone.,anger
+84,I'm really angry because system project was working yesterday but is broken today.,anger
+85,It's frustrating that UI design keeps crashing.,anger
+86,This is making me angry because server setup was changed without telling me.,anger
+87,This is making me angry because system project is not working even though I followed the instructions.,anger
+88,I'm frustrated because system project is causing unnecessary problems.,anger
+89,I'm so annoyed because API integration is taking forever to finish.,anger
+90,This is making me angry because exams is taking forever to finish.,anger
+91,This is so annoying because API integration was changed without telling me.,anger
+92,I'm seriously annoyed because documentation keeps changing the output.,anger
+93,Galit na talaga ako sa exams.,anger
+94,This is so annoying because software project keeps failing during testing.,anger
+95,I'm fed up because presentation keeps giving me the same error.,anger
+96,I'm upset because exams keeps failing during testing.,anger
+97,I'm upset because final project was changed without telling me.,anger
+98,I'm upset because documentation is causing unnecessary problems.,anger
+99,I'm upset because assignments keeps failing during testing.,anger
+100,I'm upset because networking activity keeps rejecting my input.,anger
+101,This is making me angry because final project was working yesterday but is broken today.,anger
+102,I'm really angry because exams keeps showing an unexpected error.,anger
+103,I'm angry because school requirements is not working even though I followed the instructions.,anger
+104,I'm fed up because presentation keeps changing the output.,anger
+105,I can't believe system project keeps showing an unexpected error.,anger
+106,I'm irritated because capstone is preventing me from finishing my work.,anger
+107,I'm seriously annoyed because capstone keeps failing during testing.,anger
+108,I'm getting angry because laboratory activity keeps changing the output.,anger
+109,I'm seriously annoyed because school requirements keeps crashing.,anger
+110,I'm fed up because programming suddenly stopped working.,anger
+111,Nakakabwisit yung error sa thesis.,anger
+112,It's frustrating that group project keeps showing an unexpected error.,anger
+113,This is so annoying because debugging is causing unnecessary problems.,anger
+114,I'm seriously annoyed because my groupmate is not doing their part.,anger
+115,I'm getting angry because coding keeps crashing.,anger
+116,It's frustrating that database is taking forever to finish.,anger
+117,I'm so annoyed because system project is not working even though I followed the instructions.,anger
+118,I'm tired of mobile development keeps showing an unexpected error.,anger
+119,I'm frustrated because documentation is causing unnecessary problems.,anger
+120,I'm upset because database was changed without telling me.,anger
+121,I'm so annoyed because group project is not working even though I followed the instructions.,anger
+122,I'm frustrated because mobile development was working yesterday but is broken today.,anger
+123,It's frustrating that exams was working yesterday but is broken today.,anger
+124,I'm frustrated because web development is preventing me from finishing my work.,anger
+125,I'm irritated because thesis is taking forever to finish.,anger
+126,Bwisit itong final project.,anger
+127,This is so annoying because assignments keeps giving me the same error.,anger
+128,It's frustrating that capstone is taking forever to finish.,anger
+129,I'm so annoyed because UI design has a bug I cannot find.,anger
+130,This is making me angry because system project keeps failing during testing.,anger
+131,Hindi ko na matiis itong research paper.,anger
+132,It's frustrating that thesis is taking forever to finish.,anger
+133,I'm getting really irritated because mobile development has a bug I cannot find.,anger
+134,I'm really angry because documentation is causing unnecessary problems.,anger
+135,I'm getting angry because server setup keeps giving me the same error.,anger
+136,I'm tired of web development keeps failing during testing.,anger
+137,I'm frustrated because thesis was working yesterday but is broken today.,anger
+138,I'm getting really irritated because presentation keeps crashing.,anger
+139,I'm irritated because documentation keeps failing during testing.,anger
+140,I'm so annoyed because my groupmates are not responding to our messages.,anger
+141,I'm really angry because I keep having to fix someone else's mistakes.,anger
+142,I'm getting really irritated because thesis is making me repeat the same work.,anger
+143,Galit na talaga ako sa deployment.,anger
+144,I'm angry because server setup keeps changing the output.,anger
+145,I'm seriously annoyed because exams suddenly stopped working.,anger
+146,I'm getting angry because exams keeps changing the output.,anger
+147,This is so annoying because debugging is taking forever to finish.,anger
+148,I'm angry because database is not working even though I followed the instructions.,anger
+149,I'm upset because research paper suddenly stopped working.,anger
+150,I can't believe laboratory activity was working yesterday but is broken today.,anger
+151,I'm angry because documentation is not working even though I followed the instructions.,anger
+152,This is so annoying because software project keeps rejecting my input.,anger
+153,I'm upset because final project is not working even though I followed the instructions.,anger
+154,I'm getting angry because someone deleted an important file.,anger
+155,I'm tired of server setup keeps giving me the same error.,anger
+156,I'm really angry because deployment keeps giving me the same error.,anger
+157,I'm seriously annoyed because system project is taking forever to finish.,anger
+158,I'm frustrated because final project was changed without telling me.,anger
+159,I'm so annoyed because programming was changed without telling me.,anger
+160,I'm so annoyed because web development has a bug I cannot find.,anger
+161,This is making me angry because programming has a bug I cannot find.,anger
+162,I'm frustrated because assignments has a bug I cannot find.,anger
+163,I'm irritated because presentation is causing unnecessary problems.,anger
+164,It's frustrating that mobile development keeps showing an unexpected error.,anger
+165,I'm tired of coding was changed without telling me.,anger
+166,This is so annoying because presentation is preventing me from finishing my work.,anger
+167,I'm getting really irritated because group project keeps failing during testing.,anger
+168,I'm getting angry because web development suddenly stopped working.,anger
+169,I'm irritated because final project keeps rejecting my input.,anger
+170,I'm irritated because mobile development keeps rejecting my input.,anger
+171,I'm angry because mobile development keeps showing an unexpected error.,anger
+172,I'm getting angry because debugging keeps giving me the same error.,anger
+173,I'm fed up because capstone is preventing me from finishing my work.,anger
+174,This is making me angry because database keeps rejecting my input.,anger
+175,I'm getting angry because thesis is preventing me from finishing my work.,anger
+176,I can't believe coding keeps changing the output.,anger
+177,I can't believe final project is preventing me from finishing my work.,anger
+178,This is making me angry because school requirements was changed without telling me.,anger
+179,I'm frustrated because research paper keeps rejecting my input.,anger
+180,I'm frustrated because programming is taking forever to finish.,anger
+181,This is so annoying because server setup keeps crashing.,anger
+182,I'm tired of capstone has a bug I cannot find.,anger
+183,I'm tired of server setup is preventing me from finishing my work.,anger
+184,I'm so annoyed because my groupmates keep making excuses.,anger
+185,I'm so annoyed because web development was working yesterday but is broken today.,anger
+186,I'm frustrated because assignments was working yesterday but is broken today.,anger
+187,I'm seriously annoyed because group project keeps changing the output.,anger
+188,I'm tired of server setup keeps showing an unexpected error.,anger
+189,"Nakakainis yung API integration, paulit-ulit na lang ang problema.",anger
+190,I'm getting angry because assignments keeps failing during testing.,anger
+191,I can't believe system project keeps crashing.,anger
+192,I'm tired of UI design suddenly stopped working.,anger
+193,I'm upset because API integration keeps crashing.,anger
+194,"Grabe, nakakainis itong school requirements.",anger
+195,I'm fed up because UI design keeps giving me the same error.,anger
+196,I'm frustrated because thesis keeps changing the output.,anger
+197,This is so annoying because exams suddenly stopped working.,anger
+198,I'm seriously annoyed because coding keeps showing an unexpected error.,anger
+199,I'm tired of API integration keeps changing the output.,anger
+200,I'm upset because API integration was working yesterday but is broken today.,anger
+201,I'm fed up because final project keeps changing the output.,anger
+202,I'm angry because someone deleted an important file.,anger
+203,I'm getting really irritated because web development was working yesterday but is broken today.,anger
+204,This is making me angry because my groupmate submitted incomplete work.,anger
+205,Frustrated na ako sa presentation.,anger
+206,I'm frustrated because UI design is making me repeat the same work.,anger
+207,I'm tired of system project was changed without telling me.,anger
+208,I'm seriously annoyed because server setup is not working even though I followed the instructions.,anger
+209,It's frustrating that API integration was working yesterday but is broken today.,anger
+210,I'm getting angry because my groupmate submitted incomplete work.,anger
+211,I can't believe system project keeps giving me the same error.,anger
+212,I'm fed up because networking activity suddenly stopped working.,anger
+213,It's frustrating that coding is preventing me from finishing my work.,anger
+214,Nakakainis sobra yung documentation.,anger
+215,I'm tired of exams is preventing me from finishing my work.,anger
+216,I'm so annoyed because group project was working yesterday but is broken today.,anger
+217,I'm upset because networking activity keeps failing during testing.,anger
+218,I'm so annoyed because coding was working yesterday but is broken today.,anger
+219,I'm seriously annoyed because final project was changed without telling me.,anger
+220,I can't believe debugging is not working even though I followed the instructions.,anger
+221,I'm tired of database has a bug I cannot find.,anger
+222,This is making me angry because research paper is taking forever to finish.,anger
+223,"Ilang oras na ako sa exams, pero hindi pa rin gumagana.",anger
+224,I'm frustrated because exams is preventing me from finishing my work.,anger
+225,It's frustrating that exams keeps giving me the same error.,anger
+226,This is so annoying because laboratory activity keeps showing an unexpected error.,anger
+227,I'm angry because database keeps giving me the same error.,anger
+228,I'm getting really irritated because someone changed my code without asking.,anger
+229,I'm frustrated because software project is causing unnecessary problems.,anger
+230,I'm so annoyed because laboratory activity is causing unnecessary problems.,anger
+231,This is so annoying because assignments is causing unnecessary problems.,anger
+232,I'm really angry because deployment is preventing me from finishing my work.,anger
+233,I'm irritated because research paper keeps showing an unexpected error.,anger
+234,I'm seriously annoyed because deployment keeps crashing.,anger
+235,I'm frustrated because final project keeps showing an unexpected error.,anger
+236,I'm frustrated because programming suddenly stopped working.,anger
+237,I'm angry because documentation keeps changing the output.,anger
+238,I can't believe database keeps crashing.,anger
+239,This is so annoying because assignments is taking forever to finish.,anger
+240,I'm getting angry because laboratory activity is preventing me from finishing my work.,anger
+241,I'm fed up because deployment keeps failing during testing.,anger
+242,I can't believe deployment keeps crashing.,anger
+243,I'm fed up because server setup suddenly stopped working.,anger
+244,I'm really angry because presentation keeps crashing.,anger
+245,I'm getting angry because my groupmate is not doing their part.,anger
+246,I'm fed up because software project is taking forever to finish.,anger
+247,I'm so annoyed because school requirements is preventing me from finishing my work.,anger
+248,I'm irritated because web development keeps crashing.,anger
+249,I'm seriously annoyed because server setup was changed without telling me.,anger
+250,I'm irritated because deployment was changed without telling me.,anger
+251,It's frustrating that thesis keeps giving me the same error.,anger
+252,I'm getting really irritated because presentation keeps rejecting my input.,anger
+253,I'm really angry because database keeps rejecting my input.,anger
+254,This is making me angry because presentation is not working even though I followed the instructions.,anger
+255,This is making me angry because thesis keeps rejecting my input.,anger
+256,This is making me angry because coding is causing unnecessary problems.,anger
+257,I'm so annoyed because laboratory activity was changed without telling me.,anger
+258,I'm really angry because thesis keeps crashing.,anger
+259,I'm getting really irritated because laboratory activity keeps showing an unexpected error.,anger
+260,I'm irritated because system project is preventing me from finishing my work.,anger
+261,I'm so annoyed because coding suddenly stopped working.,anger
+262,I'm irritated because school requirements keeps rejecting my input.,anger
+263,I'm getting really irritated because documentation is not working even though I followed the instructions.,anger
+264,I'm irritated because research paper is causing unnecessary problems.,anger
+265,I'm frustrated because debugging keeps crashing.,anger
+266,I'm seriously annoyed because programming is causing unnecessary problems.,anger
+267,I'm really angry because server setup has a bug I cannot find.,anger
+268,I'm getting angry because API integration keeps giving me the same error.,anger
+269,I'm so annoyed because system project suddenly stopped working.,anger
+270,I'm irritated because debugging keeps showing an unexpected error.,anger
+271,I'm tired of documentation was changed without telling me.,anger
+272,Sobrang inis ko sa school requirements.,anger
+273,I'm angry because web development is making me repeat the same work.,anger
+274,I can't believe assignments is preventing me from finishing my work.,anger
+275,I'm really angry because debugging keeps changing the output.,anger
+276,I'm really angry because research paper is taking forever to finish.,anger
+277,I'm really angry because school requirements suddenly stopped working.,anger
+278,This is so annoying because thesis keeps giving me the same error.,anger
+279,I'm angry because software project was changed without telling me.,anger
+280,I'm really angry because group project suddenly stopped working.,anger
+281,Nakakabwisit yung error sa school requirements.,anger
+282,I'm frustrated because final project is preventing me from finishing my work.,anger
+283,I'm getting angry because my groupmates are not responding to our messages.,anger
+284,This is so annoying because UI design keeps giving me the same error.,anger
+285,I'm irritated because the software keeps freezing during testing.,anger
+286,I'm so annoyed because presentation has a bug I cannot find.,anger
+287,I'm seriously annoyed because final project was working yesterday but is broken today.,anger
+288,I'm angry because web development keeps crashing.,anger
+289,I can't believe exams keeps giving me the same error.,anger
+290,I'm frustrated because assignments was changed without telling me.,anger
+291,It's frustrating that system project has a bug I cannot find.,anger
+292,I'm angry because mobile development keeps failing during testing.,anger
+293,I'm irritated because my groupmate submitted incomplete work.,anger
+294,I'm getting angry because school requirements is not working even though I followed the instructions.,anger
+295,I'm upset because system project is taking forever to finish.,anger
+296,I'm getting angry because final project keeps giving me the same error.,anger
+297,I'm fed up because system project is preventing me from finishing my work.,anger
+298,I'm getting really irritated because assignments was working yesterday but is broken today.,anger
+299,I'm getting angry because debugging keeps showing an unexpected error.,anger
+300,I'm getting angry because final project was working yesterday but is broken today.,anger
+301,I can't believe capstone is not working even though I followed the instructions.,anger
+302,I'm seriously annoyed because my groupmates are not responding to our messages.,anger
+303,I'm upset because deployment was working yesterday but is broken today.,anger
+304,This is so annoying because mobile development keeps giving me the same error.,anger
+305,I'm getting really irritated because system project is not working even though I followed the instructions.,anger
+306,I can't believe debugging is preventing me from finishing my work.,anger
+307,I'm tired of API integration is not working even though I followed the instructions.,anger
+308,Sobrang nakakafrustrate yung system project.,anger
+309,I'm getting angry because UI design keeps giving me the same error.,anger
+310,I'm getting angry because software project was working yesterday but is broken today.,anger
+311,Nakakabwisit yung error sa group project.,anger
+312,I can't believe thesis is causing unnecessary problems.,anger
+313,I'm getting angry because capstone keeps failing during testing.,anger
+314,I'm fed up because UI design is causing unnecessary problems.,anger
+315,I'm tired of presentation is making me repeat the same work.,anger
+316,I'm upset because laboratory activity is not working even though I followed the instructions.,anger
+317,I'm getting angry because documentation keeps failing during testing.,anger
+318,I'm frustrated because thesis is not working even though I followed the instructions.,anger
+319,I'm so annoyed because web development keeps rejecting my input.,anger
+320,I'm irritated because networking activity keeps failing during testing.,anger
+321,I'm angry because documentation is making me repeat the same work.,anger
+322,I'm getting angry because group project has a bug I cannot find.,anger
+323,I'm annoyed because our requirements were changed after we finished the project.,anger
+324,I'm fed up because system project was working yesterday but is broken today.,anger
+325,I'm getting really irritated because capstone keeps giving me the same error.,anger
+326,I'm really angry because server setup is taking forever to finish.,anger
+327,This is making me angry because assignments is causing unnecessary problems.,anger
+328,I'm really angry because API integration was changed without telling me.,anger
+329,I'm upset because server setup was working yesterday but is broken today.,anger
+330,I'm upset because final project is making me repeat the same work.,anger
+331,It's frustrating that networking activity keeps changing the output.,anger
+332,I'm getting angry because deployment was changed without telling me.,anger
+333,I'm so annoyed because group project is causing unnecessary problems.,anger
+334,I'm seriously annoyed because coding is making me repeat the same work.,anger
+335,Hindi ko na matiis itong server setup.,anger
+336,I'm upset because thesis was changed without telling me.,anger
+337,I'm getting angry because school requirements keeps crashing.,anger
+338,This is so annoying because school requirements keeps failing during testing.,anger
+339,I'm really angry because web development is taking forever to finish.,anger
+340,"Grabe, nakakainis itong system project.",anger
+341,This is so annoying because laboratory activity was changed without telling me.,anger
+342,I'm tired of final project keeps crashing.,anger
+343,This is making me angry because research paper is causing unnecessary problems.,anger
+344,I'm frustrated because UI design is not working even though I followed the instructions.,anger
+345,Bwisit itong system project.,anger
+346,I'm angry because system project has a bug I cannot find.,anger
+347,I'm upset because UI design keeps rejecting my input.,anger
+348,I'm frustrated because research paper is preventing me from finishing my work.,anger
+349,I'm getting angry because thesis has a bug I cannot find.,anger
+350,I'm upset because database is not working even though I followed the instructions.,anger
+351,I'm so annoyed because final project is taking forever to finish.,anger
+352,I'm seriously annoyed because software project keeps changing the output.,anger
+353,This is so annoying because research paper keeps crashing.,anger
+354,This is so annoying because coding was working yesterday but is broken today.,anger
+355,I'm getting really irritated because UI design was changed without telling me.,anger
+356,I can't believe coding keeps crashing.,anger
+357,I'm getting angry because assignments keeps crashing.,anger
+358,This is so annoying because mobile development was working yesterday but is broken today.,anger
+359,I'm fed up because system project keeps changing the output.,anger
+360,I'm getting angry because UI design keeps failing during testing.,anger
+361,I'm upset because mobile development keeps giving me the same error.,anger
+362,It's frustrating that server setup is taking forever to finish.,anger
+363,I'm really angry because thesis keeps changing the output.,anger
+364,I'm seriously annoyed because programming keeps showing an unexpected error.,anger
+365,I'm getting really irritated because school requirements keeps crashing.,anger
+366,This is so annoying because I am doing most of the work.,anger
+367,I'm getting angry because software project keeps changing the output.,anger
+368,This is making me angry because UI design keeps failing during testing.,anger
+369,I'm upset because laboratory activity keeps showing an unexpected error.,anger
+370,I'm getting angry because exams was working yesterday but is broken today.,anger
+371,I'm really angry because assignments is not working even though I followed the instructions.,anger
+372,It's frustrating that research paper is making me repeat the same work.,anger
+373,It's frustrating that mobile development is preventing me from finishing my work.,anger
+374,I'm frustrated because API integration is not working even though I followed the instructions.,anger
+375,I'm so annoyed because exams keeps changing the output.,anger
+376,This is making me angry because software project is causing unnecessary problems.,anger
+377,I'm really angry because web development keeps rejecting my input.,anger
+378,I'm really angry because web development keeps showing an unexpected error.,anger
+379,I'm seriously annoyed because research paper is causing unnecessary problems.,anger
+380,This is so annoying because research paper has a bug I cannot find.,anger
+381,I'm tired of thesis keeps changing the output.,anger
+382,I'm really angry because system project has a bug I cannot find.,anger
+383,I'm so annoyed because laboratory activity is preventing me from finishing my work.,anger
+384,I'm seriously annoyed because documentation is taking forever to finish.,anger
+385,I'm so annoyed because coding is causing unnecessary problems.,anger
+386,This is making me angry because UI design keeps changing the output.,anger
+387,It's frustrating that debugging is not working even though I followed the instructions.,anger
+388,I'm getting angry because presentation suddenly stopped working.,anger
+389,I'm seriously annoyed because thesis was changed without telling me.,anger
+390,This is so annoying because my groupmate submitted incomplete work.,anger
+391,I'm fed up because assignments is preventing me from finishing my work.,anger
+392,I can't believe research paper is not working even though I followed the instructions.,anger
+393,I'm getting angry because group project was working yesterday but is broken today.,anger
+394,I'm frustrated because documentation was changed without telling me.,anger
+395,I'm seriously annoyed because debugging is causing unnecessary problems.,anger
+396,I'm fed up because capstone is not working even though I followed the instructions.,anger
+397,I can't believe coding keeps giving me the same error.,anger
+398,This is making me angry because web development keeps changing the output.,anger
+399,I'm so annoyed because programming is taking forever to finish.,anger
+400,I'm upset because school requirements keeps failing during testing.,anger
+401,It's frustrating that documentation keeps rejecting my input.,anger
+402,I can't believe API integration is making me repeat the same work.,anger
+403,I'm seriously annoyed because research paper suddenly stopped working.,anger
+404,I can't believe laboratory activity is not working even though I followed the instructions.,anger
+405,I'm so annoyed because UI design is preventing me from finishing my work.,anger
+406,I'm angry because coding keeps showing an unexpected error.,anger
+407,I'm getting really irritated because research paper is causing unnecessary problems.,anger
+408,I'm tired of capstone is not working even though I followed the instructions.,anger
+409,I'm fed up because final project is making me repeat the same work.,anger
+410,I'm seriously annoyed because system project is preventing me from finishing my work.,anger
+411,This is so annoying because presentation keeps showing an unexpected error.,anger
+412,I'm really angry because group project is making me repeat the same work.,anger
+413,I'm angry because coding keeps failing during testing.,anger
+414,I'm irritated because assignments keeps showing an unexpected error.,anger
+415,I'm fed up because web development keeps failing during testing.,anger
+416,I'm irritated because school requirements was working yesterday but is broken today.,anger
+417,I'm irritated because software project was working yesterday but is broken today.,anger
+418,I'm really angry because group project keeps failing during testing.,anger
+419,This is so annoying because database keeps changing the output.,anger
+420,I'm upset because deployment keeps rejecting my input.,anger
+421,I'm seriously annoyed because documentation is preventing me from finishing my work.,anger
+422,I'm so annoyed because debugging keeps failing during testing.,anger
+423,This is so annoying because group project keeps showing an unexpected error.,anger
+424,I'm irritated because mobile development is not working even though I followed the instructions.,anger
+425,I'm seriously annoyed because exams is preventing me from finishing my work.,anger
+426,I'm frustrated because thesis is making me repeat the same work.,anger
+427,I'm frustrated because thesis is preventing me from finishing my work.,anger
+428,I can't believe documentation is taking forever to finish.,anger
+429,I'm angry because capstone keeps changing the output.,anger
+430,I'm getting really irritated because documentation is making me repeat the same work.,anger
+431,This is so annoying because laboratory activity is causing unnecessary problems.,anger
+432,I'm so annoyed because school requirements suddenly stopped working.,anger
+433,Bakit hindi gumagana itong thesis?,anger
+434,I'm frustrated because software project suddenly stopped working.,anger
+435,I'm getting angry because laboratory activity keeps showing an unexpected error.,anger
+436,I can't believe UI design is preventing me from finishing my work.,anger
+437,I'm so annoyed because deployment keeps changing the output.,anger
+438,I can't believe school requirements keeps rejecting my input.,anger
+439,I'm angry because school requirements keeps crashing.,anger
+440,I'm frustrated because presentation was working yesterday but is broken today.,anger
+441,"Grabe, nakakainis itong UI design.",anger
+442,I'm so annoyed because capstone was changed without telling me.,anger
+443,I'm upset because API integration is making me repeat the same work.,anger
+444,I'm so annoyed because documentation suddenly stopped working.,anger
+445,I'm seriously annoyed because laboratory activity was changed without telling me.,anger
+446,I'm tired of final project is preventing me from finishing my work.,anger
+447,I'm getting angry because web development keeps showing an unexpected error.,anger
+448,I'm getting really irritated because debugging is preventing me from finishing my work.,anger
+449,I'm upset because school requirements is making me repeat the same work.,anger
+450,It's frustrating that software project suddenly stopped working.,anger
+451,I'm fed up because programming keeps changing the output.,anger
+452,It's frustrating that laboratory activity keeps giving me the same error.,anger
+453,I'm getting really irritated because API integration keeps crashing.,anger
+454,It's frustrating that coding is making me repeat the same work.,anger
+455,It's frustrating that API integration was changed without telling me.,anger
+456,Bakit hindi gumagana itong debugging?,anger
+457,I'm irritated because programming suddenly stopped working.,anger
+458,I'm so annoyed because exams keeps rejecting my input.,anger
+459,I'm getting really irritated because networking activity was working yesterday but is broken today.,anger
+460,I can't believe database was working yesterday but is broken today.,anger
+461,This is so annoying.,anger
+462,I'm fed up because capstone is causing unnecessary problems.,anger
+463,I'm getting really irritated because UI design is preventing me from finishing my work.,anger
+464,This is making me angry because programming is preventing me from finishing my work.,anger
+465,I'm frustrated because web development keeps showing an unexpected error.,anger
+466,It's frustrating that web development was working yesterday but is broken today.,anger
+467,It's frustrating that debugging keeps giving me the same error.,anger
+468,I'm upset because database keeps crashing.,anger
+469,I'm fed up because web development keeps crashing.,anger
+470,I'm so annoyed because thesis is preventing me from finishing my work.,anger
+471,I'm seriously annoyed because school requirements keeps rejecting my input.,anger
+472,This is making me angry because school requirements is causing unnecessary problems.,anger
+473,I'm upset because capstone is causing unnecessary problems.,anger
+474,I'm irritated because deployment keeps changing the output.,anger
+475,I'm tired of networking activity is not working even though I followed the instructions.,anger
+476,I'm frustrated because system project is taking forever to finish.,anger
+477,This is making me angry because server setup is making me repeat the same work.,anger
+478,I'm really angry because someone deleted an important file.,anger
+479,I'm getting angry because someone changed my code without asking.,anger
+480,Sobrang inis ko sa UI design.,anger
+481,I'm angry because laboratory activity was changed without telling me.,anger
+482,I'm angry because assignments keeps showing an unexpected error.,anger
+483,I'm tired of server setup keeps changing the output.,anger
+484,I'm really angry because final project keeps failing during testing.,anger
+485,I'm upset because networking activity keeps changing the output.,anger
+486,It's frustrating that school requirements keeps showing an unexpected error.,anger
+487,It's frustrating that my groupmates are not responding to our messages.,anger
+488,I'm angry because database keeps changing the output.,anger
+489,Nakakainis sobra yung exams.,anger
+490,I'm upset because presentation has a bug I cannot find.,anger
+491,It's frustrating that networking activity is not working even though I followed the instructions.,anger
+492,I'm really angry because server setup is not working even though I followed the instructions.,anger
+493,I'm tired of deployment was working yesterday but is broken today.,anger
+494,I'm tired of school requirements keeps crashing.,anger
+495,I'm getting really irritated because deployment keeps crashing.,anger
+496,I'm seriously annoyed because mobile development has a bug I cannot find.,anger
+497,I'm so annoyed because debugging keeps rejecting my input.,anger
+498,I'm tired of server setup is causing unnecessary problems.,anger
+499,I'm upset because debugging keeps changing the output.,anger
+500,It's frustrating that documentation is causing unnecessary problems.,anger
+501,I'm fed up because software project keeps showing an unexpected error.,anger
+502,I'm irritated because coding is making me repeat the same work.,anger
+503,I'm really angry because web development is causing unnecessary problems.,anger
+504,I'm tired of web development keeps showing an unexpected error.,anger
+505,I'm getting angry because server setup is making me repeat the same work.,anger
+506,I'm angry because web development was working yesterday but is broken today.,anger
+507,It's frustrating that server setup was working yesterday but is broken today.,anger
+508,I'm seriously annoyed because software project was working yesterday but is broken today.,anger
+509,It's frustrating that API integration is preventing me from finishing my work.,anger
+510,I'm upset because presentation is causing unnecessary problems.,anger
+511,I'm getting really irritated because presentation is preventing me from finishing my work.,anger
+512,I'm upset because networking activity is causing unnecessary problems.,anger
+513,I can't believe API integration suddenly stopped working.,anger
+514,I'm getting angry because web development keeps giving me the same error.,anger
+515,I'm upset because UI design was changed without telling me.,anger
+516,This is so annoying because group project keeps rejecting my input.,anger
+517,I'm really angry because research paper is making me repeat the same work.,anger
+518,Sobrang nakakafrustrate yung documentation.,anger
+519,I'm tired of UI design is causing unnecessary problems.,anger
+520,I'm so annoyed because final project is not working even though I followed the instructions.,anger
+521,I can't believe capstone keeps failing during testing.,anger
+522,I'm getting really irritated because thesis is taking forever to finish.,anger
+523,This is so annoying because laboratory activity is taking forever to finish.,anger
+524,I'm fed up because research paper was changed without telling me.,anger
+525,I'm angry because presentation suddenly stopped working.,anger
+526,I'm fed up because debugging keeps showing an unexpected error.,anger
+527,I'm irritated because system project is causing unnecessary problems.,anger
+528,I'm seriously annoyed because group project is not working even though I followed the instructions.,anger
+529,I'm upset because web development keeps crashing.,anger
+530,I'm upset because server setup keeps changing the output.,anger
+531,I'm angry because UI design keeps giving me the same error.,anger
+532,I'm irritated because deployment was working yesterday but is broken today.,anger
+533,This is so annoying because system project keeps changing the output.,anger
+534,I'm upset because final project keeps changing the output.,anger
+535,I'm upset because laboratory activity was working yesterday but is broken today.,anger
+536,I'm angry because deployment keeps giving me the same error.,anger
+537,I can't believe final project suddenly stopped working.,anger
+538,This is so annoying because capstone is making me repeat the same work.,anger
+539,I'm fed up because debugging is not working even though I followed the instructions.,anger
+540,I'm getting angry because debugging was working yesterday but is broken today.,anger
+541,It's frustrating that programming keeps showing an unexpected error.,anger
+542,I'm getting angry because final project keeps showing an unexpected error.,anger
+543,I'm getting really irritated because mobile development keeps showing an unexpected error.,anger
+544,This is making me angry because presentation keeps giving me the same error.,anger
+545,I can't believe networking activity keeps giving me the same error.,anger
+546,I'm really angry because system project is preventing me from finishing my work.,anger
+547,I'm so annoyed because laboratory activity has a bug I cannot find.,anger
+548,I'm irritated because presentation suddenly stopped working.,anger
+549,I'm irritated because web development is preventing me from finishing my work.,anger
+550,I'm so annoyed because API integration has a bug I cannot find.,anger
+551,I'm tired of documentation keeps showing an unexpected error.,anger
+552,It's frustrating that mobile development suddenly stopped working.,anger
+553,I'm angry because UI design is taking forever to finish.,anger
+554,I can't believe deployment is taking forever to finish.,anger
+555,I'm fed up because school requirements is not working even though I followed the instructions.,anger
+556,I'm fed up because laboratory activity keeps crashing.,anger
+557,I'm fed up because programming is preventing me from finishing my work.,anger
+558,It's frustrating that capstone was changed without telling me.,anger
+559,I can't believe networking activity keeps rejecting my input.,anger
+560,I can't believe server setup was working yesterday but is broken today.,anger
+561,I'm so annoyed because software project keeps showing an unexpected error.,anger
+562,I'm so annoyed because thesis keeps rejecting my input.,anger
+563,I'm fed up because database was changed without telling me.,anger
+564,I'm so annoyed because networking activity has a bug I cannot find.,anger
+565,It's frustrating that web development keeps changing the output.,anger
+566,This is making me angry because research paper was working yesterday but is broken today.,anger
+567,Galit na talaga ako sa thesis.,anger
+568,I'm fed up because capstone keeps rejecting my input.,anger
+569,I'm tired of school requirements is making me repeat the same work.,anger
+570,I'm getting angry because mobile development is not working even though I followed the instructions.,anger
+571,I'm so annoyed because programming is not working even though I followed the instructions.,anger
+572,I'm upset because exams is not working even though I followed the instructions.,anger
+573,I'm so annoyed because debugging keeps changing the output.,anger
+574,I'm seriously annoyed because deployment suddenly stopped working.,anger
+575,I'm fed up because documentation suddenly stopped working.,anger
+576,I'm getting really irritated because deployment is causing unnecessary problems.,anger
+577,It's frustrating that laboratory activity keeps showing an unexpected error.,anger
+578,I'm getting really irritated because assignments is causing unnecessary problems.,anger
+579,I'm irritated because networking activity was changed without telling me.,anger
+580,I'm getting really irritated because coding keeps rejecting my input.,anger
+581,I'm so annoyed because deployment is making me repeat the same work.,anger
+582,I'm getting angry because debugging is causing unnecessary problems.,anger
+583,I'm so annoyed because server setup was working yesterday but is broken today.,anger
+584,It's frustrating that thesis keeps changing the output.,anger
+585,I'm tired of UI design keeps failing during testing.,anger
+586,I'm getting really irritated because capstone is causing unnecessary problems.,anger
+587,Nakakagalit talaga yung documentation.,anger
+588,It's frustrating that final project keeps failing during testing.,anger
+589,It's frustrating that capstone suddenly stopped working.,anger
+590,This is making me angry because database has a bug I cannot find.,anger
+591,I'm fed up because final project keeps showing an unexpected error.,anger
+592,I'm frustrated because debugging is taking forever to finish.,anger
+593,I'm frustrated because school requirements keeps failing during testing.,anger
+594,Nakakabwisit yung error sa server setup.,anger
+595,It's frustrating that group project keeps changing the output.,anger
+596,I'm getting really irritated because school requirements keeps changing the output.,anger
+597,I'm irritated because mobile development keeps showing an unexpected error.,anger
+598,This is making me angry because research paper keeps failing during testing.,anger
+599,I'm fed up because software project keeps changing the output.,anger
+600,I'm irritated because school requirements keeps crashing.,anger
+601,I'm getting really irritated because assignments is making me repeat the same work.,anger
+602,I'm really angry because school requirements is causing unnecessary problems.,anger
+603,I'm irritated because my groupmates keep making excuses.,anger
+604,I'm seriously annoyed because my group is not following the plan.,anger
+605,I'm upset because deployment has a bug I cannot find.,anger
+606,I'm getting angry because documentation is making me repeat the same work.,anger
+607,I'm seriously annoyed because assignments has a bug I cannot find.,anger
+608,I'm tired of web development suddenly stopped working.,anger
+609,I'm really angry because programming suddenly stopped working.,anger
+610,I'm getting really irritated because programming is not working even though I followed the instructions.,anger
+611,I'm upset because database keeps changing the output.,anger
+612,It's frustrating that database has a bug I cannot find.,anger
+613,I'm irritated because group project is not working even though I followed the instructions.,anger
+614,I'm getting really irritated because laboratory activity keeps rejecting my input.,anger
+615,I'm so annoyed because exams is taking forever to finish.,anger
+616,I'm upset because deployment is taking forever to finish.,anger
+617,I'm frustrated because UI design was changed without telling me.,anger
+618,Sobrang inis ko sa assignments.,anger
+619,I'm fed up because exams is preventing me from finishing my work.,anger
+620,I can't believe server setup keeps failing during testing.,anger
+621,Sobrang nakakafrustrate yung laboratory activity.,anger
+622,I'm upset because assignments keeps giving me the same error.,anger
+623,I'm so annoyed because system project keeps crashing.,anger
+624,This is making me angry because system project has a bug I cannot find.,anger
+625,It's frustrating that laboratory activity suddenly stopped working.,anger
+626,I'm tired of server setup is not working even though I followed the instructions.,anger
+627,I'm irritated because group project is taking forever to finish.,anger
+628,I'm so annoyed because deployment keeps showing an unexpected error.,anger
+629,I'm upset because deployment was changed without telling me.,anger
+630,I'm getting really irritated because documentation has a bug I cannot find.,anger
+631,Ang sakit sa ulo ng debugging.,anger
+632,I'm seriously annoyed because documentation suddenly stopped working.,anger
+633,I'm frustrated because debugging is preventing me from finishing my work.,anger
+634,I'm upset because mobile development is taking forever to finish.,anger
+635,I'm so annoyed because final project has a bug I cannot find.,anger
+636,It's frustrating that assignments was changed without telling me.,anger
+637,This is so annoying because software project keeps crashing.,anger
+638,I'm angry because server setup is causing unnecessary problems.,anger
+639,I'm getting really irritated because deployment was working yesterday but is broken today.,anger
+640,I'm fed up because research paper keeps crashing.,anger
+641,I'm really angry because final project suddenly stopped working.,anger
+642,It's frustrating that system project is causing unnecessary problems.,anger
+643,I'm getting angry because presentation was working yesterday but is broken today.,anger
+644,I'm seriously annoyed because programming is preventing me from finishing my work.,anger
+645,I'm seriously annoyed because school requirements is preventing me from finishing my work.,anger
+646,I'm so frustrated.,anger
+647,I can't believe debugging keeps giving me the same error.,anger
+648,This is making me angry because documentation keeps rejecting my input.,anger
+649,This is making me angry because programming is not working even though I followed the instructions.,anger
+650,I'm frustrated because UI design keeps failing during testing.,anger
+651,I'm tired of programming keeps giving me the same error.,anger
+652,This is making me angry because final project is not working even though I followed the instructions.,anger
+653,I'm really angry because software project is preventing me from finishing my work.,anger
+654,I'm frustrated because final project is causing unnecessary problems.,anger
+655,I'm tired of system project keeps giving me the same error.,anger
+656,I'm upset because group project is causing unnecessary problems.,anger
+657,I'm fed up because programming keeps crashing.,anger
+658,I'm getting really irritated because group project suddenly stopped working.,anger
+659,It's frustrating that deployment was working yesterday but is broken today.,anger
+660,I'm frustrated because mobile development keeps changing the output.,anger
+661,I'm tired of programming is causing unnecessary problems.,anger
+662,I'm upset because group project has a bug I cannot find.,anger
+663,I'm getting really irritated because software project is making me repeat the same work.,anger
+664,I'm irritated because database is causing unnecessary problems.,anger
+665,I'm so annoyed because mobile development keeps rejecting my input.,anger
+666,I'm frustrated because exams suddenly stopped working.,anger
+667,"Nakakainis yung programming, paulit-ulit na lang ang problema.",anger
+668,I can't believe networking activity was changed without telling me.,anger
+669,This is so annoying because server setup is making me repeat the same work.,anger
+670,I can't believe assignments is taking forever to finish.,anger
+671,I'm so annoyed because debugging keeps crashing.,anger
+672,This is making me angry because API integration keeps showing an unexpected error.,anger
+673,I'm tired of laboratory activity was changed without telling me.,anger
+674,I'm so annoyed because server setup has a bug I cannot find.,anger
+675,I'm so annoyed because API integration keeps showing an unexpected error.,anger
+676,Hindi ko na matiis itong final project.,anger
+677,I'm irritated because web development was changed without telling me.,anger
+678,I'm frustrated because laboratory activity keeps changing the output.,anger
+679,I'm angry because debugging is preventing me from finishing my work.,anger
+680,I'm getting really irritated because thesis keeps crashing.,anger
+681,I'm really angry because UI design has a bug I cannot find.,anger
+682,I'm getting really irritated because server setup keeps giving me the same error.,anger
+683,I'm getting really irritated because networking activity keeps giving me the same error.,anger
+684,I'm tired of software project suddenly stopped working.,anger
+685,I'm upset because programming was changed without telling me.,anger
+686,I'm fed up because presentation has a bug I cannot find.,anger
+687,I'm angry because my code was changed without my permission.,anger
+688,I'm angry because final project keeps showing an unexpected error.,anger
+689,Ang sakit sa ulo ng exams.,anger
+690,It's frustrating that server setup is preventing me from finishing my work.,anger
+691,I'm getting really irritated because exams was changed without telling me.,anger
+692,I'm seriously annoyed because software project is causing unnecessary problems.,anger
+693,I'm fed up because server setup is making me repeat the same work.,anger
+694,I'm frustrated because API integration is causing unnecessary problems.,anger
+695,I'm getting angry because presentation has a bug I cannot find.,anger
+696,I'm upset because deployment keeps failing during testing.,anger
+697,I'm angry because group project suddenly stopped working.,anger
+698,I'm fed up because mobile development suddenly stopped working.,anger
+699,It's frustrating that research paper keeps showing an unexpected error.,anger
+700,This is so annoying because debugging keeps rejecting my input.,anger
+701,I'm irritated because school requirements keeps failing during testing.,anger
+702,Bakit hindi gumagana itong presentation?,anger
+703,I'm angry because networking activity keeps crashing.,anger
+704,I'm tired of documentation keeps changing the output.,anger
+705,I'm getting really irritated because software project has a bug I cannot find.,anger
+706,I'm really angry because deployment suddenly stopped working.,anger
+707,This is so annoying because server setup has a bug I cannot find.,anger
+708,I'm so annoyed because software project keeps failing during testing.,anger
+709,I'm frustrated because server setup is taking forever to finish.,anger
+710,I'm irritated because API integration is making me repeat the same work.,anger
+711,This is so annoying because API integration is causing unnecessary problems.,anger
+712,I'm so annoyed because group project keeps changing the output.,anger
+713,It's frustrating that software project was working yesterday but is broken today.,anger
+714,It's frustrating that programming is preventing me from finishing my work.,anger
+715,I'm frustrated because software project is taking forever to finish.,anger
+716,I'm irritated because networking activity keeps giving me the same error.,anger
+717,This is making me angry because debugging is not working even though I followed the instructions.,anger
+718,I'm irritated because assignments was changed without telling me.,anger
+719,I'm seriously annoyed because assignments keeps showing an unexpected error.,anger
+720,I'm frustrated because web development is not working even though I followed the instructions.,anger
+721,I'm getting really irritated because debugging keeps giving me the same error.,anger
+722,I'm upset because documentation is making me repeat the same work.,anger
+723,I'm so annoyed because software project has a bug I cannot find.,anger
+724,I'm so annoyed because server setup is preventing me from finishing my work.,anger
+725,I'm getting really irritated because assignments was changed without telling me.,anger
+726,I'm fed up because software project keeps rejecting my input.,anger
+727,Nakakainis sobra yung API integration.,anger
+728,Sobrang nakakafrustrate yung research paper.,anger
+729,I'm tired of laboratory activity has a bug I cannot find.,anger
+730,I'm tired of coding suddenly stopped working.,anger
+731,I'm upset because API integration keeps giving me the same error.,anger
+732,I'm really angry because coding was changed without telling me.,anger
+733,This is so annoying because research paper keeps failing during testing.,anger
+734,I'm fed up because exams is making me repeat the same work.,anger
+735,This is so annoying because school requirements is causing unnecessary problems.,anger
+736,Frustrated na ako sa API integration.,anger
+737,This is so annoying because UI design suddenly stopped working.,anger
+738,This is making me angry because documentation is taking forever to finish.,anger
+739,I'm seriously annoyed because thesis keeps giving me the same error.,anger
+740,I'm angry because group project was changed without telling me.,anger
+741,I'm irritated because software project keeps crashing.,anger
+742,This is so annoying because web development keeps rejecting my input.,anger
+743,I'm getting angry because UI design has a bug I cannot find.,anger
+744,I'm so annoyed because laboratory activity is taking forever to finish.,anger
+745,I'm angry because presentation has a bug I cannot find.,anger
+746,I'm getting angry because final project is causing unnecessary problems.,anger
+747,I'm really angry because laboratory activity is causing unnecessary problems.,anger
+748,I'm upset because mobile development suddenly stopped working.,anger
+749,I'm angry because API integration keeps changing the output.,anger
+750,This is so annoying because API integration is preventing me from finishing my work.,anger
+751,It's frustrating that server setup keeps giving me the same error.,anger
+752,"Grabe, nakakainis itong mobile development.",anger
+753,I'm fed up because laboratory activity is causing unnecessary problems.,anger
+754,I'm angry because programming keeps failing during testing.,anger
+755,Sobrang nakakafrustrate yung UI design.,anger
+756,Hindi ko na matiis itong assignments.,anger
+757,I'm seriously annoyed because research paper keeps changing the output.,anger
+758,I'm getting angry because networking activity keeps giving me the same error.,anger
+759,I'm irritated because thesis keeps changing the output.,anger
+760,I'm getting really irritated because UI design was working yesterday but is broken today.,anger
+761,This is so annoying because research paper is causing unnecessary problems.,anger
+762,I'm frustrated because my groupmates are not responding to our messages.,anger
+763,I'm seriously annoyed because API integration is causing unnecessary problems.,anger
+764,I'm angry because UI design suddenly stopped working.,anger
+765,I'm upset because API integration keeps failing during testing.,anger
+766,I'm really angry because presentation was changed without telling me.,anger
+767,I'm fed up because school requirements keeps rejecting my input.,anger
+768,I can't believe mobile development keeps crashing.,anger
+769,I'm really angry because deployment is making me repeat the same work.,anger
+770,I'm fed up because assignments keeps showing an unexpected error.,anger
+771,I'm tired of networking activity was working yesterday but is broken today.,anger
+772,It's frustrating that networking activity is preventing me from finishing my work.,anger
+773,I'm frustrated because software project has a bug I cannot find.,anger
+774,This is making me angry because web development has a bug I cannot find.,anger
+775,I'm fed up because exams keeps changing the output.,anger
+776,I'm seriously annoyed because web development is making me repeat the same work.,anger
+777,I'm getting angry because database was working yesterday but is broken today.,anger
+778,I'm angry because thesis keeps changing the output.,anger
+779,I'm angry because system project is causing unnecessary problems.,anger
+780,I'm frustrated because server setup is preventing me from finishing my work.,anger
+781,This is so annoying because capstone was changed without telling me.,anger
+782,I'm really angry because capstone is taking forever to finish.,anger
+783,This is making me angry because database keeps changing the output.,anger
+784,I'm angry because UI design is not working even though I followed the instructions.,anger
+785,I'm irritated because exams is causing unnecessary problems.,anger
+786,Frustrated na ako sa programming.,anger
+787,I'm getting really irritated because research paper keeps rejecting my input.,anger
+788,I'm so annoyed because UI design keeps changing the output.,anger
+789,Sobrang nakakafrustrate yung capstone.,anger
+790,I'm frustrated because coding keeps failing during testing.,anger
+791,I'm fed up because debugging has a bug I cannot find.,anger
+792,I'm frustrated because school requirements was changed without telling me.,anger
+793,I'm seriously annoyed because debugging was working yesterday but is broken today.,anger
+794,I'm angry because my groupmate is not responding while the deadline is near.,anger
+795,I can't believe deployment keeps changing the output.,anger
+796,I'm frustrated because exams is making me repeat the same work.,anger
+797,It's frustrating that assignments is not working even though I followed the instructions.,anger
+798,I can't believe presentation keeps rejecting my input.,anger
+799,This is so annoying because networking activity is making me repeat the same work.,anger
+800,I'm frustrated because group project keeps showing an unexpected error.,anger
+801,I'm upset because server setup has a bug I cannot find.,anger
+802,I'm really angry because server setup is causing unnecessary problems.,anger
+803,I'm tired of school requirements is not working even though I followed the instructions.,anger
+804,I'm getting really irritated because capstone keeps showing an unexpected error.,anger
+805,Hindi ko na matiis itong programming.,anger
+806,I'm getting angry because presentation is making me repeat the same work.,anger
+807,I'm seriously annoyed because API integration is making me repeat the same work.,anger
+808,I'm tired of research paper keeps showing an unexpected error.,anger
+809,This is making me angry because capstone is causing unnecessary problems.,anger
+810,I'm irritated because UI design was working yesterday but is broken today.,anger
+811,I'm tired of assignments keeps changing the output.,anger
+812,I'm frustrated because assignments keeps crashing.,anger
+813,I'm getting angry because thesis keeps failing during testing.,anger
+814,This is so annoying because software project has a bug I cannot find.,anger
+815,I'm irritated because web development is not working even though I followed the instructions.,anger
+816,It's frustrating that coding keeps changing the output.,anger
+817,I'm irritated because capstone was working yesterday but is broken today.,anger
+818,I can't believe software project keeps changing the output.,anger
+819,I'm getting angry because school requirements is causing unnecessary problems.,anger
+820,I'm getting really irritated because coding suddenly stopped working.,anger
+821,I'm tired of server setup is taking forever to finish.,anger
+822,I'm irritated because deployment is taking forever to finish.,anger
+823,I'm getting really irritated because capstone was changed without telling me.,anger
+824,I'm really angry because debugging is making me repeat the same work.,anger
+825,I'm getting really irritated because final project keeps changing the output.,anger
+826,Hindi ko na matiis itong group project.,anger
+827,I'm really angry because thesis keeps showing an unexpected error.,anger
+828,I'm frustrated because API integration keeps crashing.,anger
+829,It's frustrating that programming was working yesterday but is broken today.,anger
+830,I'm getting really irritated because laboratory activity is making me repeat the same work.,anger
+831,I'm seriously annoyed because exams has a bug I cannot find.,anger
+832,I'm upset because programming keeps rejecting my input.,anger
+833,I'm seriously annoyed because thesis suddenly stopped working.,anger
+834,This is making me angry because software project is not working even though I followed the instructions.,anger
+835,I'm tired of programming was changed without telling me.,anger
+836,I can't believe capstone has a bug I cannot find.,anger
+837,I'm upset because coding keeps changing the output.,anger
+838,I'm getting really irritated because system project is causing unnecessary problems.,anger
+839,I'm tired of school requirements keeps failing during testing.,anger
+840,I'm so annoyed because school requirements keeps giving me the same error.,anger
+841,I can't believe capstone keeps rejecting my input.,anger
+842,This is so annoying because school requirements is not working even though I followed the instructions.,anger
+843,This is so annoying because programming keeps rejecting my input.,anger
+844,I'm so annoyed because deployment keeps rejecting my input.,anger
+845,This is making me angry because group project is preventing me from finishing my work.,anger
+846,This is so annoying because debugging keeps giving me the same error.,anger
+847,I'm getting angry because networking activity was working yesterday but is broken today.,anger
+848,This is so annoying because assignments keeps changing the output.,anger
+849,I'm frustrated because assignments is taking forever to finish.,anger
+850,It's frustrating that server setup has a bug I cannot find.,anger
+851,I'm seriously annoyed because system project is causing unnecessary problems.,anger
+852,I'm tired of group project keeps failing during testing.,anger
+853,I'm getting angry because documentation keeps rejecting my input.,anger
+854,I'm getting angry because group project was changed without telling me.,anger
+855,Ang sakit sa ulo ng group project.,anger
+856,I'm fed up because web development keeps changing the output.,anger
+857,I'm really angry because coding keeps giving me the same error.,anger
+858,I'm seriously annoyed because my groupmates keep making excuses.,anger
+859,I'm angry because UI design has a bug I cannot find.,anger
+860,I'm seriously annoyed because assignments keeps giving me the same error.,anger
+861,I'm frustrated because mobile development keeps crashing.,anger
+862,Nakakagalit talaga yung networking activity.,anger
+863,I'm really angry because API integration is taking forever to finish.,anger
+864,This is so annoying because group project was working yesterday but is broken today.,anger
+865,I'm getting angry because coding is not working even though I followed the instructions.,anger
+866,I'm so annoyed because coding is taking forever to finish.,anger
+867,I'm irritated because database keeps crashing.,anger
+868,I'm fed up because exams keeps showing an unexpected error.,anger
+869,I'm seriously annoyed because capstone is not working even though I followed the instructions.,anger
+870,I'm getting angry because coding was changed without telling me.,anger
+871,This is making me angry because school requirements keeps rejecting my input.,anger
+872,It's frustrating that database keeps crashing.,anger
+873,I can't believe my groupmate submitted incomplete work.,anger
+874,I'm angry because web development keeps failing during testing.,anger
+875,I'm getting angry because system project is causing unnecessary problems.,anger
+876,I'm frustrated because documentation keeps giving me the same error.,anger
+877,This is making me angry because final project was changed without telling me.,anger
+878,It's frustrating that database is not working even though I followed the instructions.,anger
+879,I'm getting angry because UI design was working yesterday but is broken today.,anger
+880,I'm irritated because UI design has a bug I cannot find.,anger
+881,I'm angry because assignments was changed without telling me.,anger
+882,This is making me angry because API integration was changed without telling me.,anger
+883,I'm so annoyed because server setup suddenly stopped working.,anger
+884,Sobrang nakakafrustrate yung networking activity.,anger
+885,It's frustrating that final project is making me repeat the same work.,anger
+886,It's frustrating that system project was working yesterday but is broken today.,anger
+887,This is so annoying because API integration was working yesterday but is broken today.,anger
+888,I'm fed up because assignments keeps crashing.,anger
+889,I'm tired of research paper is taking forever to finish.,anger
+890,I'm irritated because software project suddenly stopped working.,anger
+891,I'm irritated because coding keeps failing during testing.,anger
+892,I can't believe coding keeps showing an unexpected error.,anger
+893,I'm fed up because server setup is preventing me from finishing my work.,anger
+894,I'm really angry because deployment is not working even though I followed the instructions.,anger
+895,This is so annoying because mobile development suddenly stopped working.,anger
+896,I'm angry because programming is causing unnecessary problems.,anger
+897,I can't believe final project is taking forever to finish.,anger
+898,It's frustrating that research paper was changed without telling me.,anger
+899,I'm getting really irritated because final project was changed without telling me.,anger
+900,I'm upset because system project keeps showing an unexpected error.,anger
+901,I'm fed up because documentation is not working even though I followed the instructions.,anger
+902,It's frustrating that debugging was working yesterday but is broken today.,anger
+903,I can't believe research paper keeps rejecting my input.,anger
+904,Bakit hindi gumagana itong deployment?,anger
+905,I'm really angry because laboratory activity is taking forever to finish.,anger
+906,I'm frustrated because thesis was changed without telling me.,anger
+907,I'm so annoyed because UI design keeps rejecting my input.,anger
+908,I'm upset because exams keeps giving me the same error.,anger
+909,I'm tired of debugging keeps rejecting my input.,anger
+910,I'm frustrated because deployment keeps rejecting my input.,anger
+911,I'm getting really irritated because networking activity is preventing me from finishing my work.,anger
+912,I'm frustrated because coding keeps crashing.,anger
+913,This is making me angry because debugging is making me repeat the same work.,anger
+914,I'm really angry because thesis keeps giving me the same error.,anger
+915,This is making me angry because networking activity is not working even though I followed the instructions.,anger
+916,I'm getting really irritated because system project has a bug I cannot find.,anger
+917,I'm irritated because I am doing most of the work.,anger
+918,I'm frustrated because server setup was changed without telling me.,anger
+919,I'm seriously annoyed because software project suddenly stopped working.,anger
+920,I can't believe mobile development is making me repeat the same work.,anger
+921,It's frustrating that final project keeps giving me the same error.,anger
+922,I can't believe documentation has a bug I cannot find.,anger
+923,I'm seriously annoyed because deployment keeps failing during testing.,anger
+924,I'm fed up because software project keeps giving me the same error.,anger
+925,It's frustrating that networking activity keeps showing an unexpected error.,anger
+926,I'm tired of API integration is causing unnecessary problems.,anger
+927,I'm getting angry because mobile development suddenly stopped working.,anger
+928,I'm frustrated because coding keeps changing the output.,anger
+929,This is so annoying because database was working yesterday but is broken today.,anger
+930,Bakit hindi gumagana itong software project?,anger
+931,I'm irritated because database keeps failing during testing.,anger
+932,I'm fed up because documentation keeps rejecting my input.,anger
+933,I'm angry because UI design was working yesterday but is broken today.,anger
+934,I'm frustrated because debugging was changed without telling me.,anger
+935,It's frustrating that capstone is preventing me from finishing my work.,anger
+936,This is making me angry because database was working yesterday but is broken today.,anger
+937,Nakakagalit talaga yung school requirements.,anger
+938,Ang sakit sa ulo ng software project.,anger
+939,I'm getting angry because capstone is preventing me from finishing my work.,anger
+940,This is so annoying because software project is making me repeat the same work.,anger
+941,Bakit hindi gumagana itong laboratory activity?,anger
+942,I'm upset because API integration keeps rejecting my input.,anger
+943,I'm really angry because debugging is taking forever to finish.,anger
+944,I'm frustrated because the documentation keeps coming back for revisions.,anger
+945,I'm upset because networking activity has a bug I cannot find.,anger
+946,Bakit hindi gumagana itong capstone?,anger
+947,I'm angry because server setup is preventing me from finishing my work.,anger
+948,I'm angry because group project is taking forever to finish.,anger
+949,I'm tired of school requirements is causing unnecessary problems.,anger
+950,It's frustrating that documentation is taking forever to finish.,anger
+951,I'm getting really irritated because programming is taking forever to finish.,anger
+952,I'm getting really irritated because web development is taking forever to finish.,anger
+953,I'm seriously annoyed because server setup keeps crashing.,anger
+954,I'm fed up because software project keeps crashing.,anger
+955,This is so annoying because research paper is taking forever to finish.,anger
+956,"Nakakainis yung laboratory activity, paulit-ulit na lang ang problema.",anger
+957,I can't believe thesis is preventing me from finishing my work.,anger
+958,It's frustrating that database keeps failing during testing.,anger
+959,This is so annoying because database has a bug I cannot find.,anger
+960,This is making me angry because group project keeps crashing.,anger
+961,I'm angry because research paper was working yesterday but is broken today.,anger
+962,This is so annoying because final project is preventing me from finishing my work.,anger
+963,This is making me angry because mobile development keeps showing an unexpected error.,anger
+964,I'm getting angry because exams suddenly stopped working.,anger
+965,This is making me angry because API integration keeps changing the output.,anger
+966,I'm irritated because capstone keeps giving me the same error.,anger
+967,I'm irritated because database is preventing me from finishing my work.,anger
+968,I can't believe database suddenly stopped working.,anger
+969,I'm so annoyed because coding keeps rejecting my input.,anger
+970,I'm so annoyed because school requirements keeps crashing.,anger
+971,This is so annoying because laboratory activity keeps crashing.,anger
+972,I'm fed up because mobile development was changed without telling me.,anger
+973,I'm getting really irritated because API integration keeps changing the output.,anger
+974,I'm getting angry because exams is causing unnecessary problems.,anger
+975,It's frustrating that web development keeps rejecting my input.,anger
+976,I'm irritated because networking activity has a bug I cannot find.,anger
+977,I'm getting really irritated because mobile development is taking forever to finish.,anger
+978,I'm angry because exams keeps changing the output.,anger
+979,This is so annoying because system project suddenly stopped working.,anger
+980,I'm upset because programming is taking forever to finish.,anger
+981,I can't believe server setup suddenly stopped working.,anger
+982,This is making me angry because final project has a bug I cannot find.,anger
+983,I'm so annoyed because thesis keeps giving me the same error.,anger
+984,I'm so annoyed because assignments keeps showing an unexpected error.,anger
+985,It's frustrating that programming is causing unnecessary problems.,anger
+986,I'm getting angry because thesis keeps showing an unexpected error.,anger
+987,It's frustrating that server setup keeps crashing.,anger
+988,It's frustrating that mobile development keeps crashing.,anger
+989,I'm getting angry because exams was changed without telling me.,anger
+990,I'm frustrated because database is making me repeat the same work.,anger
+991,I'm getting really irritated because documentation keeps changing the output.,anger
+992,I'm getting angry because deployment keeps showing an unexpected error.,anger
+993,I'm angry because group project is not working even though I followed the instructions.,anger
+994,I'm irritated because server setup was changed without telling me.,anger
+995,I'm upset because networking activity suddenly stopped working.,anger
+996,I'm getting really irritated because exams is preventing me from finishing my work.,anger
+997,I'm seriously annoyed because web development keeps crashing.,anger
+998,I'm really angry because presentation keeps changing the output.,anger
+999,I'm seriously annoyed because exams was working yesterday but is broken today.,anger
+1000,This is making me angry because web development was working yesterday but is broken today.,anger
