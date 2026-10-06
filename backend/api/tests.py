@@ -4123,6 +4123,119 @@ class EmotionTrackPoolTests(TestCase):
         self.assertEqual(refresh_result['stored'], 10)
         self.assertEqual(len(EmotionTrackPool.objects.get(emotion='calm').tracks), 10)
 
+    def _named(self, track_id, name, artist):
+        return {
+            'id': track_id, 'item_type': 'track', 'name': name, 'artist': artist, 'album': 'A',
+            'spotify_url': f'https://open.spotify.com/track/{track_id}', 'uri': f'spotify:track:{track_id}',
+            'recommendation_source': 'spotify_catalog',
+        }
+
+    def test_pools_drop_non_music_and_repeat_versions_on_read(self):
+        """QA 2026-10-06: pools held "- Commentary" tracks and three takes of one song.
+
+        Cleaned on read, so pools stored before the rule need no Spotify refresh.
+        """
+        self._create_pool('stressed', [
+            self._named('t1', 'Shake It Off', 'Taylor Swift'),
+            self._named('t2', 'Shake It Off - Commentary', 'Taylor Swift'),
+            self._named('t3', 'Choker / Stressed Out / Migraine - Livestream Version', 'Twenty One Pilots'),
+            self._named('t4', 'the cure - performance video', 'Olivia Rodrigo'),
+            self._named('t5', 'Black', 'Pearl Jam'),
+            self._named('t6', "Black - Brendan O'Brien Mix", 'Pearl Jam'),
+            self._named('t7', 'Black - Kaufman Astoria Studios - MTV Unplugged - New York, NY 3/16/1992', 'Pearl Jam'),
+            self._named('t8', 'Ikaw - (2024 Remastered Version)', 'Yeng Constantino'),
+            self._named('t9', 'Ikaw', 'Yeng Constantino'),
+            self._named('t10', 'Lover (Remix) [feat. Shawn Mendes]', 'Taylor Swift'),
+            self._named('t11', 'Lover', 'Taylor Swift'),
+            # Different songs that merely share a title stay.
+            self._named('t12', 'Bittersweet', 'Madison Beer'),
+            self._named('t13', 'Bittersweet', 'Matilda Mann'),
+        ])
+
+        names = [track['name'] for track in pool.read_pool('stressed')['tracks']]
+
+        self.assertEqual(names, [
+            'Shake It Off', 'Black', 'Ikaw - (2024 Remastered Version)',
+            'Lover (Remix) [feat. Shawn Mendes]', 'Bittersweet', 'Bittersweet',
+        ])
+
+    def test_live_search_results_skip_non_music_tracks(self):
+        search_mock = Mock(return_value={'ok': True, 'items': [
+            self._named('c1', 'Look What You Made Me Do - Commentary', 'Taylor Swift'),
+            self._named('m1', 'Calm Waters', 'Quiet Band'),
+        ]})
+        with patch.object(
+            spotify_service, '_get_catalog_token_candidates', return_value=([('client', 'client-token')], []),
+        ):
+            with patch.object(spotify_service, 'search_tracks_detailed', search_mock):
+                with patch.object(
+                    spotify_service, '_filter_tracks_for_query', side_effect=lambda query, items, **kwargs: items,
+                ):
+                    result = spotify_service.build_emotion_pool('calm', target_size=10)
+
+        names = {track['name'] for track in result['tracks']}
+        self.assertIn('Calm Waters', names)
+        self.assertNotIn('Look What You Made Me Do - Commentary', names)
+
+    def _refresh_with_a_429_after_the_first_query(self, emotion, *, first_query_tracks):
+        """First search answers, every later one is rate-limited (a 429 storm)."""
+        rate_limited = {
+            'ok': False, 'items': [], 'status_code': 429, 'reason': 'rate_limited',
+            'error': 'rate limited', 'retry_after': 30,
+        }
+        search_mock = Mock(side_effect=[{'ok': True, 'items': first_query_tracks}] + [rate_limited] * 50)
+        with patch.object(
+            spotify_service,
+            '_get_catalog_token_candidates',
+            return_value=([('client', 'client-token')], []),
+        ):
+            with patch.object(spotify_service, 'search_tracks_detailed', search_mock):
+                # The first queries are seed-track searches that drop anything
+                # whose title doesn't match; this is about storage, not relevance.
+                with patch.object(
+                    spotify_service,
+                    '_filter_tracks_for_query',
+                    side_effect=lambda query, items, **kwargs: items,
+                ):
+                    return spotify_service.refresh_emotion_pool(emotion, target_size=100)
+
+    def test_a_rate_limited_refresh_never_shrinks_a_live_pool(self):
+        """QA 2026-10-06: a refresh during the 429 storm left "happy" with one track."""
+        self._create_pool('happy', self._pool_tracks(25), age_seconds=8 * 60 * 60)
+
+        result = self._refresh_with_a_429_after_the_first_query(
+            'happy', first_query_tracks=self._pool_tracks(1, prefix='espresso'),
+        )
+
+        self.assertTrue(result['partial'])
+        self.assertEqual(result['stored'], 0)
+        # Lets the refresh command wait out Retry-After and try again.
+        self.assertEqual(result['reason'], 'rate_limited')
+        self.assertEqual(len(EmotionTrackPool.objects.get(emotion='happy').tracks), 25)
+
+    def test_a_rate_limited_refresh_still_fills_an_empty_pool(self):
+        result = self._refresh_with_a_429_after_the_first_query(
+            'calm', first_query_tracks=self._pool_tracks(3, prefix='partial'),
+        )
+
+        self.assertEqual(result['stored'], 3)
+        self.assertEqual(len(EmotionTrackPool.objects.get(emotion='calm').tracks), 3)
+
+    def test_a_clean_refresh_still_rotates_a_bigger_pool(self):
+        self._create_pool('calm', self._pool_tracks(40), age_seconds=8 * 60 * 60)
+        search_mock = Mock(return_value={'ok': True, 'items': self._pool_tracks(10, prefix='rotated')})
+
+        with patch.object(
+            spotify_service,
+            '_get_catalog_token_candidates',
+            return_value=([('client', 'client-token')], []),
+        ):
+            with patch.object(spotify_service, 'search_tracks_detailed', search_mock):
+                result = spotify_service.refresh_emotion_pool('calm', target_size=10)
+
+        self.assertFalse(result['partial'])
+        self.assertEqual(result['stored'], 10)
+
     def test_refresh_emotion_pool_reports_missing_tokens_without_storing(self):
         with patch.object(
             spotify_service,

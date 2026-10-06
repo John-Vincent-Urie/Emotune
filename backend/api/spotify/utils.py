@@ -402,14 +402,36 @@ def _canonical_track_title(value):
     if not title:
         return ''
     title = re.sub(r'\s*\([^)]*\)', '', title)
+    title = re.sub(r'\s*\[[^\]]*\]', '', title)
+    # Everything after " - " that names a version of the same recording. The
+    # later words (mix, unplugged, recorded at, spotify singles, stripped, a
+    # cappella, soundtrack, studio, tour) let pools stop holding "Black",
+    # "Black - Brendan O'Brien Mix" and "Black - ... MTV Unplugged" side by side.
     title = re.sub(
-        r'\s*-\s*.*(?:live|acoustic|remix|edit|version|remaster(?:ed)?|anniversary|sped up|slowed(?: down)?|instrumental|karaoke|from ).*',
+        r'\s*-\s*.*(?:live|acoustic|remix|edit|version|remaster(?:ed)?|anniversary|sped up|slowed(?: down)?|'
+        r'instrumental|karaoke|from |mix|unplugged|recorded at|spotify singles|spotify sessions|session|'
+        r'stripped|a cappella|acapella|soundtrack|studio|tour|demo).*',
         '',
         title,
     )
     title = re.sub(r'\s+part\s+\d+\b', '', title)
+    title = re.sub(r'\s*-\s*$', '', title)  # "Ikaw - (2024 Remastered Version)" left "ikaw -"
     title = re.sub(r'\s+', ' ', title).strip()
     return title
+
+
+# Spotify search also returns spoken or video companion tracks ("Shake It Off -
+# Commentary", "Choker / ... - Livestream Version", "the cure - performance
+# video"). They are not songs to play someone in a mood.
+_NON_MUSIC_TITLE = re.compile(
+    r'\b(?:commentary|interview|podcast|reaction|livestream|live stream|performance video|music video|'
+    r'behind the scenes|track by track|voice memo)\b',
+    re.IGNORECASE,
+)
+
+
+def _is_non_music_track(track):
+    return isinstance(track, dict) and bool(_NON_MUSIC_TITLE.search(str(track.get('name') or '')))
 
 def _unique_text_values(values):
     unique_values = []

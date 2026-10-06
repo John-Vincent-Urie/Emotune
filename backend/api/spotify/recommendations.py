@@ -21,6 +21,7 @@ from .utils import (
     _safe_int,
     _taste_discovery_bonus,
     _taste_instrumental_bonus,
+    _is_non_music_track,
     _track_match_key,
     _unique_text_values,
 )
@@ -1386,6 +1387,8 @@ class SpotifyRecommendationEngine:
             result['queries_tried'].append(query)
 
             for track in tracks:
+                if _is_non_music_track(track):
+                    continue
                 track_id = track.get('id')
                 track_match_key = _track_match_key(track)
                 if (
@@ -1816,6 +1819,9 @@ class SpotifyRecommendationEngine:
             'token_failures': [],
             'reason': None,
             'retry_after': None,
+            # True when some queries failed (a 429 mid-run, say): the tracks are
+            # whatever got through, not a full refresh.
+            'partial': False,
         }
 
         resolved_target_size = max(int(target_size or pool.target_size()), 1)
@@ -1846,7 +1852,8 @@ class SpotifyRecommendationEngine:
 
         result['tracks'] = pooled_tracks
         result['ok'] = bool(pooled_tracks)
-        if not pooled_tracks:
+        result['partial'] = bool(pooled_tracks and result['spotify_errors'])
+        if not pooled_tracks or result['partial']:
             first_error = (
                 result['spotify_errors'][0] if result['spotify_errors'] else {}
             )
@@ -1864,7 +1871,15 @@ class SpotifyRecommendationEngine:
         return result
 
     def refresh_emotion_pool(self, emotion, *, target_size=None, time_budget_seconds=None):
-        """Build the shared candidate pool for one emotion and store it."""
+        """Build the shared candidate pool for one emotion and store it.
+
+        Only a clean build may replace the pool outright. A partial one (some
+        queries failed, typically to a 429) goes through the normal size check,
+        so it can fill an empty or expired pool but never shrink a live one: a
+        refresh during the 2026-10-05 rate-limit storm left "happy" with one
+        track. With nothing stored, the refresh command retries after the
+        Retry-After it reports.
+        """
         refresh_result = self.build_emotion_pool(
             emotion,
             target_size=target_size,
@@ -1875,7 +1890,7 @@ class SpotifyRecommendationEngine:
                 refresh_result['emotion'],
                 refresh_result['tracks'],
                 refresh_result['queries_tried'],
-                force=True,
+                force=not refresh_result['partial'],
             )
             if refresh_result['ok']
             else 0

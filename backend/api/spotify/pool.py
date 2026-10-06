@@ -27,7 +27,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from .constants import EMOTION_QUERY_PROFILES
-from .utils import _track_match_key
+from .utils import _is_non_music_track, _track_match_key
 
 logger = logging.getLogger('api.spotify_service')
 
@@ -115,7 +115,7 @@ def read_pool(emotion):
     if pool is None:
         return None
 
-    tracks = [track for track in (pool.tracks or []) if isinstance(track, dict) and track.get('id')]
+    tracks = clean_tracks(pool.tracks)
     if not tracks:
         return None
 
@@ -137,6 +137,29 @@ def read_pool(emotion):
         'queries_used': list(pool.queries_used or []),
         'refreshed_at': pool.refreshed_at,
     }
+
+
+def clean_tracks(tracks):
+    """Playable songs only, one version of each.
+
+    Applied when a pool is read as well as when it is stored, so pools built
+    before these rules (with "- Commentary" tracks and three takes of the same
+    song) are cleaned without spending Spotify quota on a refresh.
+    """
+    cleaned = []
+    seen_track_ids = set()
+    seen_match_keys = set()
+    for track in tracks or []:
+        if not isinstance(track, dict) or not track.get('id') or _is_non_music_track(track):
+            continue
+        match_key = _track_match_key(track)
+        if track['id'] in seen_track_ids or (match_key and match_key in seen_match_keys):
+            continue
+        seen_track_ids.add(track['id'])
+        if match_key:
+            seen_match_keys.add(match_key)
+        cleaned.append(track)
+    return cleaned
 
 
 def sample_tracks(pool_tracks, *, limit, seen_track_ids=None, seen_track_match_keys=None):
@@ -196,14 +219,7 @@ def store_pool(emotion, tracks, queries_used=None, *, force=False):
 
     normalized_emotion = normalize_emotion(emotion)
     stored_tracks = []
-    seen_track_ids = set()
-    for track in tracks or []:
-        if not isinstance(track, dict):
-            continue
-        track_id = track.get('id')
-        if not track_id or track_id in seen_track_ids:
-            continue
-        seen_track_ids.add(track_id)
+    for track in clean_tracks(tracks):
         # `pool_cached` is stamped on read, not stored, so a pool refreshed
         # from a previous pool's tracks cannot accumulate the flag.
         stored_tracks.append({key: value for key, value in track.items() if key != 'pool_cached'})
