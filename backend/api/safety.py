@@ -264,7 +264,7 @@ _CRISIS_COMPOSED = [
     # passive ideation
     r"\b(?:wish|rather|better off|might as well) {_gap}(?:be |been |was |were )?dead\b".replace("{_gap}", _gap(3)),
     r"\bbetter off without me\b",
-    r"\b(?:dont|do not|dont really|never) want to (?:live|be alive|exist|wake up|be here anymore|be here na|be around anymore)\b",
+    r"\b(?:dont|do not|dont really|never|doesnt|does not|doesnt really|didnt) want to (?:live|be alive|exist|wake up|be here anymore|be here na|be around anymore)\b",
     r"\bnever wake up\b(?! early| late)",
     rf"\b(?:better|happier|easier|fine|okay|ok|lighter|good)(?: off)? {_gap(4)}if i (?:was|were|am) "
     r"(?:gone|dead|not here|not around|not alive|never born)\b",
@@ -317,6 +317,8 @@ _CRISIS_COMPOSED = [
     # Tagalog / Taglish
     r"\bpakamatay\b|\bmagpakamatay\b|\bmagpapakamatay\b|\bnagpakamatay\b",
     r"\b(?:ayoko|hindi ko gusto|di ko gusto|hindi ko na gusto|di ko na gusto) {g}mabuhay\b".replace("{g}", _gap(3)),
+    # Someone else's words: "ayaw na niyang mabuhay" (they don't want to live anymore).
+    r"\bayaw (?:na |nang )?(?:niyang|nyang|niya|nya|nilang|nila) {g}mabuhay\b".replace("{g}", _gap(2)),
     r"\bpagod na (?:ako|ko|akong|kong) (?:pag ?)?mabuhay\b",
     rf"\bwala(?:ng)? {_gap(3)}(?:gana|ganang|dahilan|rason|reason|point|motibasyon|saysay) {_gap(2)}"
     r"(?:mabuhay|mag ?live|magpatuloy|sa buhay)\b",
@@ -525,19 +527,48 @@ _CONCERN_COMPOSED = [
     r"\bi (?:just )?want out\b(?! of)",
     r"\bforget (?:that )?i (?:ever )?existed\b",
     r"\b(?:sumuko|suko na (?:ako|ko)) sa buhay\b",
-    # Someone else at risk ("my friend wants to kill herself, what do I do").
-    # Resources help either way; whether this should be the crisis tier is the
-    # owner's call (raised 2026-10-05).
+    # Someone else at risk ("my friend wants to kill herself") is appended from
+    # _SOMEONE_ELSE below: the concern tier, music plus the hotline list, which
+    # the owner decided on 2026-10-06 must reach these users.
+]
+
+# Risk language about another person ("my friend wants to kill herself, what
+# do I do"). It decides `support_subject`, i.e. which words the app shows; the
+# tier still comes from the checks above, and this list also counts as concern.
+_SOMEONE_ELSE = [
     r"\b(?:wants?|wanted|trying|tried|going|plans?|planning|thinking (?:about|of)) (?:to )?(?:[^\s|]+ )?"
     r"(?:kill|hurt|harm|cut|end) (?:herself|himself|themselves|her life|his life|their life|their own life)\b",
-    r"\b(?:gusto|balak) (?:niyang|nyang|niya|nya|nilang) (?:na )?(?:mamatay|magpakamatay)\b",
+    r"\b(?:gusto|balak)(?: na)? (?:niyang|nyang|niya|nya|nilang) (?:na )?(?:mamatay|magpakamatay)\b",
+    rf"\b(?:my|our|si|ang|yung|kaibigan ko|kapatid ko) {_gap(1)}(?:friend|best friend|bestfriend|bff|brother|sister|mom|"
+    rf"mother|dad|father|cousin|classmate|roommate|girlfriend|boyfriend|partner|son|daughter|kaibigan|kapatid|kuya|"
+    rf"ate|nanay|tatay|pinsan)\b {_gap(6)}(?:suicidal|suicide|kill (?:herself|himself|themselves)|self harm|cutting|"
+    r"hurting (?:herself|himself|themselves)|magpakamatay|mamatay)\b",
 ]
+_CONCERN_COMPOSED += _SOMEONE_ELSE
 _CONCERN_COMPOSED_PATTERN = _any(_CONCERN_COMPOSED)
+_SOMEONE_ELSE_PATTERN = _any(_SOMEONE_ELSE)
+
+SUPPORT_SUBJECT_SELF = "self"
+SUPPORT_SUBJECT_SOMEONE_ELSE = "someone_else"
 
 # The model alone only raises a concern when it is confident: a low-confidence
 # "depressing" is as likely to be a sad song request as a person in trouble.
 _CONCERN_EMOTIONS = {"depressing"}
 _CONCERN_CONFIDENCE_BANDS = {"high"}
+
+SOMEONE_ELSE_CHECK_IN_MESSAGE = (
+    "It sounds like you're worried about someone you care about. If they might be in "
+    "danger right now, call emergency services and stay with them if you can. You don't "
+    "have to handle this alone -- the people below can help you work out how to support "
+    "them, and you deserve support too."
+)
+
+SOMEONE_ELSE_CRISIS_MESSAGE = (
+    "It sounds like someone you care about may be in danger. If they might act on it "
+    "soon, call your local emergency number now and stay with them if you can. A crisis "
+    "line can also talk you through what to say and do -- you don't have to handle this "
+    "alone, and what you're carrying matters too."
+)
 
 CONCERN_CHECK_IN_MESSAGE = (
     "It sounds like things have been really heavy lately. Music can help, but you "
@@ -624,6 +655,70 @@ def assess_concern(text: str, result: dict | None = None) -> str | None:
         if emotion in _CONCERN_EMOTIONS and band in _CONCERN_CONFIDENCE_BANDS:
             return "model"
     return None
+
+
+# Who a clause is about. From a mention of another person ("my sister", "she")
+# to the end of the clause is about them -- "my sister says she's going to jump
+# off a bridge tonight" -- unless the user turns to themselves on the way
+# ("my friend is suicidal and honestly I want to die too").
+_OTHER_PERSON = re.compile(
+    r"\b(?:(?:my|our|si|ni|kay|ang|yung|kaibigan ko|kapatid ko) (?:[^\s|]+ )?(?:friend|best friend|bestfriend|bff|"
+    r"brother|sister|mom|mum|mother|dad|father|parent|cousin|classmate|roommate|girlfriend|boyfriend|bf|gf|"
+    r"partner|son|daughter|kid|wife|husband|aunt|uncle|grandma|grandpa|coworker|officemate|groupmate|"
+    r"kaibigan|kapatid|kuya|ate|nanay|tatay|mama|papa|pinsan|anak|asawa|tita|tito|lola|lolo|jowa)|"
+    r"(?:kaibigan|kapatid|kuya|ate|nanay|tatay|mama|papa|pinsan|anak|asawa|tita|tito|lola|lolo|jowa) (?:ko|namin|natin)|"
+    r"someone i know|a friend|(?:she|he|they|siya|sya|niya|niyang|nya|nyang|nila|nilang))\b"
+)
+_TURN_TO_SELF = re.compile(
+    r"\b(?:and|but|so|also|tapos|pero|at)\b (?:[^\s|]+ ){0,2}(?:i|im|ive|id|ill|ako|me too|so am i)\b"
+)
+# "my friend told me to kill myself": the risk is still the user's.
+_ABOUT_MYSELF = re.compile(r"\b(?:myself|sarili ko|my life|my own life)\b")
+
+
+def _sounds_at_risk(norm: str) -> bool:
+    return bool(
+        _CRISIS_PATTERN.search(norm)
+        or _COMPOSED_PATTERN.search(norm)
+        or _METHOD_PATTERN.search(norm)
+        or _FAREWELL_PATTERN.search(norm)
+        or _CONCERN_PATTERN.search(norm)
+        or _CONCERN_COMPOSED_PATTERN.search(norm)
+    )
+
+
+def support_subject(text: str) -> str:
+    """Whether risk language in `text` is about the user or about someone else.
+
+    Only wording depends on this; the tier comes from the checks above. It is
+    "someone_else" when the risk sits in clauses about another person and
+    nothing the user says about themselves sounds at risk.
+    """
+    if not text:
+        return SUPPORT_SUBJECT_SELF
+    norm = normalize_for_safety(text)
+    if not (_OTHER_PERSON.search(norm) or _SOMEONE_ELSE_PATTERN.search(norm)):
+        return SUPPORT_SUBJECT_SELF
+
+    own_words = []
+    for clause in norm.split("|"):
+        mention = _OTHER_PERSON.search(clause)
+        if not mention:
+            own_words.append(clause)
+            continue
+        about_them = clause[mention.start():]
+        if _ABOUT_MYSELF.search(about_them):
+            own_words.append(clause)
+            continue
+        turn = _TURN_TO_SELF.search(about_them)
+        own_words.append(clause[:mention.start()] + (about_them[turn.start():] if turn else ""))
+    own_text = _SOMEONE_ELSE_PATTERN.sub(" | ", " | ".join(own_words))
+
+    if _sounds_at_risk(own_text):
+        return SUPPORT_SUBJECT_SELF
+    if _sounds_at_risk(norm):
+        return SUPPORT_SUBJECT_SOMEONE_ELSE
+    return SUPPORT_SUBJECT_SELF
 
 
 def build_crisis_support_message() -> str:

@@ -51,12 +51,16 @@ from users.serializers import PromptHistorySerializer
 from .models import SupportEvent, SupportResource
 from .safety import (
     CONCERN_CHECK_IN_MESSAGE,
+    SOMEONE_ELSE_CHECK_IN_MESSAGE,
+    SOMEONE_ELSE_CRISIS_MESSAGE,
+    SUPPORT_SUBJECT_SOMEONE_ELSE,
     RISK_CONCERN,
     RISK_CRISIS,
     assess_concern,
     SEVERITY_CRISIS,
     assess_crisis_severity,
     build_crisis_support_message,
+    support_subject,
 )
 
 User = get_user_model()
@@ -115,18 +119,28 @@ def _record_support_event(level, trigger, source):
         logger.exception("Could not record support event")
 
 
-def _attach_concern_check_in(payload, trigger):
-    """Mark a normal (music-bearing) payload with the gentle check-in tier."""
+def _attach_concern_check_in(payload, trigger, subject):
+    """Mark a normal (music-bearing) payload with the gentle check-in tier.
+
+    `support_about` says who the worry is about ("self" or "someone_else"), so
+    the app can word the card; the hotline list goes out either way.
+    """
     payload['risk_level'] = RISK_CONCERN
+    payload['support_about'] = subject
     payload['support_check_in'] = {
-        'message': CONCERN_CHECK_IN_MESSAGE,
+        'message': (
+            SOMEONE_ELSE_CHECK_IN_MESSAGE
+            if subject == SUPPORT_SUBJECT_SOMEONE_ELSE
+            else CONCERN_CHECK_IN_MESSAGE
+        ),
         'trigger': trigger,
+        'about': subject,
         'resources': _support_resources_payload(),
     }
     return payload
 
 
-def _build_crisis_response_payload(severity=SEVERITY_CRISIS):
+def _build_crisis_response_payload(severity=SEVERITY_CRISIS, subject='self'):
     """Short-circuit payload for text matching `safety.assess_crisis_severity`.
 
     `crisis_severity` is "imminent" when the text names a plan, method or time
@@ -143,6 +157,7 @@ def _build_crisis_response_payload(severity=SEVERITY_CRISIS):
         'crisis': True,
         'risk_level': RISK_CRISIS,
         'crisis_severity': severity,
+        'support_about': subject,
         'support_resources': _support_resources_payload(),
         'emotion': 'mixed',
         'confidence': 0.0,
@@ -166,7 +181,11 @@ def _build_crisis_response_payload(severity=SEVERITY_CRISIS):
         'prediction_fallback_used': False,
         'prediction_fallback_reason': None,
         'needs_review': True,
-        'ai_response': build_crisis_support_message(),
+        'ai_response': (
+            SOMEONE_ELSE_CRISIS_MESSAGE
+            if subject == SUPPORT_SUBJECT_SOMEONE_ELSE
+            else build_crisis_support_message()
+        ),
         'tracks': [],
         'selected_track': None,
         'selected_track_source': None,
@@ -1427,7 +1446,7 @@ def analyze_emotion(request):
             request.user.id if request.user.is_authenticated else None,
         )
         _record_support_event(RISK_CRISIS, 'phrase', 'analyze_emotion')
-        return Response(_build_crisis_response_payload(severity))
+        return Response(_build_crisis_response_payload(severity, support_subject(text)))
 
     outcome_mode = _request_outcome_mode(request)
     session_length_minutes = _request_session_length_minutes(request)
@@ -1456,7 +1475,7 @@ def analyze_emotion(request):
     concern_trigger = assess_concern(text, result)
     if concern_trigger:
         _record_support_event(RISK_CONCERN, concern_trigger, 'analyze_emotion')
-        _attach_concern_check_in(payload, concern_trigger)
+        _attach_concern_check_in(payload, concern_trigger, support_subject(text))
     return Response(payload)
 
 
@@ -1484,7 +1503,7 @@ def recommend_by_emotion(request):
             request.user.id if request.user.is_authenticated else None,
         )
         _record_support_event(RISK_CRISIS, 'phrase', 'recommend_by_emotion')
-        return Response(_build_crisis_response_payload(severity))
+        return Response(_build_crisis_response_payload(severity, support_subject(raw_text)))
 
     text = raw_text or f'Play songs for a {emotion} mood.'
     outcome_mode = _request_outcome_mode(request)
@@ -1519,7 +1538,7 @@ def recommend_by_emotion(request):
     concern_trigger = assess_concern(raw_text)
     if concern_trigger:
         _record_support_event(RISK_CONCERN, concern_trigger, 'recommend_by_emotion')
-        _attach_concern_check_in(payload, concern_trigger)
+        _attach_concern_check_in(payload, concern_trigger, support_subject(raw_text))
     return Response(payload)
 
 

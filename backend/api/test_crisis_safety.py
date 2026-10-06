@@ -16,6 +16,7 @@ from api.safety import (
     assess_concern,
     assess_crisis_risk,
     assess_crisis_severity,
+    support_subject,
 )
 from users.models import PromptHistory
 
@@ -229,6 +230,44 @@ def _prediction(emotion, band):
     }
 
 
+class SupportSubjectTests(TestCase):
+    def test_about_someone_else_only_when_nothing_else_is_about_the_user(self):
+        cases = {
+            'my best friend told me she wants to kill herself, what do I do': 'someone_else',
+            'my sister is suicidal and I am scared for her': 'someone_else',
+            'gusto niyang magpakamatay, ano gagawin ko': 'someone_else',
+            'my friend is suicidal and honestly I want to die too': 'self',
+            # QA 2026-10-07: when the crisis rules fire on someone else's
+            # danger, the helper needs the "stay with them, call 911" words.
+            "my sister just texted me goodbye and says she's going to jump off a bridge tonight": 'someone_else',
+            "my friend says she's going to jump off a bridge tonight": 'someone_else',
+            'my brother told me he took a bunch of pills': 'someone_else',
+            "my dad keeps saying he'd be better off dead": 'someone_else',
+            "my mom said she doesn't want to live anymore": 'someone_else',
+            "I'm worried my roommate is cutting herself": 'someone_else',
+            'sabi ni kuya gusto na niyang mamatay': 'someone_else',
+            'sinabi ng kaibigan ko na ayaw na niyang mabuhay': 'someone_else',
+            'she broke up with me and i want to kill myself': 'self',
+            'my friend told me to kill myself': 'self',
+            'gusto ko na mamatay, sabi ko kay ate': 'self',
+            'great day with my sister at the beach': 'self',
+            'I want to die': 'self',
+            "I don't know what to do anymore": 'self',
+            '': 'self',
+        }
+        for text, expected in cases.items():
+            with self.subTest(text=text):
+                self.assertEqual(support_subject(text), expected)
+
+
+class ThirdPersonRiskTests(TestCase):
+    def test_someone_elses_wish_not_to_live_is_flagged(self):
+        """QA 2026-10-07: these got plain music and no contacts."""
+        for text in ["my mom said she doesn't want to live anymore", 'sinabi ng kaibigan ko na ayaw na niyang mabuhay']:
+            with self.subTest(text=text):
+                self.assertTrue(assess_crisis_risk(text))
+
+
 class AssessConcernTests(TestCase):
     def test_flags_hopeless_phrasing(self):
         concerning = [
@@ -310,6 +349,19 @@ class SupportResourceTests(TestCase):
         self.assertEqual(names, ['Verified Line'])
         self.assertIn('emergency number', response.json()['message'])
 
+    def test_crisis_about_someone_else_gets_words_for_the_helper(self):
+        user = User.objects.create_user(username='helper', email='helper@example.com', password='password123')
+        self.client.force_authenticate(user=user)
+
+        payload = self.client.post(
+            '/api/analyze/', {'text': "my sister says she's going to jump off a bridge tonight"}, format='json',
+        ).json()
+
+        self.assertEqual(payload['crisis_severity'], 'imminent')
+        self.assertEqual(payload['support_about'], 'someone_else')
+        self.assertIn('someone you care about may be in danger', payload['ai_response'])
+        self.assertEqual([r['name'] for r in payload['support_resources']], ['Verified Line'])
+
     def test_crisis_payload_embeds_resources_and_records_event_without_text(self):
         user = User.objects.create_user(username='u', email='u@example.com', password='password123')
         self.client.force_authenticate(user=user)
@@ -364,6 +416,41 @@ class ConcernResponseViewTests(TestCase):
         ).json()
 
         self.assertEqual(payload['support_check_in']['trigger'], 'model')
+
+    @patch('api.views.spotify_service.get_recommendations_with_details')
+    @patch('api.views.get_classifier')
+    def test_worry_about_a_friend_gets_the_hotlines_and_its_own_words(self, mock_get_classifier, mock_recs):
+        """Owner decision 2026-10-06: third-party disclosures must get the hotline list."""
+        SupportResource.objects.create(name='Hotline', kind='hotline', phone='1553', is_verified=True)
+        mock_get_classifier.return_value.predict.return_value = _prediction('fear', 'high')
+        mock_recs.side_effect = RuntimeError('spotify unavailable')
+
+        payload = self.client.post(
+            '/api/analyze/',
+            {'text': 'my best friend told me she wants to kill herself, what do I do'},
+            format='json',
+        ).json()
+
+        self.assertEqual(payload['risk_level'], 'concern')
+        self.assertEqual(payload['support_about'], 'someone_else')
+        check_in = payload['support_check_in']
+        self.assertEqual(check_in['about'], 'someone_else')
+        self.assertIn('worried about someone', check_in['message'])
+        self.assertIn('tel:1553', [r['phone_uri'] for r in check_in['resources']])
+
+    @patch('api.views.spotify_service.get_recommendations_with_details')
+    @patch('api.views.get_classifier')
+    def test_own_hopelessness_keeps_self_wording(self, mock_get_classifier, mock_recs):
+        mock_get_classifier.return_value.predict.return_value = _prediction('sad', 'high')
+        mock_recs.side_effect = RuntimeError('spotify unavailable')
+
+        payload = self.client.post(
+            '/api/analyze/', {'text': "I don't know what to do anymore"}, format='json',
+        ).json()
+
+        self.assertEqual(payload['support_about'], 'self')
+        self.assertEqual(payload['support_check_in']['about'], 'self')
+        self.assertTrue(payload['support_check_in']['resources'] is not None)
 
     @patch('api.views.spotify_service.get_recommendations_with_details')
     @patch('api.views.get_classifier')
