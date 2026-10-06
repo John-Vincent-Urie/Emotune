@@ -196,9 +196,13 @@ class CrisisResponseViewTests(TestCase):
         mock_get_classifier.assert_not_called()
         mock_get_recommendations_with_details.assert_not_called()
 
-    def test_recommend_by_emotion_ignores_template_default_text(self):
+    # Patched like its siblings: unpatched, this test fetched a real Spotify
+    # token and searched with the dev credentials on every suite run.
+    @patch('api.views.spotify_service.get_recommendations_with_details')
+    def test_recommend_by_emotion_ignores_template_default_text(self, mock_recs):
         """The templated default ('Play songs for a sad mood.') must never trip
         the crisis check -- only caller-supplied text is inspected."""
+        mock_recs.side_effect = RuntimeError('spotify unavailable')
         response = self.client.post(
             '/api/recommend-by-emotion/',
             {'emotion': 'sad'},

@@ -3832,6 +3832,13 @@ class FeelBetterRecoveryTests(TestCase):
         )
 
 
+# Pinned: .env.example sets a 72h max age on purpose (it outlasts missed
+# refresh runs), so ages below would mean different things on different
+# machines if they were read from the environment.
+@override_settings(
+    SPOTIFY_TRACK_POOL_FRESH_SECONDS=6 * 60 * 60,
+    SPOTIFY_TRACK_POOL_MAX_AGE_SECONDS=24 * 60 * 60,
+)
 class EmotionTrackPoolTests(TestCase):
     """The shared per-emotion candidate pool ("waiting room").
 
