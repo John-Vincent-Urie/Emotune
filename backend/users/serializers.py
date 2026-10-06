@@ -1,6 +1,9 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from rest_framework_simplejwt.exceptions import InvalidToken
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.settings import api_settings as jwt_settings
 from .models import FavoriteTrack, PromptHistory, UserPreference
 
 User = get_user_model()
@@ -79,6 +82,24 @@ class RegisterSerializer(serializers.ModelSerializer):
             terms_accepted_at=timezone.now(),
         )
         return user
+
+
+class ActiveUserTokenRefreshSerializer(TokenRefreshSerializer):
+    """Refresh that refuses accounts that were deactivated or deleted.
+
+    simplejwt 5.3 never looks the user up on refresh, so a disabled account kept
+    getting fresh access tokens that every other endpoint then rejected: the app
+    retried forever instead of reaching its normal session-expired -> login path.
+    A 401 here (InvalidToken, like any dead refresh token) gets it there.
+    """
+
+    def validate(self, attrs):
+        # An invalid or expired token raises TokenError, which the view already
+        # turns into a 401.
+        user_id = self.token_class(attrs['refresh']).payload.get(jwt_settings.USER_ID_CLAIM)
+        if not User.objects.filter(**{jwt_settings.USER_ID_FIELD: user_id, 'is_active': True}).exists():
+            raise InvalidToken('No active account found for this token.')
+        return super().validate(attrs)
 
 
 class ChangePasswordSerializer(serializers.Serializer):

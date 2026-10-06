@@ -184,6 +184,52 @@ class LogoutTests(TestCase):
         self.assertEqual(response.status_code, 205)
 
 
+class TokenRefreshAccountStateTests(TestCase):
+    """QA 2026-10-06: a deactivated account kept refreshing, so the app looped on
+    "Try again" instead of falling back to the login screen."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='refresh-user', email='refresh@example.com', password='correct-horse-battery',
+        )
+        response = self.client.post(
+            '/api/users/login/',
+            {'email': 'refresh@example.com', 'password': 'correct-horse-battery'},
+            format='json',
+        )
+        self.refresh = response.json()['refresh']
+
+    def _refresh(self):
+        return self.client.post('/api/users/token/refresh/', {'refresh': self.refresh}, format='json')
+
+    def test_an_active_account_still_refreshes_and_rotates(self):
+        response = self._refresh()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('access', response.json())
+        self.assertNotEqual(response.json()['refresh'], self.refresh)
+
+    def test_a_deactivated_account_cannot_refresh(self):
+        self.user.is_active = False
+        self.user.save(update_fields=['is_active'])
+
+        response = self._refresh()
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()['code'], 'token_not_valid')
+
+    def test_a_deleted_account_cannot_refresh(self):
+        self.user.delete()
+
+        self.assertEqual(self._refresh().status_code, 401)
+
+    def test_a_garbage_token_is_still_a_401(self):
+        response = self.client.post('/api/users/token/refresh/', {'refresh': 'not-a-token'}, format='json')
+
+        self.assertEqual(response.status_code, 401)
+
+
 class CredentialThrottleTests(TestCase):
     """The credential endpoints must stop answering once a client hammers them."""
 
