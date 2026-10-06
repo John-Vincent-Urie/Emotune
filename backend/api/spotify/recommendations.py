@@ -1189,7 +1189,15 @@ class SpotifyRecommendationEngine:
             if not _history_allows_learning(history):
                 continue
             playlist_data = history.playlist_data if isinstance(history.playlist_data, list) else []
-            _append_unique_tracks(tracks, seen_keys, playlist_data, limit)
+            # Skip the static curated playlists a past fallback stored: they say
+            # nothing about this listener, and replaying them kept serving the
+            # old padded list (with "Sad Songs") to happy users long after the
+            # padding was removed. The curated step below adds today's set.
+            learned = [
+                track for track in playlist_data
+                if not (isinstance(track, dict) and track.get('recommendation_source') == 'curated_fallback')
+            ]
+            _append_unique_tracks(tracks, seen_keys, learned, limit)
             if len(tracks) >= limit:
                 return tracks
 
@@ -1218,9 +1226,12 @@ class SpotifyRecommendationEngine:
         return tracks
 
     def _build_curated_fallback_tracks(self, emotion, limit=20):
-        context_keys = CURATED_PLAYABLE_CONTEXTS.get(emotion, [])
-        if emotion != 'mixed':
-            context_keys = [*context_keys, *CURATED_PLAYABLE_CONTEXTS['mixed']]
+        # Only this emotion's own playlists. This used to pad every emotion with
+        # the 'mixed' list, whose first entry is Sad Songs, so a happy, angry,
+        # calm or stressed listener got "Sad Songs" whenever search fell back.
+        # A shorter list beats a mismatched one; choosing related playlists to
+        # pad with would be a music-therapy decision, not a code default.
+        context_keys = CURATED_PLAYABLE_CONTEXTS.get(emotion) or CURATED_PLAYABLE_CONTEXTS['mixed']
 
         tracks = []
         seen_keys = set()

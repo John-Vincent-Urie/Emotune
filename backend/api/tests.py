@@ -2803,6 +2803,49 @@ class SpotifyRecommendationTests(TestCase):
         self.assertTrue(all(track['spotify_url'].startswith('https://open.spotify.com/') for track in tracks))
         self.assertTrue(all(track['recommendation_source'] == 'curated_fallback' for track in tracks))
 
+    def test_curated_fallback_only_uses_the_emotions_own_playlists(self):
+        """QA 2026-10-06: a happy listener got "Sad Songs" whenever search fell
+        back, because every emotion was padded with the 'mixed' list."""
+        from api.spotify.constants import CURATED_CONTEXT_LIBRARY, CURATED_PLAYABLE_CONTEXTS
+
+        sad_songs = CURATED_CONTEXT_LIBRARY['sad_songs']['name']
+        for emotion, context_keys in CURATED_PLAYABLE_CONTEXTS.items():
+            with self.subTest(emotion=emotion):
+                allowed = {CURATED_CONTEXT_LIBRARY[key]['name'] for key in context_keys}
+                names = {
+                    track['name']
+                    for track in spotify_service._build_curated_fallback_tracks(emotion, limit=20)
+                }
+
+                self.assertTrue(names)
+                self.assertLessEqual(names, allowed)
+                if 'sad_songs' not in context_keys:
+                    self.assertNotIn(sad_songs, names)
+
+    def test_history_replay_skips_curated_playlists_stored_by_old_fallbacks(self):
+        """QA 2026-10-06: happy users kept getting the old padded list (with
+        "Sad Songs") because a past fallback had saved it to their history."""
+        from api.spotify.constants import CURATED_CONTEXT_LIBRARY
+        from users.models import PromptHistory
+
+        user = User.objects.create_user(username='replay', email='replay@example.com', password='pw12345!')
+        learned = {
+            'id': 'learned-1', 'item_type': 'track', 'name': 'Espresso', 'artist': 'Sabrina Carpenter',
+            'uri': 'spotify:track:learned-1', 'spotify_url': 'https://open.spotify.com/track/learned-1',
+            'recommendation_source': 'spotify_catalog',
+        }
+        stale_curated = {**CURATED_CONTEXT_LIBRARY['sad_songs'], 'recommendation_source': 'curated_fallback'}
+        PromptHistory.objects.create(
+            user=user, prompt_text='so happy', detected_emotion='happy', ai_response='',
+            playlist_data=[learned, stale_curated],
+        )
+
+        tracks = spotify_service._build_fallback_tracks('happy', user=user, limit=20)
+        names = [track['name'] for track in tracks]
+
+        self.assertIn('Espresso', names)
+        self.assertNotIn(CURATED_CONTEXT_LIBRARY['sad_songs']['name'], names)
+
     def test_get_recommendations_uses_user_preferences_as_playable_fallback_when_no_tokens(self):
         user = User.objects.create_user(
             username='history-user',
