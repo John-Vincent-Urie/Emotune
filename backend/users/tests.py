@@ -62,6 +62,44 @@ class RegistrationTests(TestCase):
         self.assertEqual(self._register('Maria', 'maria1@example.com').status_code, 201)
         self.assertEqual(self._register('Maria', 'maria2@example.com').status_code, 201)
 
+    def test_same_email_in_other_case_is_a_clean_400_not_a_500(self):
+        self.assertEqual(self._register('Avery', 'avery@example.com').status_code, 201)
+
+        response = self._register('Avery Two', 'Avery@Example.com')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('email', response.json())
+        self.assertEqual(User.objects.filter(email__iexact='avery@example.com').count(), 1)
+
+    def test_login_ignores_email_case_and_surrounding_spaces(self):
+        self._register('QA', 'qa.e1@example.com')
+        # Phone keyboards capitalize the first letter; other clients may not trim.
+        for typed in ['qa.e1@example.com', 'QA.e1@example.com', 'Qa.e1@Example.com', ' qa.e1@example.com ']:
+            with self.subTest(email=typed):
+                response = self.client.post(
+                    '/api/users/login/', {'email': typed, 'password': 'password123'}, format='json',
+                )
+                self.assertEqual(response.status_code, 200)
+
+    def test_login_finds_a_mixed_case_account_made_outside_register(self):
+        # createsuperuser and the admin store the address as typed.
+        User.objects.create_user(username='Admin', email='Admin@Example.com', password='password123')
+
+        response = self.client.post(
+            '/api/users/login/', {'email': 'admin@example.com', 'password': 'password123'}, format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_login_with_wrong_password_still_fails_in_any_case(self):
+        self._register('QA', 'qa.e1@example.com')
+
+        response = self.client.post(
+            '/api/users/login/', {'email': 'QA.E1@EXAMPLE.COM', 'password': 'wrong-password'}, format='json',
+        )
+
+        self.assertEqual(response.status_code, 401)
+
     def test_register_requires_terms_acceptance(self):
         response = self.client.post(
             '/api/users/register/',

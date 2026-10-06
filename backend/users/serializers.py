@@ -55,6 +55,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         data['email'] = str(data.get('email') or '').strip().lower()
         if not data['username']:
             raise serializers.ValidationError({'username': 'Display name is required.'})
+        # The field's own unique check ran on the address as typed, before the
+        # lowercasing above, so "Avery@Example.com" slipped past it and hit the
+        # database constraint as a 500.
+        if User.objects.filter(email__iexact=data['email']).exists():
+            raise serializers.ValidationError({'email': 'An account with this email already exists.'})
         if not data['accept_terms']:
             raise serializers.ValidationError({
                 'accept_terms': 'You must agree to the Terms and Privacy Policy.',

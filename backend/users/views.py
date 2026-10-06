@@ -54,9 +54,14 @@ def register(request):
 @permission_classes([permissions.AllowAny])
 @throttle_classes([LoginIPThrottle, LoginEmailThrottle])
 def login(request):
-    email = request.data.get('email')
+    # Register stores addresses trimmed and lowercased, but phone keyboards
+    # capitalize the first letter and admin-made accounts can be mixed case, so
+    # match the stored address case-insensitively (as password reset does).
+    email = str(request.data.get('email') or '').strip()
     password = request.data.get('password')
-    user = authenticate(request, username=email, password=password)
+    matches = list(User.objects.filter(email__iexact=email).values_list('email', flat=True))
+    stored_email = email.lower() if email.lower() in matches else (matches[0] if matches else email)
+    user = authenticate(request, username=stored_email, password=password)
     if user:
         refresh = RefreshToken.for_user(user)
         return Response({
