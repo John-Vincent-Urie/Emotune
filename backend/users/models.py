@@ -21,7 +21,8 @@ class User(AbstractUser):
     # Sign-in is by email, so `username` is only the display name the app
     # greets people with. Drop AbstractUser's handle rules: "Maria Santos" has
     # a space, and two people can both be called Maria.
-    username = models.CharField(max_length=150)
+    # Labelled for the password similarity check, whose message names the field.
+    username = models.CharField('display name', max_length=150)
     email = models.EmailField(unique=True)
     terms_accepted_at = models.DateTimeField(blank=True, null=True)
     personalization_opt_in = models.BooleanField(default=True)

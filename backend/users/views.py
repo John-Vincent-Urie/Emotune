@@ -118,7 +118,7 @@ def profile(request):
 @api_view(['POST'])
 @throttle_classes([PasswordChangeThrottle])
 def change_password(request):
-    serializer = ChangePasswordSerializer(data=request.data)
+    serializer = ChangePasswordSerializer(data=request.data, context={'user': request.user})
     if serializer.is_valid():
         user = request.user
         if not user.check_password(serializer.validated_data['old_password']):

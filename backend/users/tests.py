@@ -20,8 +20,8 @@ class RegistrationTests(TestCase):
             {
                 'username': 'Avery',
                 'email': 'avery@example.com',
-                'password': 'password123',
-                'confirm_password': 'password123',
+                'password': 'quiet-harbor-42',
+                'confirm_password': 'quiet-harbor-42',
                 'accept_terms': True,
                 'personalization_opt_in': False,
             },
@@ -44,8 +44,8 @@ class RegistrationTests(TestCase):
             {
                 'username': display_name,
                 'email': email,
-                'password': 'password123',
-                'confirm_password': 'password123',
+                'password': 'quiet-harbor-42',
+                'confirm_password': 'quiet-harbor-42',
                 'accept_terms': True,
             },
             format='json',
@@ -77,16 +77,16 @@ class RegistrationTests(TestCase):
         for typed in ['qa.e1@example.com', 'QA.e1@example.com', 'Qa.e1@Example.com', ' qa.e1@example.com ']:
             with self.subTest(email=typed):
                 response = self.client.post(
-                    '/api/users/login/', {'email': typed, 'password': 'password123'}, format='json',
+                    '/api/users/login/', {'email': typed, 'password': 'quiet-harbor-42'}, format='json',
                 )
                 self.assertEqual(response.status_code, 200)
 
     def test_login_finds_a_mixed_case_account_made_outside_register(self):
         # createsuperuser and the admin store the address as typed.
-        User.objects.create_user(username='Admin', email='Admin@Example.com', password='password123')
+        User.objects.create_user(username='Admin', email='Admin@Example.com', password='quiet-harbor-42')
 
         response = self.client.post(
-            '/api/users/login/', {'email': 'admin@example.com', 'password': 'password123'}, format='json',
+            '/api/users/login/', {'email': 'admin@example.com', 'password': 'quiet-harbor-42'}, format='json',
         )
 
         self.assertEqual(response.status_code, 200)
@@ -106,8 +106,8 @@ class RegistrationTests(TestCase):
             {
                 'username': 'Jordan',
                 'email': 'jordan@example.com',
-                'password': 'password123',
-                'confirm_password': 'password123',
+                'password': 'quiet-harbor-42',
+                'confirm_password': 'quiet-harbor-42',
                 'accept_terms': False,
                 'personalization_opt_in': True,
             },
@@ -117,6 +117,63 @@ class RegistrationTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('accept_terms', response.json())
         self.assertFalse(User.objects.filter(email='jordan@example.com').exists())
+
+
+class PasswordStrengthTests(TestCase):
+    """Owner decision 2026-10-06: Django's AUTH_PASSWORD_VALIDATORS on every
+    way a password gets set. The messages below are what the app shows."""
+
+    def setUp(self):
+        self.client = APIClient()
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+    def _register(self, password, email='strength@example.com', name='Robin Cruz'):
+        return self.client.post(
+            '/api/users/register/',
+            {
+                'username': name, 'email': email, 'password': password,
+                'confirm_password': password, 'accept_terms': True,
+            },
+            format='json',
+        )
+
+    def test_register_refuses_weak_passwords_with_readable_reasons(self):
+        cases = {
+            'short1!': 'This password is too short. It must contain at least 8 characters.',
+            'password123': 'This password is too common.',
+            '83920174': 'This password is entirely numeric.',
+            'strength@example': 'The password is too similar to the email.',
+            'robincruz7': 'The password is too similar to the display name.',
+        }
+        for password, message in cases.items():
+            with self.subTest(password=password):
+                response = self._register(password)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(message, response.json()['password'])
+        self.assertFalse(User.objects.filter(email='strength@example.com').exists())
+
+    def test_register_accepts_a_strong_password(self):
+        self.assertEqual(self._register('quiet-harbor-42').status_code, 201)
+
+    def test_change_password_uses_the_same_rules(self):
+        user = User.objects.create_user(username='Robin', email='robin@example.com', password='quiet-harbor-42')
+        self.client.force_authenticate(user=user)
+
+        weak = self.client.post(
+            '/api/users/change-password/',
+            {'old_password': 'quiet-harbor-42', 'new_password': '12345678', 'confirm_new_password': '12345678'},
+            format='json',
+        )
+        strong = self.client.post(
+            '/api/users/change-password/',
+            {'old_password': 'quiet-harbor-42', 'new_password': 'lantern-maple-9', 'confirm_new_password': 'lantern-maple-9'},
+            format='json',
+        )
+
+        self.assertEqual(weak.status_code, 400)
+        self.assertIn('This password is too common.', weak.json()['new_password'])
+        self.assertEqual(strong.status_code, 200)
 
 
 class LogoutTests(TestCase):

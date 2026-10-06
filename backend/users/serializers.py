@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from rest_framework_simplejwt.exceptions import InvalidToken
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
@@ -36,8 +38,21 @@ class UserSerializer(serializers.ModelSerializer):
         ]
 
 
+def _check_password_strength(password, field, user):
+    """Run AUTH_PASSWORD_VALIDATORS (8+ characters, not common, not only digits,
+    not like the user's own details), reporting under `field` as DRF does.
+
+    Register, change-password and reset all go through this, so none of them
+    can set a password the others would refuse.
+    """
+    try:
+        validate_password(password, user=user)
+    except DjangoValidationError as error:
+        raise serializers.ValidationError({field: list(error.messages)})
+
+
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=6)
+    password = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)
     accept_terms = serializers.BooleanField(write_only=True)
     personalization_opt_in = serializers.BooleanField(required=False, default=True)
@@ -69,6 +84,10 @@ class RegisterSerializer(serializers.ModelSerializer):
             })
         if data['password'] != data['confirm_password']:
             raise serializers.ValidationError("Passwords do not match.")
+        # An unsaved user, so "too similar" compares against what was typed.
+        _check_password_strength(
+            data['password'], 'password', User(username=data['username'], email=data['email']),
+        )
         return data
 
     def create(self, validated_data):
@@ -103,13 +122,16 @@ class ActiveUserTokenRefreshSerializer(TokenRefreshSerializer):
 
 
 class ChangePasswordSerializer(serializers.Serializer):
+    """Expects the signed-in user in context['user'] for the similarity check."""
+
     old_password = serializers.CharField(required=True)
-    new_password = serializers.CharField(required=True, min_length=6)
+    new_password = serializers.CharField(required=True)
     confirm_new_password = serializers.CharField(required=True)
 
     def validate(self, data):
         if data['new_password'] != data['confirm_new_password']:
             raise serializers.ValidationError("New passwords do not match.")
+        _check_password_strength(data['new_password'], 'new_password', self.context.get('user'))
         return data
 
 
@@ -128,14 +150,17 @@ class PasswordResetVerifySerializer(PasswordResetRequestSerializer):
 
 
 class PasswordResetConfirmSerializer(PasswordResetVerifySerializer):
-    # Same floor as registration, so a reset cannot be used to sneak past the
-    # rule the sign-up form enforces.
-    new_password = serializers.CharField(min_length=6)
+    # Same rules as registration, so a reset cannot be used to sneak past them.
+    new_password = serializers.CharField()
     confirm_new_password = serializers.CharField()
 
     def validate(self, data):
         if data['new_password'] != data['confirm_new_password']:
             raise serializers.ValidationError("New passwords do not match.")
+        # Compared with the address typed, never the stored account: a "too
+        # similar" error that only appeared for real accounts would tell anyone
+        # which emails are registered.
+        _check_password_strength(data['new_password'], 'new_password', User(email=data['email']))
         return data
 
 

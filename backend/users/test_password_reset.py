@@ -95,6 +95,36 @@ class PasswordResetTests(TestCase):
         )
         self.assertEqual(confirm.status_code, 200)
 
+    def test_confirm_refuses_a_weak_password_and_keeps_the_code(self):
+        self._request_code()
+        code = self._issued_code()
+
+        response = self.client.post(
+            CONFIRM_URL,
+            {'email': 'robin@example.com', 'code': code, 'new_password': 'password', 'confirm_new_password': 'password'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('This password is too common.', response.json()['new_password'])
+        self.assertTrue(PasswordResetCode.objects.get(user=self.user).is_usable)
+        self.assertTrue(User.objects.get(pk=self.user.pk).check_password('original-pass'))
+
+    def test_similarity_error_does_not_reveal_whether_the_email_has_an_account(self):
+        def confirm(email, password):
+            return self.client.post(
+                CONFIRM_URL,
+                {'email': email, 'code': '000000', 'new_password': password, 'confirm_new_password': password},
+                format='json',
+            ).json()
+
+        # robin@example.com has an account, nobod@example.com does not. Both
+        # passwords echo their own address; the answer must not differ.
+        existing = confirm('robin@example.com', 'robin-example')
+        missing = confirm('nobod@example.com', 'nobod-example')
+        self.assertEqual(existing, missing)
+        self.assertIn('The password is too similar to the email.', existing['new_password'])
+
     def test_confirm_sets_the_password_and_burns_the_code(self):
         self._request_code()
         code = self._issued_code()
