@@ -196,6 +196,26 @@ class CredentialThrottleTests(TestCase):
         other = self._login(email='someone-else@example.com')
         self.assertEqual(other.status_code, 401)
 
+    def test_faked_forwarded_for_does_not_dodge_the_ip_throttle(self):
+        # With DRF's default NUM_PROXIES (None) every request below would count
+        # as a new client. settings pins it to 0: the socket address decides.
+        for index in range(5):
+            response = self.client.post(
+                '/api/users/register/',
+                {
+                    'username': f'spoof{index}',
+                    'email': f'spoof{index}@example.com',
+                    'password': 'correct-horse-battery',
+                    'confirm_password': 'correct-horse-battery',
+                    'accept_terms': True,
+                },
+                format='json',
+                HTTP_X_FORWARDED_FOR=f'203.0.113.{index}',
+            )
+            if index < 2:
+                self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 429)
+
     def test_registration_is_throttled(self):
         def signup(name):
             return self.client.post(

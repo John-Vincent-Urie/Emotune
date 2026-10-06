@@ -1,6 +1,7 @@
 """The forgotten-password flow: request a code, verify it, set a new password."""
 
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core import mail
@@ -8,6 +9,7 @@ from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
+from rest_framework.throttling import SimpleRateThrottle
 
 from .models import PasswordResetCode
 
@@ -210,7 +212,12 @@ class PasswordResetTests(TestCase):
         self.assertEqual(fresh.status_code, 200)
 
     def test_repeated_requests_for_one_address_are_throttled(self):
-        limit = 6  # THROTTLE_PASSWORD_RESET_EMAIL default
+        # Pinned: the default rate is looser when DJANGO_DEBUG is on. DRF reads
+        # the rates at import, so the shared dict is what has to be patched.
+        limit = 6
+        rates = patch.dict(SimpleRateThrottle.THROTTLE_RATES, {'password_reset_email': f'{limit}/hour'})
+        rates.start()
+        self.addCleanup(rates.stop)
         for _ in range(limit):
             self.client.post(REQUEST_URL, {'email': 'robin@example.com'}, format='json')
 

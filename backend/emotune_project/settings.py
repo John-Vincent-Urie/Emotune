@@ -180,6 +180,24 @@ EMAIL_BACKEND = os.getenv('DJANGO_EMAIL_BACKEND') or (
 )
 
 
+# Credential-endpoint rate limits, as (production, development) defaults. Every
+# development client -- browser, emulator, a phone over `adb reverse` -- runs on
+# this one machine, so they all share one address (127.0.0.1, or the Docker
+# bridge gateway behind `docker compose`). At production rates one person's
+# testing locks everyone out (QA hit a 26-minute register lockout), so with
+# DJANGO_DEBUG on the defaults are loose but still finite. A THROTTLE_* variable
+# overrides either.
+_THROTTLE_DEFAULTS = {
+    'login_ip': ('THROTTLE_LOGIN_IP', '20/min', '300/min'),
+    'login_email': ('THROTTLE_LOGIN_EMAIL', '10/min', '60/min'),
+    'register': ('THROTTLE_REGISTER', '10/hour', '300/hour'),
+    'password_change': ('THROTTLE_PASSWORD_CHANGE', '10/hour', '120/hour'),
+    'password_reset_ip': ('THROTTLE_PASSWORD_RESET_IP', '20/hour', '300/hour'),
+    'password_reset_email': ('THROTTLE_PASSWORD_RESET_EMAIL', '6/hour', '60/hour'),
+    'password_reset_verify_ip': ('THROTTLE_PASSWORD_RESET_VERIFY_IP', '60/hour', '600/hour'),
+    'password_reset_verify_email': ('THROTTLE_PASSWORD_RESET_VERIFY_EMAIL', '20/hour', '200/hour'),
+}
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -193,15 +211,15 @@ REST_FRAMEWORK = {
     # client can guess passwords against /api/users/login/ as fast as the
     # network allows. Scopes are applied by the throttles in users/throttles.py.
     'DEFAULT_THROTTLE_RATES': {
-        'login_ip': os.getenv('THROTTLE_LOGIN_IP', '20/min'),
-        'login_email': os.getenv('THROTTLE_LOGIN_EMAIL', '10/min'),
-        'register': os.getenv('THROTTLE_REGISTER', '10/hour'),
-        'password_change': os.getenv('THROTTLE_PASSWORD_CHANGE', '10/hour'),
-        'password_reset_ip': os.getenv('THROTTLE_PASSWORD_RESET_IP', '20/hour'),
-        'password_reset_email': os.getenv('THROTTLE_PASSWORD_RESET_EMAIL', '6/hour'),
-        'password_reset_verify_ip': os.getenv('THROTTLE_PASSWORD_RESET_VERIFY_IP', '60/hour'),
-        'password_reset_verify_email': os.getenv('THROTTLE_PASSWORD_RESET_VERIFY_EMAIL', '20/hour'),
+        scope: os.getenv(env_name) or (debug_rate if DEBUG else production_rate)
+        for scope, (env_name, production_rate, debug_rate) in _THROTTLE_DEFAULTS.items()
     },
+    # How many reverse proxies in front of Django append to X-Forwarded-For.
+    # Left unset, DRF trusts that header from anyone, so a client could send a
+    # fresh fake address with every request and never be throttled. 0 (the
+    # default) uses the socket address only; set 1 behind exactly one trusted
+    # proxy (nginx, a load balancer) that sets the header itself.
+    'NUM_PROXIES': env_int('DRF_NUM_PROXIES', 0),
 }
 
 def _access_token_lifetime():
