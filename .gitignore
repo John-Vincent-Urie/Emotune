@@ -31,6 +31,9 @@ flutter_app/android/.gradle-local-fresh/
 # Local database
 backend/db.sqlite3
 
+# Output of manage.py collectstatic
+backend/staticfiles/
+
 # Trained models and checkpoints
 backend/ml/models/bert_emotion_model/
 *.safetensors

@@ -1,0 +1,18 @@
+# The build context is the repository root (see backend/Dockerfile), so send
+# only what the backend image needs instead of the Flutter app and datasets.
+*
+!backend/
+!docs/music.md
+
+# Never into the image: secrets, local state, and the model weights, which
+# docker-compose.yml mounts at runtime instead.
+**/.env
+**/.env.*
+backend/venv/
+backend/db.sqlite3
+backend/staticfiles/
+backend/media/
+backend/logs/
+backend/ml/models/
+**/__pycache__/
+**/*.pyc

@@ -1,0 +1,76 @@
+# EmoTune backend in Docker.
+#
+#   docker compose up --build -d     # build and start on http://127.0.0.1:8000
+#   docker compose logs -f backend
+#   docker compose exec backend python manage.py createsuperuser
+#   docker compose down              # stop (the database volume is kept)
+#
+# Configuration comes from the same .env the local runserver uses.
+
+x-backend-env: &backend-env
+  env_file:
+    - path: .env
+      required: false
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: emotune-backend
+    <<: *backend-env
+    environment:
+      # Load the emotion models when gunicorn starts rather than on the first
+      # request, which would otherwise wait on them.
+      EMOTUNE_WARM_MODELS_ON_STARTUP: always
+    ports:
+      # Bound on all interfaces like `runserver 0.0.0.0:8000`, so a phone on the
+      # LAN can reach it. Set EMOTUNE_PORT if a local runserver holds 8000.
+      - "${EMOTUNE_PORT:-8000}:8000"
+    volumes:
+      - emotune-data:/data
+      # Mounted rather than baked in: the models are 11GB+ with checkpoints,
+      # and a promoted or candidate model (ML_MODEL_PATH) needs no rebuild.
+      - ./backend/ml/models:/app/backend/ml/models:ro
+      # The GoEmotions fallback model loads from the Hugging Face cache with
+      # downloads disabled (EMOTION_GOEMOTIONS_LOCAL_ONLY), so share the host's.
+      - ${HF_CACHE_DIR:-${HOME}/.cache/huggingface}:/home/app/.cache/huggingface:ro
+    healthcheck:
+      # Any answer below 500 means Django is up. Not followed: with DEBUG off
+      # the SSL redirect alone would otherwise fail the check.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import http.client,sys; c=http.client.HTTPConnection('127.0.0.1',8000,timeout=4); c.request('GET','/django-admin/login/',headers={'Host':'localhost'}); sys.exit(c.getresponse().status>=500)"
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    restart: unless-stopped
+
+  # Keeps the per-emotion Spotify candidate pools warm, which is what makes a
+  # recommendation take ~0.1s instead of 6-9s (see backend/scripts/refresh_pools.sh).
+  # Fresh pools are skipped, so restarting this does not re-query Spotify.
+  pool-refresher:
+    image: emotune-backend
+    <<: *backend-env
+    environment:
+      EMOTUNE_MIGRATE_ON_START: "false"
+      EMOTUNE_PYTHON: python
+      EMOTUNE_POOL_LOG: /dev/stdout
+      POOL_REFRESH_INTERVAL_SECONDS: 14400
+    volumes:
+      - emotune-data:/data
+    depends_on:
+      backend:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - 'while true; do scripts/refresh_pools.sh; sleep "$$POOL_REFRESH_INTERVAL_SECONDS"; done'
+    restart: unless-stopped
+
+volumes:
+  # SQLite database and uploaded profile pictures.
+  emotune-data:

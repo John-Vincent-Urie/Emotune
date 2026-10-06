@@ -38,6 +38,44 @@ Backend base URL:
 - local machine: `http://127.0.0.1:8000/api`
 - Android emulator: `http://10.0.2.2:8000/api`
 
+### Running the backend in Docker
+
+Instead of the venv, the backend can run in a container (Docker Engine with the
+Compose plugin; on Ubuntu see https://docs.docker.com/engine/install/ubuntu/).
+From the repository root, with `.env` in place:
+
+```bash
+docker compose up --build -d      # serves http://127.0.0.1:8000, same URLs as above
+docker compose logs -f backend
+docker compose exec backend python manage.py createsuperuser
+docker compose down               # stops it; the database volume is kept
+```
+
+What differs from the venv setup:
+
+- It serves with gunicorn (one worker, four threads, since each worker loads its
+  own copy of the emotion models) and WhiteNoise for the admin's static files.
+- The SQLite database and uploaded profile pictures live in the `emotune-data`
+  volume, not `backend/db.sqlite3`. Migrations run on every start. To start
+  from your existing local database instead of an empty one (copied as the
+  container's user, so it stays writable):
+
+  ```bash
+  docker compose stop
+  docker compose run --rm --no-deps -v ./backend/db.sqlite3:/import.sqlite3:ro \
+      --entrypoint cp backend /import.sqlite3 /data/db.sqlite3
+  docker compose up -d
+  ```
+- The models are not in the image. `backend/ml/models` is mounted read-only,
+  so `ML_MODEL_PATH` must be relative (`ml/models/...`) or point under
+  `/app/backend/ml/models`. The host's Hugging Face cache is mounted for the
+  GoEmotions fallback (override with `HF_CACHE_DIR`).
+- A `pool-refresher` service runs `scripts/refresh_pools.sh` at start and every
+  4 hours, so no cron entry is needed. Pools that are still fresh are skipped.
+- `ml_model/artifacts/picker_weights.json` is not copied in, so the picker uses
+  its built-in weights unless you mount the file and set `PICKER_RANKER_WEIGHTS_PATH`.
+- Set `EMOTUNE_PORT=8001` if a local `runserver` already holds port 8000.
+
 ### Ranking is built in -- nothing extra to install
 
 The music picker ranks candidates with `backend/api/picker_ranker.py`, a linear

@@ -94,6 +94,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Serves STATIC_ROOT (the admin and admin-panel CSS/JS) from the app itself,
+    # since gunicorn -- unlike runserver -- serves no static files.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -127,7 +130,9 @@ ASGI_APPLICATION = 'emotune_project.asgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        # Overridable so a container can keep the database on a volume instead
+        # of inside the image's code directory.
+        'NAME': os.getenv('DJANGO_SQLITE_PATH') or BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -148,7 +153,7 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = os.getenv('DJANGO_MEDIA_ROOT') or BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
