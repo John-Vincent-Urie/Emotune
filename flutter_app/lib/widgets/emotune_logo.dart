@@ -237,11 +237,34 @@ class EmoTuneWordmark extends StatelessWidget {
     this.fontSize = 34,
     this.reduceMotion = false,
     this.color,
+    this.onLightBackground = false,
   });
 
   final Animation<double> shimmer;
   final double fontSize;
   final bool reduceMotion;
+
+  /// The brand gradient is 1.2-1.4:1 on the light theme's background, so on a
+  /// light surface the wordmark uses deep shades of the same hues (4.7:1+).
+  /// Callers pass this rather than it reading the theme: Welcome always sits
+  /// on the dark backdrop whatever the theme says.
+  final bool onLightBackground;
+
+  static const List<Color> _brandGradient = [
+    AppColors.teal,
+    AppColors.mint,
+    AppColors.lime,
+    AppColors.mint,
+    AppColors.teal,
+  ];
+
+  static const List<Color> _lightGradient = [
+    Color(0xFF0F7563),
+    Color(0xFF2B7838),
+    Color(0xFF5A6B00),
+    Color(0xFF2B7838),
+    Color(0xFF0F7563),
+  ];
 
   /// Fallback solid color shown while the gradient shader mounts, and used
   /// verbatim when [reduceMotion] callers still want a static tint.
@@ -267,8 +290,8 @@ class EmoTuneWordmark extends StatelessWidget {
           blendMode: BlendMode.srcIn,
           shaderCallback: (bounds) {
             final dx = reduceMotion ? bounds.width : shimmer.value * bounds.width;
-            return const LinearGradient(
-              colors: [AppColors.teal, AppColors.mint, AppColors.lime, AppColors.mint, AppColors.teal],
+            return LinearGradient(
+              colors: onLightBackground ? _lightGradient : _brandGradient,
               tileMode: TileMode.mirror,
             ).createShader(
               Rect.fromLTWH(

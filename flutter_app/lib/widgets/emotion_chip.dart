@@ -19,17 +19,22 @@ class EmotionChip extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
+  /// Black or white, whichever reads better on [fill] (at least 4.85:1 on
+  /// every mood color).
+  static Color inkFor(Color fill) {
+    final l = fill.computeLuminance();
+    final onWhite = 1.05 / (l + 0.05);
+    final onBlack = (l + 0.05) / 0.05;
+    return onBlack >= onWhite ? Colors.black : Colors.white;
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.emoColors;
-    // On a filled chip the label sits on the mood color, so pick the ink
-    // that actually contrasts with it rather than assuming dark text.
-    const onDark = Colors.white;
-    const onLight = Color(0xFF14180F);
-    final onSelected =
-        ThemeData.estimateBrightnessForColor(color) == Brightness.dark
-            ? onDark
-            : onLight;
+    // On a filled chip the label sits on the mood color, so pick whichever
+    // ink measures higher contrast against it. The brightness estimate this
+    // replaced chose white on orange-red and dark on slate, both under 4.5:1.
+    final onSelected = inkFor(color);
 
     return Semantics(
       button: true,

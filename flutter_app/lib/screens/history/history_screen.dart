@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/emotion_chip.dart';
 import 'package:intl/intl.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -111,8 +112,8 @@ class _HistoryScreenState extends State<HistoryScreen>
         ],
         bottom: TabBar(
           controller: _tabCtrl,
-          indicatorColor: AppColors.accent,
-          labelColor: AppColors.accent,
+          indicatorColor: context.emoColors.accentText,
+          labelColor: context.emoColors.accentText,
           unselectedLabelColor: isDark ? Colors.white54 : Colors.black54,
           tabs: const [
             Tab(text: 'Prompts'),
@@ -215,10 +216,12 @@ class _HistoryScreenState extends State<HistoryScreen>
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: color),
                     ),
+                    // The mood color stays on the tint and border; as text
+                    // several moods fell under 3:1 in one theme or the other.
                     child: Text(
                       emotion.toUpperCase(),
                       style: TextStyle(
-                          color: color,
+                          color: context.emoColors.textPrimary,
                           fontSize: 11,
                           fontWeight: FontWeight.bold),
                     ),
@@ -228,7 +231,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                     Text(
                       DateFormat('MMM d, h:mm a').format(date.toLocal()),
                       style: TextStyle(
-                          color: isDark ? Colors.white38 : Colors.black38,
+                          color: context.emoColors.textSecondary,
                           fontSize: 11),
                     ),
                 ],
@@ -290,8 +293,11 @@ class _HistoryScreenState extends State<HistoryScreen>
         value: pct,
         title: '${pct.toStringAsFixed(0)}%',
         radius: 80,
-        titleStyle: const TextStyle(
-            color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+        // White on the yellow and tan slices was under 2:1.
+        titleStyle: TextStyle(
+            color: EmotionChip.inkFor(color),
+            fontSize: 11,
+            fontWeight: FontWeight.bold),
       );
     }).toList();
 

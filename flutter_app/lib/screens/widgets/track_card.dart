@@ -101,7 +101,9 @@ class TrackCard extends StatelessWidget {
                         child: _CardBadge(
                           label: staticPickLabel,
                           background: AppColors.gradientEnd,
-                          foreground: Colors.white,
+                          // White on the lime badge was about 1.2:1 and
+                          // hard to read; black is about 16:1.
+                          foreground: Colors.black,
                         ),
                       ),
                     if (canFavorite)

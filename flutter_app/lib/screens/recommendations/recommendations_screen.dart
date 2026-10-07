@@ -86,11 +86,11 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
       body: SafeArea(
         child: Column(
         children: [
-          const EmoTunePageHeader(
+          EmoTunePageHeader(
             title: 'Recommendations',
             titleIcon: Icon(
               Icons.explore_rounded,
-              color: AppColors.mint,
+              color: context.emoColors.accentText,
               size: 18,
             ),
           ),
@@ -138,12 +138,12 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 if (_loadingMoreTracks) ...[
-                                  const SizedBox(
+                                  SizedBox(
                                     width: 28,
                                     height: 28,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2.5,
-                                      color: AppColors.accent,
+                                      color: context.emoColors.accentText,
                                     ),
                                   ),
                                   const SizedBox(height: 12),
@@ -167,9 +167,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                                         ? 'Select a mood above'
                                         : 'No recommendations found for this mood yet',
                                     style: TextStyle(
-                                        color: isDark
-                                            ? Colors.white38
-                                            : Colors.black38),
+                                        color: context.emoColors.textSecondary),
                                   ),
                                 ],
                               ],
@@ -183,12 +181,12 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                                       const EdgeInsets.fromLTRB(16, 12, 16, 0),
                                   child: Row(
                                     children: [
-                                      const SizedBox(
+                                      SizedBox(
                                         width: 16,
                                         height: 16,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          color: AppColors.accent,
+                                          color: context.emoColors.accentText,
                                         ),
                                       ),
                                       const SizedBox(width: 10),

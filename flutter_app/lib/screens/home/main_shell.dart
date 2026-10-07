@@ -187,7 +187,8 @@ class _TabButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tint = selected ? AppColors.mint : colors.textSecondary;
+    // accentText, not mint: mint was 1.5:1 on the light theme's white bar.
+    final tint = selected ? colors.accentText : colors.textSecondary;
 
     Widget icon = Icon(
       selected ? item.activeIcon : item.icon,

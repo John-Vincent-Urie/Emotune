@@ -123,6 +123,8 @@ class _HomeHeaderState extends State<HomeHeader> with TickerProviderStateMixin {
               shimmer: _shimmer,
               fontSize: 19,
               reduceMotion: widget.reduceMotion,
+              onLightBackground:
+                  Theme.of(context).brightness == Brightness.light,
             ),
           ],
         ),

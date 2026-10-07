@@ -28,7 +28,8 @@ class AppColors {
   // directly rather than through the theme's textTheme.
   static const Color textPrimary = Color(0xFFF3F6F3);
   static const Color textSecondary = Color(0xFF93A199);
-  static const Color textFine = Color(0xFF5C6A61);
+  // Was #5C6A61, 3.6:1 on the dark backdrop -- under AA for 12px text.
+  static const Color textFine = Color(0xFF7D8B82);
 
   // Light theme
   static const Color lightBg = Color(0xFFF5F5F5);
@@ -88,6 +89,9 @@ class EmoTuneColors extends ThemeExtension<EmoTuneColors> {
     required this.textPrimary,
     required this.textSecondary,
     required this.divider,
+    required this.safety,
+    required this.onSafety,
+    required this.accentText,
   });
 
   final Color background;
@@ -100,6 +104,16 @@ class EmoTuneColors extends ThemeExtension<EmoTuneColors> {
   final Color textPrimary;
   final Color textSecondary;
   final Color divider;
+  // Text, icons and borders on safety surfaces (check-in banner, support
+  // screen). The brand amber #FFB020 is 1.6:1 on the light theme's amber
+  // tint, so light uses a dark amber (5.5:1 there); dark keeps the bright one.
+  final Color safety;
+  // Foreground on a filled [safety] button.
+  final Color onSafety;
+  // The brand green for icons, ticks, spinners and text drawn straight on a
+  // themed surface. Lime and mint are 1.2-1.4:1 on the light theme, so light
+  // uses a deep green (5:1+); dark keeps mint.
+  final Color accentText;
 
   static const EmoTuneColors light = EmoTuneColors(
     background: Color(0xFFF5F6F2),
@@ -107,8 +121,12 @@ class EmoTuneColors extends ThemeExtension<EmoTuneColors> {
     card: Color(0xFFFFFFFF),
     cardAlt: Color(0xFFF7F8F5),
     textPrimary: Color(0xFF1B1F1C),
-    textSecondary: Color(0xFF767F76),
+    // #767F76 was 3.6-4.1:1 on every light surface, under AA for body text.
+    textSecondary: Color(0xFF5F675F),
     divider: Color(0x14000000),
+    safety: Color(0xFF8A5300),
+    onSafety: Color(0xFFFFFFFF),
+    accentText: Color(0xFF2B7838),
   );
 
   static const EmoTuneColors dark = EmoTuneColors(
@@ -119,6 +137,9 @@ class EmoTuneColors extends ThemeExtension<EmoTuneColors> {
     textPrimary: Color(0xFFF3F6F3),
     textSecondary: Color(0xFF8B948C),
     divider: Color(0x14FFFFFF),
+    safety: Color(0xFFFFB020),
+    onSafety: Color(0xFF000000),
+    accentText: AppColors.mint,
   );
 
   /// Convenience accessor so screens read `context.emoColors` rather than
@@ -135,6 +156,9 @@ class EmoTuneColors extends ThemeExtension<EmoTuneColors> {
     Color? textPrimary,
     Color? textSecondary,
     Color? divider,
+    Color? safety,
+    Color? onSafety,
+    Color? accentText,
   }) {
     return EmoTuneColors(
       background: background ?? this.background,
@@ -144,6 +168,9 @@ class EmoTuneColors extends ThemeExtension<EmoTuneColors> {
       textPrimary: textPrimary ?? this.textPrimary,
       textSecondary: textSecondary ?? this.textSecondary,
       divider: divider ?? this.divider,
+      safety: safety ?? this.safety,
+      onSafety: onSafety ?? this.onSafety,
+      accentText: accentText ?? this.accentText,
     );
   }
 
@@ -160,6 +187,9 @@ class EmoTuneColors extends ThemeExtension<EmoTuneColors> {
       textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
       textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
       divider: Color.lerp(divider, other.divider, t)!,
+      safety: Color.lerp(safety, other.safety, t)!,
+      onSafety: Color.lerp(onSafety, other.onSafety, t)!,
+      accentText: Color.lerp(accentText, other.accentText, t)!,
     );
   }
 }
