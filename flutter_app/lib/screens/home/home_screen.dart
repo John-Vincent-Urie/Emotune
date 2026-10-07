@@ -13,7 +13,9 @@ import 'widgets/mood_composer.dart';
 import '../widgets/track_card.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/feel_better_dialog.dart';
+import '../support/support_contact_quick_list.dart';
 import '../support/support_screen.dart';
+import '../../services/support_contacts.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -31,6 +33,10 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isAnalyzing = false;
   Map<String, dynamic>? _lastResult;
   String? _aiMessage;
+  // A failed analyze. Kept apart from [_aiMessage] so an error never renders
+  // as if it were EmoTune's reply.
+  String? _analyzeError;
+  bool _analyzeErrorIsNetwork = false;
   bool _isCrisis = false;
   // Gentle check-in from the backend's concern tier; music still plays.
   Map<String, dynamic>? _supportCheckIn;
@@ -82,7 +88,8 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  bool get _isEmptyState => _tracks.isEmpty && _aiMessage == null;
+  bool get _isEmptyState =>
+      _tracks.isEmpty && _aiMessage == null && _analyzeError == null;
 
   @override
   Widget build(BuildContext context) {
@@ -122,6 +129,17 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (_analyzeError != null) ...[
+                      _buildAnalyzeError(colors),
+                      const SizedBox(height: 16),
+                    ],
+                    // First, above the reply and the playlist: on a 360x820
+                    // phone the last contact used to sit under the mini
+                    // player until the user thought to scroll.
+                    if (_supportCheckIn != null && !_isCrisis) ...[
+                      _buildCheckInBanner(colors),
+                      const SizedBox(height: 16),
+                    ],
                     if (_aiMessage != null) ...[
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -131,29 +149,29 @@ class _HomeScreenState extends State<HomeScreen>
                               : colors.card,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: _isCrisis
-                                ? const Color(0xFFFFB020)
-                                : colors.divider,
+                            color: _isCrisis ? colors.safety : colors.divider,
                           ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (_isCrisis) ...[
-                              const Row(
+                              Row(
                                 children: [
                                   Icon(
                                     Icons.favorite,
-                                    color: Color(0xFFFFB020),
+                                    color: colors.safety,
                                     size: 18,
                                   ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    "We'd rather check in than play a song",
-                                    style: TextStyle(
-                                      color: Color(0xFFFFB020),
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      "We'd rather check in than play a song",
+                                      style: TextStyle(
+                                        color: colors.safety,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -172,8 +190,8 @@ class _HomeScreenState extends State<HomeScreen>
                               const SizedBox(height: 12),
                               FilledButton.icon(
                                 style: FilledButton.styleFrom(
-                                  backgroundColor: const Color(0xFFFFB020),
-                                  foregroundColor: Colors.black,
+                                  backgroundColor: colors.safety,
+                                  foregroundColor: colors.onSafety,
                                 ),
                                 icon: const Icon(Icons.support_agent),
                                 label: const Text('Get support now'),
@@ -198,13 +216,14 @@ class _HomeScreenState extends State<HomeScreen>
                                             AppColors.accent,
                                       ),
                                     ),
+                                    // The mood color stays on the tint and
+                                    // border; as text it fell to 1.3:1
+                                    // (happy, light) and 1.9:1 (fear, dark).
                                     child: Text(
                                       '${_lastResult!['emotion'].toString().toUpperCase()} '
                                       '${_lastResult!['confidence']}%',
                                       style: TextStyle(
-                                        color: AppColors.emotionColors[
-                                                _lastResult!['emotion']] ??
-                                            AppColors.accent,
+                                        color: colors.textPrimary,
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -218,19 +237,15 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                       const SizedBox(height: 16),
                     ],
-                    if (_supportCheckIn != null && !_isCrisis) ...[
-                      _buildCheckInBanner(colors),
-                      const SizedBox(height: 16),
-                    ],
                     if (_loadingMoreTracks) ...[
                       Row(
                         children: [
-                          const SizedBox(
+                          SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: AppColors.accent,
+                              color: colors.accentText,
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -315,7 +330,19 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _analyze() async {
     final text = _promptCtrl.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty) {
+      // Sending nothing used to do nothing at all, which read as broken.
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Type a few words about how you feel first.'),
+          ),
+        );
+      return;
+    }
+    // Drop the keyboard so the reply and playlist aren't hidden under it.
+    FocusManager.instance.primaryFocus?.unfocus();
     final requestId = ++_requestSequence;
     final studio = context.read<RecommendationStudioProvider>();
 
@@ -323,6 +350,8 @@ class _HomeScreenState extends State<HomeScreen>
       _isAnalyzing = true;
       _tracks = [];
       _aiMessage = null;
+      _analyzeError = null;
+      _analyzeErrorIsNetwork = false;
       _isCrisis = false;
       _supportCheckIn = null;
       _loadingMoreTracks = false;
@@ -385,7 +414,9 @@ class _HomeScreenState extends State<HomeScreen>
       setState(() {
         _lastResult = null;
         _tracks = [];
-        _aiMessage = e.message;
+        _analyzeError = e.message;
+        // No status means the server was never reached.
+        _analyzeErrorIsNetwork = e.statusCode == null;
         _loadingMoreTracks = false;
       });
     } catch (e) {
@@ -395,7 +426,7 @@ class _HomeScreenState extends State<HomeScreen>
       setState(() {
         _lastResult = null;
         _tracks = [];
-        _aiMessage =
+        _analyzeError =
             'Could not analyze your prompt right now. Please try again.';
         _loadingMoreTracks = false;
       });
@@ -412,34 +443,104 @@ class _HomeScreenState extends State<HomeScreen>
       level: 'crisis',
       message: _aiMessage ?? '',
       resources: List<dynamic>.from(_lastResult?['support_resources'] ?? []),
+      about: _lastResult?['support_about']?.toString() ?? 'self',
     );
   }
 
-  Widget _buildCheckInBanner(EmoTuneColors colors) {
-    const amber = Color(0xFFFFB020);
-    final checkIn = _supportCheckIn!;
-    final message = checkIn['message']?.toString() ?? '';
+  /// A failed analyze, styled as a notice rather than EmoTune's reply. Crisis
+  /// detection runs on the server, so whatever the user wrote got no safety
+  /// check; the card always offers the support contacts bundled in the app.
+  Widget _buildAnalyzeError(EmoTuneColors colors) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: amber.withValues(alpha: 0.10),
+        color: colors.card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: amber.withValues(alpha: 0.6)),
+        border: Border.all(color: colors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.favorite, color: amber, size: 18),
-              SizedBox(width: 8),
-              Text(
-                'Checking in on you',
-                style: TextStyle(
-                  color: amber,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
+              Icon(Icons.cloud_off_rounded, color: colors.textSecondary, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    _analyzeError!,
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontSize: 14,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              foregroundColor: colors.safety,
+              padding: EdgeInsets.zero,
+            ),
+            icon: const Icon(Icons.support_agent, size: 18),
+            label: const Text(
+              'Need to talk to someone now?',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            onPressed: () => SupportScreen.open(
+              context,
+              level: 'concern',
+              message: _analyzeErrorIsNetwork
+                  ? "EmoTune can't connect right now, but these people can "
+                      'be reached by phone.'
+                  : 'EmoTune hit a problem, but these people can be reached '
+                      'by phone.',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCheckInBanner(EmoTuneColors colors) {
+    const amberTint = Color(0xFFFFB020);
+    final checkIn = _supportCheckIn!;
+    final message = checkIn['message']?.toString() ?? '';
+    final about = checkIn['about']?.toString() ?? 'self';
+    final resources = supportContactsOrBundled(
+      List<dynamic>.from(checkIn['resources'] ?? const []),
+    );
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: amberTint.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.safety.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.favorite, color: colors.safety, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  about == 'someone_else'
+                      ? 'Help for someone you care about'
+                      : 'Checking in on you',
+                  style: TextStyle(
+                    color: colors.safety,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -450,6 +551,8 @@ class _HomeScreenState extends State<HomeScreen>
             style: TextStyle(color: colors.textPrimary, fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 10),
+          SupportContactQuickList(resources: resources),
+          const SizedBox(height: 4),
           Row(
             children: [
               TextButton(
@@ -457,11 +560,15 @@ class _HomeScreenState extends State<HomeScreen>
                   context,
                   level: 'concern',
                   message: message,
-                  resources: List<dynamic>.from(checkIn['resources'] ?? []),
+                  resources: resources,
+                  about: about,
                 ),
-                child: const Text(
-                  'Talk to a counselor',
-                  style: TextStyle(color: amber, fontWeight: FontWeight.bold),
+                child: Text(
+                  'More ways to get support',
+                  style: TextStyle(
+                    color: colors.safety,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const Spacer(),

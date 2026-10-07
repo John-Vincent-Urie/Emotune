@@ -71,6 +71,9 @@ class _MoodComposerState extends State<MoodComposer>
         10,
       ),
       child: Row(
+        // The field grows upward for longer feelings; the send button stays
+        // level with its last line.
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
             child: AnimatedContainer(
@@ -83,7 +86,7 @@ class _MoodComposerState extends State<MoodComposer>
                 borderRadius: BorderRadius.circular(26),
                 border: Border.all(
                   color: focused
-                      ? AppColors.mint.withValues(alpha: 0.8)
+                      ? colors.accentText.withValues(alpha: 0.8)
                       : colors.divider,
                 ),
                 boxShadow: focused
@@ -100,8 +103,16 @@ class _MoodComposerState extends State<MoodComposer>
                 controller: widget.controller,
                 focusNode: _focusNode,
                 style: TextStyle(color: colors.textPrimary, fontSize: 15),
-                cursorColor: AppColors.mint,
+                cursorColor: colors.accentText,
+                // Wraps up to four lines, then scrolls. The keyboard keeps its
+                // Send key: a feeling is one message, not a document.
+                minLines: 1,
+                maxLines: 4,
+                keyboardType: TextInputType.text,
                 decoration: InputDecoration(
+                  // The theme fills inputs; here that painted a square over
+                  // the rounded pill behind it.
+                  filled: false,
                   hintText: 'I feel......',
                   hintStyle: TextStyle(
                     color: colors.textSecondary,
