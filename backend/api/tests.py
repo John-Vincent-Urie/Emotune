@@ -1,6 +1,7 @@
 import json
 from datetime import timedelta
 from io import StringIO
+import tempfile
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from unittest.mock import Mock, patch
@@ -2680,6 +2681,13 @@ class SpotifyRecommendationTests(TestCase):
         self.assertTrue(all(track['spotify_url'].startswith('https://open.spotify.com/') for track in tracks))
         mock_search.assert_called_once()
 
+    # A fresh service under pinned credentials, like its neighbours: the
+    # shared spotify_service read its client ID from the local .env at import,
+    # so on a fresh checkout it had none and never asked for a token.
+    @override_settings(
+        SPOTIFY_CLIENT_ID='client-id',
+        SPOTIFY_CLIENT_SECRET='client-secret',
+    )
     def test_get_client_token_reuses_cached_token_until_expiry(self):
         response = Mock()
         response.ok = True
@@ -2688,13 +2696,11 @@ class SpotifyRecommendationTests(TestCase):
             'access_token': 'cached-token',
             'expires_in': 3600,
         }
-
-        spotify_service._client_token = None
-        spotify_service._client_token_expires_at = None
+        service = SpotifyService()
 
         with patch('api.http_client.post', return_value=response) as mock_post:
-            first_token = spotify_service.get_client_token()
-            second_token = spotify_service.get_client_token()
+            first_token = service.get_client_token()
+            second_token = service.get_client_token()
 
         self.assertEqual(first_token, 'cached-token')
         self.assertEqual(second_token, 'cached-token')
@@ -3557,23 +3563,26 @@ class EmotionClassifierTests(TestCase):
 
     @patch.object(EmotionClassifier, '_load_model', return_value=None)
     @patch.object(EmotionClassifier, '_load_goemotions_model', return_value=None)
-    @override_settings(ML_MODEL_PATH='ml/models/bert_emotion_model')
     def test_resolve_model_source_uses_existing_local_model_directory(
         self,
         _mock_load_goemotions_model,
         _mock_load_model,
     ):
-        classifier = EmotionClassifier()
-
-        model_source, is_local = classifier._resolve_model_source(settings.ML_MODEL_PATH)
+        # A relative ML_MODEL_PATH resolves against BASE_DIR. The real model is
+        # gitignored, so a stand-in directory keeps this passing on a fresh
+        # checkout instead of only on machines that have trained one.
+        with tempfile.TemporaryDirectory() as base_dir:
+            model_dir = Path(base_dir) / 'ml' / 'models' / 'bert_emotion_model'
+            model_dir.mkdir(parents=True)
+            with override_settings(BASE_DIR=Path(base_dir), ML_MODEL_PATH='ml/models/bert_emotion_model'):
+                classifier = EmotionClassifier()
+                model_source, is_local = classifier._resolve_model_source(settings.ML_MODEL_PATH)
+            # Compared as a Path, not a string suffix: the resolver joins with
+            # the OS separator, so a hardcoded one only ever passes on the
+            # machine it was written on.
+            expected = model_dir.resolve()
 
         self.assertTrue(is_local)
-        # Compared as a Path, not a string suffix: the resolver joins with the
-        # OS separator, so a hardcoded one only ever passes on the machine it
-        # was written on.
-        expected = (
-            Path(settings.BASE_DIR) / 'ml' / 'models' / 'bert_emotion_model'
-        ).resolve()
         self.assertEqual(Path(model_source), expected)
 
     @patch.object(EmotionClassifier, '_load_model', return_value=None)
