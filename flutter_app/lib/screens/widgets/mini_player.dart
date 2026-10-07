@@ -114,28 +114,34 @@ class MiniPlayer extends StatelessWidget {
                     IconButton(
                       icon: Icon(Icons.skip_previous,
                           color: isDark ? Colors.white : Colors.black87),
+                      tooltip: 'Previous track',
                       onPressed: player.previous,
                       iconSize: 20,
                     ),
-                    GestureDetector(
-                      onTap: player.togglePlayPause,
-                      child: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: const BoxDecoration(
-                          gradient: AppColors.buttonGradient,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          player.isPlaying ? Icons.pause : Icons.play_arrow,
-                          color: Colors.black,
-                          size: 18,
+                    Semantics(
+                      button: true,
+                      label: player.isPlaying ? 'Pause' : 'Play',
+                      child: GestureDetector(
+                        onTap: player.togglePlayPause,
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: const BoxDecoration(
+                            gradient: AppColors.buttonGradient,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            player.isPlaying ? Icons.pause : Icons.play_arrow,
+                            color: Colors.black,
+                            size: 18,
+                          ),
                         ),
                       ),
                     ),
                     IconButton(
                       icon: Icon(Icons.skip_next,
                           color: isDark ? Colors.white : Colors.black87),
+                      tooltip: 'Next track',
                       onPressed: player.next,
                       iconSize: 20,
                     ),

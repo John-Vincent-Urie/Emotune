@@ -9,16 +9,21 @@ class EmoTuneToggle extends StatelessWidget {
     super.key,
     required this.value,
     required this.onChanged,
+    required this.label,
   });
 
   final bool value;
   final ValueChanged<bool> onChanged;
+  // What the switch controls; without it TalkBack announced "switch, on" with
+  // no hint of which setting.
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.emoColors;
     return Semantics(
       toggled: value,
+      label: label,
       child: GestureDetector(
         onTap: () => onChanged(!value),
         child: AnimatedContainer(

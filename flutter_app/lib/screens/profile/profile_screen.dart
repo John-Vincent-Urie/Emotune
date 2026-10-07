@@ -107,10 +107,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   icon: themeProvider.isDark
                       ? Icons.light_mode_outlined
                       : Icons.dark_mode_outlined,
+                  label: themeProvider.isDark
+                      ? 'Switch to light theme'
+                      : 'Switch to dark theme',
                   onTap: themeProvider.toggleTheme,
                 ),
                 EmoTuneIconButton(
                   icon: Icons.logout_rounded,
+                  label: 'Log out',
                   onTap: () => _confirmLogout(context, auth),
                 ),
               ],
@@ -130,6 +134,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           icon: Icons.dark_mode_outlined,
                           title: 'Dark mode',
                           trailing: EmoTuneToggle(
+                            label: 'Dark mode',
                             value: themeProvider.isDark,
                             onChanged: (_) => themeProvider.toggleTheme(),
                           ),
@@ -189,11 +194,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     style: TextStyle(color: colors.textPrimary),
                                   ),
                                   trailing: saved
-                                      ? const Icon(Icons.check,
-                                          color: AppColors.mint)
+                                      ? Icon(Icons.check,
+                                          color: colors.accentText)
                                       : IconButton(
-                                          icon: const Icon(Icons.add,
-                                              color: AppColors.mint),
+                                          icon: Icon(Icons.add,
+                                              color: colors.accentText),
                                           onPressed: _isSavingArtists
                                               ? null
                                               : () => _addArtist(name),
@@ -230,6 +235,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           subtitle:
                               'Lets EmoTune learn from your sessions to improve future picks.',
                           trailing: EmoTuneToggle(
+                            label: 'Mood-based personalization',
                             value: user['personalization_opt_in'] != false,
                             onChanged: _updatePersonalizationOptIn,
                           ),
@@ -285,8 +291,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       strokeWidth: 2),
                                 )
                               : user['is_spotify_connected'] == true
-                                  ? const Icon(Icons.check_circle_rounded,
-                                      color: AppColors.mint, size: 18)
+                                  ? Icon(Icons.check_circle_rounded,
+                                      color: colors.accentText, size: 18)
                                   : null,
                         ),
                         if (user['is_spotify_connected'] == true)
@@ -482,41 +488,129 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showChangePassword(BuildContext ctx) {
     final oldCtrl = TextEditingController();
     final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
     final colors = ctx.emoColors;
+    String? error;
+    var saving = false;
+    var obscure = true;
+
+    InputDecoration field(String label, {String? helper}) => InputDecoration(
+          labelText: label,
+          helperText: helper,
+          // Wraps instead of cutting off at 360px wide.
+          helperMaxLines: 2,
+        );
+
     showDialog(
       context: ctx,
-      builder: (_) => AlertDialog(
-        backgroundColor: colors.card,
-        title: Text('Change Password', style: TextStyle(color: colors.textPrimary)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: oldCtrl,
-              obscureText: true,
-              style: TextStyle(color: colors.textPrimary),
-              decoration: const InputDecoration(labelText: 'Old Password'),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final toggle = IconButton(
+            icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+            tooltip: obscure ? 'Show passwords' : 'Hide passwords',
+            onPressed: () => setDialogState(() => obscure = !obscure),
+          );
+          return AlertDialog(
+            backgroundColor: colors.card,
+            // Without this the dialog was announced only as "Alert".
+            semanticLabel: 'Change password',
+            title: Text('Change Password', style: TextStyle(color: colors.textPrimary)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: oldCtrl,
+                    obscureText: obscure,
+                    style: TextStyle(color: colors.textPrimary),
+                    decoration: field('Current password').copyWith(
+                      suffixIcon: toggle,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: newCtrl,
+                    obscureText: obscure,
+                    style: TextStyle(color: colors.textPrimary),
+                    decoration: field(
+                      'New password',
+                      helper: 'At least 8 characters, not only numbers',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // A typo in a hidden new password used to go unnoticed
+                  // until the next login failed.
+                  TextField(
+                    controller: confirmCtrl,
+                    obscureText: obscure,
+                    style: TextStyle(color: colors.textPrimary),
+                    decoration: field('Confirm new password'),
+                  ),
+                  // A rejected password used to fail silently: the dialog just
+                  // stayed open. The server's reasons now show here.
+                  if (error != null) ...[
+                    const SizedBox(height: 12),
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        error!,
+                        style: TextStyle(
+                          // 5.3:1 on the light card, 6.7:1 on the dark one.
+                          color: Theme.of(dialogContext).brightness ==
+                                  Brightness.light
+                              ? const Color(0xFFC9302C)
+                              : const Color(0xFFFF6B6B),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: newCtrl,
-              obscureText: true,
-              style: TextStyle(color: colors.textPrimary),
-              decoration: const InputDecoration(labelText: 'New Password'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              await ApiService.changePassword(oldCtrl.text, newCtrl.text);
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Change'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: saving
+                    ? null
+                    : () async {
+                        if (newCtrl.text != confirmCtrl.text) {
+                          setDialogState(
+                              () => error = 'New passwords do not match.');
+                          return;
+                        }
+                        setDialogState(() {
+                          saving = true;
+                          error = null;
+                        });
+                        try {
+                          await ApiService.changePassword(
+                              oldCtrl.text, newCtrl.text);
+                          if (!dialogContext.mounted) return;
+                          Navigator.pop(dialogContext);
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            const SnackBar(content: Text('Password changed.')),
+                          );
+                        } on ApiException catch (e) {
+                          if (!dialogContext.mounted) return;
+                          setDialogState(() {
+                            saving = false;
+                            // The server's "Wrong password" doesn't say which
+                            // of the fields is wrong.
+                            error = e.message == 'Wrong password'
+                                ? 'Your current password is incorrect.'
+                                : e.message;
+                          });
+                        }
+                      },
+                child: const Text('Change'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -621,7 +715,7 @@ class _SettingsRow extends StatelessWidget {
               color: colors.cardAlt,
               borderRadius: BorderRadius.circular(9),
             ),
-            child: Icon(icon, size: 15, color: AppColors.mint),
+            child: Icon(icon, size: 15, color: colors.accentText),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -782,7 +876,10 @@ class _ProfileHeader extends StatelessWidget {
               alignment: Alignment.center,
               child: Text(
                 initial,
-                style: emoTuneHeadlineFont(fontSize: 28, color: AppColors.lime),
+                style: emoTuneHeadlineFont(
+                  fontSize: 28,
+                  color: context.emoColors.accentText,
+                ),
               ),
             ),
             const SizedBox(height: 10),
@@ -806,7 +903,7 @@ class _ProfileHeader extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: isSpotifyConnected
-                      ? AppColors.teal
+                      ? colors.accentText
                       : colors.divider,
                   width: 1.4,
                 ),

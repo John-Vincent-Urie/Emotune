@@ -221,7 +221,7 @@ class _SegButton extends StatelessWidget {
             color: colors.cardAlt,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: selected ? AppColors.mint : colors.divider,
+              color: selected ? colors.accentText : colors.divider,
               width: 1.4,
             ),
           ),
@@ -229,7 +229,7 @@ class _SegButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (selected) ...[
-                const Icon(Icons.check_rounded, size: 12, color: AppColors.mint),
+                Icon(Icons.check_rounded, size: 12, color: colors.accentText),
                 const SizedBox(width: 5),
               ],
               Text(
@@ -293,7 +293,7 @@ class _ToggleRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          EmoTuneToggle(value: value, onChanged: onChanged),
+          EmoTuneToggle(label: title, value: value, onChanged: onChanged),
         ],
       ),
     );

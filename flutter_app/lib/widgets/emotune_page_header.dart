@@ -69,10 +69,13 @@ class EmoTuneIconButton extends StatelessWidget {
   const EmoTuneIconButton({
     super.key,
     required this.icon,
+    required this.label,
     this.onTap,
   });
 
   final IconData icon;
+  // An icon alone reads as just "button" to a screen reader.
+  final String label;
   final VoidCallback? onTap;
 
   @override
@@ -80,6 +83,7 @@ class EmoTuneIconButton extends StatelessWidget {
     final colors = context.emoColors;
     return Semantics(
       button: true,
+      label: label,
       child: GestureDetector(
         onTap: onTap,
         child: Container(

@@ -231,7 +231,12 @@ class _PressFeedbackState extends State<_PressFeedback> {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
+      enabled: widget.onTap != null,
       label: widget.semanticLabel,
+      onTap: widget.onTap,
+      // The visible label is a Text inside, so without this the button was
+      // announced twice ("Get started, Get started").
+      excludeSemantics: true,
       child: MouseRegion(
         cursor: widget.onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
         onEnter: (_) => setState(() => _hovered = true),
