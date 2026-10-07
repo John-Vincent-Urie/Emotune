@@ -418,6 +418,7 @@ class ApiService {
     } on FormatException {
       throw ApiException(
         'The server returned an invalid response (${response.statusCode}).',
+        statusCode: response.statusCode,
       );
     }
 
@@ -425,10 +426,38 @@ class ApiService {
       return decoded;
     }
 
+    if (response.statusCode == 429) {
+      throw ApiException(
+        _throttledMessage(decoded, response.headers['retry-after']),
+        statusCode: 429,
+      );
+    }
+
     throw ApiException(
       _extractErrorMessage(decoded, response.statusCode),
       statusCode: response.statusCode,
     );
+  }
+
+  /// DRF's throttle text ("Request was throttled. Expected available in 57
+  /// seconds.") reads like a log line. Keep the useful part, the wait.
+  static String _throttledMessage(dynamic decoded, String? retryAfter) {
+    var seconds = int.tryParse(retryAfter?.trim() ?? '');
+    if (seconds == null && decoded is Map) {
+      final detail = decoded['detail']?.toString() ?? '';
+      final match = RegExp(r'(\d+)\s*second').firstMatch(detail);
+      seconds = int.tryParse(match?.group(1) ?? '');
+    }
+    const lead = "That's a lot of tries in a short time.";
+    if (seconds == null || seconds <= 0) {
+      return '$lead Please wait a moment and try again.';
+    }
+    if (seconds < 60) {
+      return '$lead Please try again in $seconds seconds.';
+    }
+    final minutes = (seconds / 60).ceil();
+    return '$lead Please try again in $minutes '
+        '${minutes == 1 ? 'minute' : 'minutes'}.';
   }
 
   static Map<String, dynamic> _parseObject(http.Response response) {
@@ -447,7 +476,9 @@ class ApiService {
       }
       for (final value in decoded.values) {
         if (value is List && value.isNotEmpty) {
-          return _asSentence(value.first.toString());
+          // The password validators can fail several rules at once ("too
+          // short" and "entirely numeric"); show them all, not just one.
+          return value.map((m) => _asSentence(m.toString())).join(' ');
         }
         if (value != null && value.toString().trim().isNotEmpty) {
           return _asSentence(value.toString());

@@ -9,6 +9,7 @@ import '../../widgets/emotune_backdrop.dart';
 import '../../widgets/emotune_buttons.dart';
 import '../../widgets/emotune_logo.dart';
 import '../../theme/app_theme.dart';
+import '../legal/legal_screen.dart';
 
 /// Widest the form is allowed to get. Past this a single column of inputs
 /// stretches into an unreadable line on tablets and desktop windows.
@@ -39,6 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
     // there is actually something to submit.
     _emailCtrl.addListener(_onFormChanged);
     _passCtrl.addListener(_onFormChanged);
+    _clearStaleAuthError(this);
   }
 
   @override
@@ -100,7 +102,6 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       child: Form(
         key: _formKey,
-        autovalidateMode: AutovalidateMode.onUserInteraction,
         child: AutofillGroup(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -117,7 +118,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 validator: _validateEmail,
                 onSubmitted: (_) => _passFocus.requestFocus(),
               ),
-              const SizedBox(height: 18),
               _AuthField(
                 label: 'Password',
                 hint: 'Your password',
@@ -133,7 +133,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     : null,
                 onSubmitted: (_) => _submit(),
               ),
-              const SizedBox(height: 4),
               // Sits with the password field rather than below the button:
               // it is a way out of that field, not a second submit action.
               Align(
@@ -222,6 +221,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     ]) {
       controller.addListener(_onFormChanged);
     }
+    _clearStaleAuthError(this);
   }
 
   @override
@@ -272,7 +272,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
       child: Form(
         key: _formKey,
-        autovalidateMode: AutovalidateMode.onUserInteraction,
         child: AutofillGroup(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -291,7 +290,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     : null,
                 onSubmitted: (_) => _emailFocus.requestFocus(),
               ),
-              const SizedBox(height: 18),
               _AuthField(
                 label: 'Email',
                 hint: 'name@example.com',
@@ -304,10 +302,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 validator: _validateEmail,
                 onSubmitted: (_) => _passFocus.requestFocus(),
               ),
-              const SizedBox(height: 18),
               _AuthField(
                 label: 'Password',
-                hint: 'At least 6 characters',
+                hint: 'At least 8 characters',
                 controller: _passCtrl,
                 focusNode: _passFocus,
                 enabled: !auth.isLoading,
@@ -341,7 +338,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     : null,
                 onSubmitted: (_) => _submit(),
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 2),
               _ConsentTile(
                 title: 'I agree to the Terms and Privacy Policy',
                 subtitle: 'Required so we can create and protect your account.',
@@ -350,7 +347,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 isRequired: true,
                 onChanged: (value) => setState(() => _acceptTerms = value),
               ),
-              const SizedBox(height: 12),
+              // Outside the tile: a link inside it would also toggle the box.
+              // A Wrap, so the second link drops to its own line on a narrow
+              // phone instead of overflowing.
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _LegalLink(
+                    label: 'Read the Terms',
+                    onTap: () => LegalScreen.open(context, LegalDoc.terms),
+                  ),
+                  Text(
+                    '·',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                  ),
+                  _LegalLink(
+                    label: 'Read the Privacy Policy',
+                    onTap: () => LegalScreen.open(context, LegalDoc.privacy),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
               _ConsentTile(
                 title: 'Use my mood activity to personalize recommendations',
                 subtitle:
@@ -430,11 +447,25 @@ String? _validateEmail(String? value) {
   return null;
 }
 
+/// Login and Register share AuthProvider.error, so a failed sign-in banner
+/// followed the user onto Register. Each screen starts clean. After the first
+/// frame, because clearing notifies listeners and must not run mid-build.
+void _clearStaleAuthError(State state) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (state.mounted) state.context.read<AuthProvider>().clearError();
+  });
+}
+
 String? _validatePassword(String? value) {
   final password = value ?? '';
   if (password.isEmpty) return 'Password is required';
-  // Matches the server's own minimum so the rule is never a surprise.
-  if (password.length < 6) return 'Use at least 6 characters';
+  // Mirrors the server's validators that can be checked on the device, so
+  // the rule is never a surprise. "Too common" and "too similar to your
+  // email" are server-only and come back in the error banner.
+  if (password.length < 8) return 'Use at least 8 characters';
+  if (RegExp(r'^\d+$').hasMatch(password)) {
+    return 'Add a letter or symbol, not only numbers';
+  }
   return null;
 }
 
@@ -651,7 +682,15 @@ class _AuthField extends StatefulWidget {
 }
 
 class _AuthFieldState extends State<_AuthField> {
+  final _fieldKey = GlobalKey<FormFieldState<String>>();
   bool _focused = false;
+  // Typed in at least once. A field the user only tabbed through is not
+  // flagged on blur; submit still validates it.
+  bool _dirty = false;
+  // Validating from the first keystroke shouted "Enter a valid email" at
+  // "j". Errors now wait for the user to leave the field (or submit), and
+  // once shown they track every keystroke so a fix clears them at once.
+  bool _liveValidation = false;
 
   @override
   void initState() {
@@ -667,90 +706,117 @@ class _AuthFieldState extends State<_AuthField> {
 
   void _onFocusChanged() {
     if (!mounted) return;
-    setState(() => _focused = widget.focusNode.hasFocus);
+    setState(() {
+      _focused = widget.focusNode.hasFocus;
+      if (!_focused && _dirty) _liveValidation = true;
+    });
+  }
+
+  void _onChanged(String _) {
+    _dirty = true;
+    // After a failed submit the error is on screen but live validation is
+    // not on yet; without this it would sit there stale until the next submit.
+    if (!_liveValidation && (_fieldKey.currentState?.hasError ?? false)) {
+      setState(() => _liveValidation = true);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isPassword = widget.onToggleObscure != null;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // The label brightens with focus: a second, non-color-only cue that
-        // pairs with the border so it reads without relying on hue alone.
-        AnimatedDefaultTextStyle(
-          duration: const Duration(milliseconds: 160),
-          style: TextStyle(
-            color: _focused
-                ? AppColors.accent
-                : Colors.white.withValues(alpha: 0.72),
-            fontSize: 13,
-            fontWeight: _focused ? FontWeight.w600 : FontWeight.w500,
-            letterSpacing: 0.2,
+    // Merged so the field is announced by its visible label ("Email, edit
+    // box"), not only by its hint text.
+    return MergeSemantics(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // The label brightens with focus: a second, non-color-only cue that
+          // pairs with the border so it reads without relying on hue alone.
+          AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 160),
+            style: TextStyle(
+              color: _focused
+                  ? AppColors.accent
+                  : Colors.white.withValues(alpha: 0.72),
+              fontSize: 13,
+              fontWeight: _focused ? FontWeight.w600 : FontWeight.w500,
+              letterSpacing: 0.2,
+            ),
+            child: Text(widget.label),
           ),
-          child: Text(widget.label),
-        ),
-        const SizedBox(height: 7),
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: _focused
-                ? [
-                    BoxShadow(
-                      color: AppColors.accent.withValues(alpha: 0.18),
-                      blurRadius: 14,
-                      spreadRadius: 1,
-                    ),
-                  ]
-                : const [],
-          ),
-          child: TextFormField(
-            controller: widget.controller,
-            focusNode: widget.focusNode,
-            enabled: widget.enabled,
-            obscureText: widget.obscure,
-            keyboardType: widget.keyboardType,
-            textInputAction: widget.textInputAction,
-            textCapitalization: widget.textCapitalization,
-            autofillHints: widget.autofillHints,
-            validator: widget.validator,
-            onFieldSubmitted: widget.onSubmitted,
-            // Email and password fields should never be "helpfully" corrected.
-            autocorrect: !isPassword && widget.keyboardType == null,
-            enableSuggestions: !isPassword,
-            style: const TextStyle(color: Colors.white, fontSize: 15),
-            cursorColor: AppColors.accent,
-            decoration: InputDecoration(
-              hintText: widget.hint,
-              hintStyle: TextStyle(
-                color: Colors.white.withValues(alpha: 0.32),
-                fontSize: 14,
+          const SizedBox(height: 7),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: _focused
+                  ? [
+                      BoxShadow(
+                        color: AppColors.accent.withValues(alpha: 0.18),
+                        blurRadius: 14,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : const [],
+            ),
+            child: TextFormField(
+              key: _fieldKey,
+              autovalidateMode: _liveValidation
+                  ? AutovalidateMode.always
+                  : AutovalidateMode.disabled,
+              onChanged: _onChanged,
+              controller: widget.controller,
+              focusNode: widget.focusNode,
+              enabled: widget.enabled,
+              obscureText: widget.obscure,
+              keyboardType: widget.keyboardType,
+              textInputAction: widget.textInputAction,
+              textCapitalization: widget.textCapitalization,
+              autofillHints: widget.autofillHints,
+              validator: widget.validator,
+              onFieldSubmitted: widget.onSubmitted,
+              // Email and password fields should never be "helpfully" corrected.
+              autocorrect: !isPassword && widget.keyboardType == null,
+              enableSuggestions: !isPassword,
+              style: const TextStyle(color: Colors.white, fontSize: 15),
+              cursorColor: AppColors.accent,
+              decoration: InputDecoration(
+                hintText: widget.hint,
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.32),
+                  fontSize: 14,
+                ),
+                filled: true,
+                fillColor: widget.enabled
+                    ? AppColors.darkCard
+                    : AppColors.darkCard.withValues(alpha: 0.5),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                border: _border(AppColors.darkBorder),
+                enabledBorder: _border(AppColors.darkBorder),
+                disabledBorder: _border(AppColors.darkBorder),
+                focusedBorder: _border(AppColors.accent, width: 1.6),
+                errorBorder: _border(const Color(0xFFFF6B6B)),
+                focusedErrorBorder:
+                    _border(const Color(0xFFFF6B6B), width: 1.6),
+                errorStyle: const TextStyle(
+                  color: Color(0xFFFF6B6B),
+                  fontSize: 12,
+                ),
+                // A blank helper line holds the error's slot open, so an error
+                // appearing or clearing moves nothing below the field. The gaps
+                // between fields were cut by the same amount.
+                helperText: ' ',
+                helperStyle: const TextStyle(fontSize: 12),
+                errorMaxLines: 2,
+                suffixIcon: _buildSuffix(isPassword),
               ),
-              filled: true,
-              fillColor: widget.enabled
-                  ? AppColors.darkCard
-                  : AppColors.darkCard.withValues(alpha: 0.5),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              border: _border(AppColors.darkBorder),
-              enabledBorder: _border(AppColors.darkBorder),
-              disabledBorder: _border(AppColors.darkBorder),
-              focusedBorder: _border(AppColors.accent, width: 1.6),
-              errorBorder: _border(const Color(0xFFFF6B6B)),
-              focusedErrorBorder:
-                  _border(const Color(0xFFFF6B6B), width: 1.6),
-              errorStyle: const TextStyle(
-                color: Color(0xFFFF6B6B),
-                fontSize: 12,
-              ),
-              suffixIcon: _buildSuffix(isPassword),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -789,9 +855,9 @@ class _PasswordStrengthMeter extends StatelessWidget {
 
   /// 0 = too short, 1 = weak, 2 = fair, 3 = strong.
   int get _score {
-    if (password.length < 6) return 0;
+    if (password.length < 8) return 0;
     var score = 1;
-    if (password.length >= 10) score++;
+    if (password.length >= 12) score++;
     final hasLetters = RegExp(r'[A-Za-z]').hasMatch(password);
     final hasDigits = RegExp(r'\d').hasMatch(password);
     final hasSymbols = RegExp(r'[^A-Za-z0-9]').hasMatch(password);
@@ -818,7 +884,8 @@ class _PasswordStrengthMeter extends StatelessWidget {
       opacity: password.isEmpty ? 0 : 1,
       duration: const Duration(milliseconds: 180),
       child: Padding(
-        padding: const EdgeInsets.only(top: 10),
+        // The field's reserved error line above already spaces it.
+        padding: const EdgeInsets.only(top: 2),
         child: Row(
           children: [
             for (var index = 0; index < 3; index++) ...[
@@ -859,6 +926,35 @@ class _PasswordStrengthMeter extends StatelessWidget {
   }
 }
 
+class _LegalLink extends StatelessWidget {
+  const _LegalLink({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.accent,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        // A full 48dp target; QA measured the old ones under 48 tall. Standard
+        // density, or web/desktop's compact default shrinks the minimum.
+        minimumSize: const Size(48, 48),
+        tapTargetSize: MaterialTapTargetSize.padded,
+        visualDensity: VisualDensity.standard,
+        textStyle: const TextStyle(
+          fontSize: 13.5,
+          fontWeight: FontWeight.w600,
+          decoration: TextDecoration.underline,
+        ),
+      ),
+      child: Text(label),
+    );
+  }
+}
+
 /// A consent row where the whole card is the target, not just the checkbox.
 class _ConsentTile extends StatelessWidget {
   const _ConsentTile({
@@ -892,73 +988,79 @@ class _ConsentTile extends StatelessWidget {
               : AppColors.darkBorder,
         ),
       ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
+      child: Semantics(
+        // The checkbox itself is excluded below, so the tile carries the
+        // checked state; before, TalkBack never said whether it was ticked.
+        checked: value,
+        enabled: enabled,
+        child: Material(
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(14),
-          onTap: enabled ? () => onChanged(!value) : null,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Excluded from semantics because the InkWell above already
-                // exposes one checkbox; two would be read out twice.
-                ExcludeSemantics(
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: Checkbox(
-                      value: value,
-                      activeColor: AppColors.accent,
-                      checkColor: Colors.black,
-                      side: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.4),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: enabled ? () => onChanged(!value) : null,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Excluded from semantics because the InkWell above already
+                  // exposes one checkbox; two would be read out twice.
+                  ExcludeSemantics(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: Checkbox(
+                        value: value,
+                        activeColor: AppColors.accent,
+                        checkColor: Colors.black,
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.4),
+                        ),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        onChanged:
+                            enabled ? (next) => onChanged(next ?? false) : null,
                       ),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      onChanged:
-                          enabled ? (next) => onChanged(next ?? false) : null,
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              title,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                height: 1.3,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.3,
+                                ),
                               ),
                             ),
-                          ),
-                          if (isRequired) ...[
-                            const SizedBox(width: 6),
-                            const _RequiredChip(),
+                            if (isRequired) ...[
+                              const SizedBox(width: 6),
+                              const _RequiredChip(),
+                            ],
                           ],
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
-                          fontSize: 12,
-                          height: 1.35,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 3),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.6),
+                            fontSize: 12,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -1111,7 +1213,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool get _emailLooksValid => _validateEmail(_emailCtrl.text) == null;
   bool get _codeComplete => _codeCtrl.text.length == _codeLength;
   bool get _passwordsReady =>
-      _passCtrl.text.length >= 6 && _passCtrl.text == _confirmCtrl.text;
+      _validatePassword(_passCtrl.text) == null &&
+      _passCtrl.text == _confirmCtrl.text;
 
   String get _email => _emailCtrl.text.trim().toLowerCase();
 
@@ -1166,13 +1269,35 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     });
   }
 
-  Future<void> _verifyCode() {
-    return _run(() async {
-      await ApiService.verifyPasswordResetCode(_email, _codeCtrl.text);
+  Future<void> _verifyCode() async {
+    int? rejectedWith;
+    await _run(() async {
+      try {
+        await ApiService.verifyPasswordResetCode(_email, _codeCtrl.text);
+      } on ApiException catch (e) {
+        rejectedWith = e.statusCode;
+        rethrow;
+      }
       if (!mounted) return;
       setState(() => _step = _ResetStep.password);
       _passFocus.requestFocus();
     });
+    // A rejected code left all six boxes full, so typing the right one meant
+    // deleting six digits first. Only on a real rejection: after a network
+    // error or a throttle the code may well be right.
+    final status = rejectedWith;
+    if (mounted &&
+        status != null &&
+        status >= 400 &&
+        status < 500 &&
+        status != 429) {
+      // clear() fires _onTyping, which wipes _error -- the code vanished with
+      // no explanation. Put the server's message back after clearing.
+      final message = _error;
+      _codeCtrl.clear();
+      setState(() => _error = message);
+      _codeFocus.requestFocus();
+    }
   }
 
   Future<void> _resetPassword() {
@@ -1269,7 +1394,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           validator: _validateEmail,
           onSubmitted: (_) => _emailLooksValid ? _sendCode() : null,
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 8),
         EmoTunePrimaryButton(
           label: 'Send code',
           isLoading: _busy,
@@ -1329,7 +1454,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       children: [
         _AuthField(
           label: 'New password',
-          hint: 'At least 6 characters',
+          hint: 'At least 8 characters',
           controller: _passCtrl,
           focusNode: _passFocus,
           enabled: !_busy,
@@ -1337,12 +1462,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           onToggleObscure: () => setState(() => _obscure = !_obscure),
           textInputAction: TextInputAction.next,
           autofillHints: const [AutofillHints.newPassword],
-          validator: (value) => (value == null || value.length < 6)
-              ? 'Use at least 6 characters'
-              : null,
+          validator: _validatePassword,
           onSubmitted: (_) => _confirmFocus.requestFocus(),
         ),
-        const SizedBox(height: 12),
         _PasswordStrengthMeter(password: _passCtrl.text),
         const SizedBox(height: 18),
         _AuthField(
@@ -1360,7 +1482,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               (value != _passCtrl.text) ? 'Passwords do not match' : null,
           onSubmitted: (_) => _passwordsReady ? _resetPassword() : null,
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 8),
         EmoTunePrimaryButton(
           label: 'Reset password',
           isLoading: _busy,
@@ -1494,28 +1616,31 @@ class _OtpFieldState extends State<_OtpField> {
         // Invisible, but full-width so a tap anywhere on the row opens the
         // keyboard and lands the caret at the end.
         Positioned.fill(
-          child: TextField(
-            controller: widget.controller,
-            focusNode: widget.focusNode,
-            enabled: widget.enabled,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            textInputAction: TextInputAction.done,
-            autofillHints: const [AutofillHints.oneTimeCode],
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(widget.length),
-            ],
-            showCursor: false,
-            cursorColor: Colors.transparent,
-            style: const TextStyle(color: Colors.transparent, fontSize: 1),
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              filled: false,
-              counterText: '',
-              contentPadding: EdgeInsets.zero,
+          child: Semantics(
+            label: 'Verification code, ${widget.length} digits',
+            child: TextField(
+              controller: widget.controller,
+              focusNode: widget.focusNode,
+              enabled: widget.enabled,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.oneTimeCode],
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(widget.length),
+              ],
+              showCursor: false,
+              cursorColor: Colors.transparent,
+              style: const TextStyle(color: Colors.transparent, fontSize: 1),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
+                counterText: '',
+                contentPadding: EdgeInsets.zero,
+              ),
             ),
           ),
         ),

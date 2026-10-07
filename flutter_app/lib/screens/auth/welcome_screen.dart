@@ -1,17 +1,13 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../theme/app_theme.dart';
+import '../legal/legal_screen.dart';
 import '../../widgets/emotune_backdrop.dart';
 import '../../widgets/emotune_buttons.dart';
 import '../../widgets/emotune_logo.dart';
 
 // Placeholders until the documents are hosted -- swap for the real URLs.
-const String _termsUrl = 'https://emotune.app/terms';
-const String _privacyUrl = 'https://emotune.app/privacy';
-
 /// Entrance order. Each element rises [_stagger] after the one before it, so
 /// the eye is led logo -> name -> promise -> action instead of being handed
 /// the whole screen at once.
@@ -115,16 +111,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     super.dispose();
   }
 
-  Future<void> _openLegal(String url) async {
-    final uri = Uri.parse(url);
-    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!opened && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open that document.')),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final reduce = _reduceMotion ?? false;
@@ -220,8 +206,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         _reveal(
           index: _revealFinePrint,
           child: _FinePrint(
-            onTermsTap: () => _openLegal(_termsUrl),
-            onPrivacyTap: () => _openLegal(_privacyUrl),
+            onTermsTap: () => LegalScreen.open(context, LegalDoc.terms),
+            onPrivacyTap: () => LegalScreen.open(context, LegalDoc.privacy),
           ),
         ),
       ],
@@ -326,33 +312,11 @@ class _RingedLogoMark extends StatelessWidget {
 // Fine print
 // ---------------------------------------------------------------------------
 
-class _FinePrint extends StatefulWidget {
+class _FinePrint extends StatelessWidget {
   const _FinePrint({required this.onTermsTap, required this.onPrivacyTap});
 
   final VoidCallback onTermsTap;
   final VoidCallback onPrivacyTap;
-
-  @override
-  State<_FinePrint> createState() => _FinePrintState();
-}
-
-class _FinePrintState extends State<_FinePrint> {
-  late final TapGestureRecognizer _terms;
-  late final TapGestureRecognizer _privacy;
-
-  @override
-  void initState() {
-    super.initState();
-    _terms = TapGestureRecognizer()..onTap = () => widget.onTermsTap();
-    _privacy = TapGestureRecognizer()..onTap = () => widget.onPrivacyTap();
-  }
-
-  @override
-  void dispose() {
-    _terms.dispose();
-    _privacy.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -361,23 +325,57 @@ class _FinePrintState extends State<_FinePrint> {
       fontSize: 12,
       height: 1.5,
     );
-    final link = base.copyWith(
-      color: AppColors.textSecondary,
-      decoration: TextDecoration.underline,
-      decorationColor: AppColors.textSecondary.withValues(alpha: 0.5),
-    );
 
-    return Text.rich(
-      TextSpan(
-        style: base,
-        children: [
-          const TextSpan(text: 'By continuing you agree to our '),
-          TextSpan(text: 'terms', style: link, recognizer: _terms),
-          const TextSpan(text: ' and '),
-          TextSpan(text: 'privacy policy', style: link, recognizer: _privacy),
-        ],
+    // Separate widgets rather than one Text.rich with tap recognizers: on web
+    // with accessibility on, the two inline links collapsed into one node and
+    // both opened the privacy policy.
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text('By continuing you agree to our ', style: base),
+        _FineLink(label: 'terms', style: base, onTap: onTermsTap),
+        Text(' and ', style: base),
+        _FineLink(label: 'privacy policy', style: base, onTap: onPrivacyTap),
+      ],
+    );
+  }
+}
+
+class _FineLink extends StatelessWidget {
+  const _FineLink({
+    required this.label,
+    required this.style,
+    required this.onTap,
+  });
+
+  final String label;
+  final TextStyle style;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      link: true,
+      label: label,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          // A taller hit area than the 18px line, without moving the text.
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            label,
+            style: style.copyWith(
+              color: AppColors.textSecondary,
+              decoration: TextDecoration.underline,
+              decorationColor: AppColors.textSecondary.withValues(alpha: 0.5),
+            ),
+          ),
+        ),
       ),
-      textAlign: TextAlign.center,
     );
   }
 }

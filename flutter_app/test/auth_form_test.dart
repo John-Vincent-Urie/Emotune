@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:emotune/providers/auth_provider.dart';
 import 'package:emotune/screens/auth/login_register_screen.dart';
+import 'package:emotune/services/api_service.dart';
 import 'package:emotune/widgets/emotune_buttons.dart';
 
 /// Pumps an auth screen with the routes it can navigate to. No request is ever
@@ -134,7 +138,18 @@ void main() {
       await _tap(tester, find.text('I agree to the Terms and Privacy Policy'));
       await _tap(tester, find.byType(EmoTunePrimaryButton));
 
-      expect(find.text('Use at least 6 characters'), findsOneWidget);
+      expect(find.text('Use at least 8 characters'), findsOneWidget);
+    });
+
+    testWidgets('an all-digit password is caught before the server',
+        (tester) async {
+      await _pumpAuth(tester, const RegisterScreen());
+      await tester.enterText(fieldAt(2), '12345678');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+
+      expect(find.text('Add a letter or symbol, not only numbers'),
+          findsOneWidget);
     });
 
     testWidgets('mismatched passwords are reported on the confirm field',
@@ -143,8 +158,40 @@ void main() {
       await tester.enterText(fieldAt(2), 'secret123');
       await tester.enterText(fieldAt(3), 'secret124');
       await tester.pump();
+      // Not while the user is still typing in the field...
+      expect(find.text('Passwords do not match'), findsNothing);
 
+      // ...but as soon as they leave it.
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
       expect(find.text('Passwords do not match'), findsOneWidget);
+
+      // And a fix clears it without another submit.
+      await tester.enterText(fieldAt(3), 'secret123');
+      await tester.pump();
+      expect(find.text('Passwords do not match'), findsNothing);
+    });
+
+    testWidgets('a half-typed email is not flagged while typing',
+        (tester) async {
+      await _pumpAuth(tester, const RegisterScreen());
+      await tester.enterText(fieldAt(1), 'j');
+      await tester.pump();
+
+      expect(find.text('Enter a valid email address'), findsNothing);
+    });
+
+    testWidgets('an error appearing does not move the fields below it',
+        (tester) async {
+      await _pumpAuth(tester, const RegisterScreen());
+      final before = tester.getTopLeft(fieldAt(3));
+
+      await tester.enterText(fieldAt(1), 'not-an-email');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+
+      expect(find.textContaining('valid email'), findsOneWidget);
+      expect(tester.getTopLeft(fieldAt(3)), before);
     });
 
     testWidgets('password strength is shown while typing', (tester) async {
@@ -154,7 +201,7 @@ void main() {
       await tester.pump();
       expect(find.text('Too short'), findsOneWidget);
 
-      await tester.enterText(fieldAt(2), 'abcdef');
+      await tester.enterText(fieldAt(2), 'abcdefgh');
       await tester.pump();
       expect(find.text('Weak'), findsOneWidget);
 
@@ -170,5 +217,41 @@ void main() {
       await _tap(tester, find.text('Log in'));
       expect(find.text('Welcome back'), findsOneWidget);
     });
+  });
+
+  testWidgets('a failed login banner does not follow the user to Register',
+      (tester) async {
+    final auth = AuthProvider();
+    await tester.pumpWidget(
+      ChangeNotifierProvider<AuthProvider>.value(
+        value: auth,
+        child: const MediaQuery(
+          data: MediaQueryData(disableAnimations: true),
+          child: MaterialApp(home: RegisterScreen()),
+        ),
+      ),
+    );
+    // A real failed login, as if Login had just handed over to Register.
+    SharedPreferences.setMockInitialValues({
+      'resolved_api_base_url': 'http://emotune.test/api',
+    });
+    ApiService.httpClient = MockClient(
+      (_) async => http.Response('{"error": "Invalid credentials"}', 401),
+    );
+    addTearDown(() => ApiService.httpClient = http.Client());
+    await tester.runAsync(() => auth.login('qa@example.com', 'nope'));
+    expect(auth.error, 'Wrong email or password.');
+    await tester.pumpWidget(
+      ChangeNotifierProvider<AuthProvider>.value(
+        value: auth,
+        child: const MediaQuery(
+          data: MediaQueryData(disableAnimations: true),
+          child: MaterialApp(home: RegisterScreen(key: ValueKey('fresh'))),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Wrong email or password.'), findsNothing);
   });
 }

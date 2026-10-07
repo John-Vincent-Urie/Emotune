@@ -104,7 +104,9 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
     } on ApiException catch (e) {
-      _error = e.message;
+      // The server says "Invalid credentials", which reads like a system
+      // fault; tell people what to check instead.
+      _error = e.statusCode == 401 ? 'Wrong email or password.' : e.message;
       _isLoading = false;
       notifyListeners();
       return false;
