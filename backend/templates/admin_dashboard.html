@@ -12,8 +12,12 @@
 </head>
 <body>
 
-{# The page is already staff-gated by admin_panel, so the dashboard reads its
-   API token from here instead of asking for credentials a second time. #}
+{% comment %}
+The page is already staff-gated by admin_panel, so the dashboard reads its API
+token from here instead of asking for credentials a second time. ({# #} comments
+must fit on one line; a multi-line one renders as text and, with body as a flex
+row, pushes the whole dashboard right.)
+{% endcomment %}
 {{ admin_access_token|json_script:"admin-access-token" }}
 
 <!-- APP -->

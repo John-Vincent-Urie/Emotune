@@ -7,6 +7,11 @@ let allUsers=[],deleteUserId=null,monthlyData=[],moodData=[];
 let mC,mPC,mBC,mDC,tC;
 const EC={happy:'#ffd166',sad:'#4da6ff',angry:'#ff4d6d',motivational:'#ff9a3c',fear:'#b06aff',depressing:'#6b7d8e',surprising:'#ff69b4',stressed:'#ff6b6b',calm:'#4dffd2',lonely:'#778899',romantic:'#ff85c8',nostalgic:'#deb887',mixed:'#9370db'};
 const EE={happy:'😊',sad:'😢',angry:'😠',motivational:'💪',fear:'😨',depressing:'😔',surprising:'😲',stressed:'😤',calm:'😌',lonely:'🥺',romantic:'💕',nostalgic:'🌅',mixed:'🎭'};
+// Display names are free text (spaces allowed since 2026-10-04), so anything a
+// user typed goes through esc() before it becomes HTML: a name like
+// <img onerror=...> or one with a quote would otherwise run script in a staff
+// browser or break the table and its delete buttons.
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function normalizeMoodKey(mood){return String(mood||'').trim().toLowerCase();}
 function accentClass(index){return `accent-${index%7}`;}
 function moodFillClass(emotion){const key=normalizeMoodKey(emotion);return EC[key]?`mood-fill-${key}`:'mood-fill-default';}
@@ -66,14 +71,14 @@ function renderMoodPie(){
 function renderMoodBars(){
   const el=document.getElementById('mood-bars');if(!el)return;
   const max=moodData[0]?.count||1;
-  el.innerHTML=moodData.slice(0,7).map(m=>{const moodKey=normalizeMoodKey(m.detected_emotion);return `<div class="mood-row"><span class="mood-emoji">${EE[moodKey]||'🎵'}</span><div class="mood-info"><div class="mood-name"><span>${m.detected_emotion}</span><span class="mood-count">${m.count}</span></div><div class="mood-bar-bg"><div class="mood-bar-fill ${moodFillClass(moodKey)}" data-width="${m.count/max*100}"></div></div></div></div>`;}).join('');
+  el.innerHTML=moodData.slice(0,7).map(m=>{const moodKey=normalizeMoodKey(m.detected_emotion);return `<div class="mood-row"><span class="mood-emoji">${EE[moodKey]||'🎵'}</span><div class="mood-info"><div class="mood-name"><span>${esc(m.detected_emotion)}</span><span class="mood-count">${m.count}</span></div><div class="mood-bar-bg"><div class="mood-bar-fill ${moodFillClass(moodKey)}" data-width="${m.count/max*100}"></div></div></div></div>`;}).join('');
   applyMoodFillWidths(el);
 }
 
 function renderActivity(users){
   const el=document.getElementById('recent-activity');if(!el)return;
   const recent=[...users].sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0)).slice(0,5);
-  el.innerHTML=recent.map((u,i)=>`<div class="activity-item"><div class="activity-avatar ${accentClass(i)}">${(u.username||'U')[0].toUpperCase()}</div><div class="activity-main"><div class="activity-name">${u.username||'User'}</div><div class="activity-meta">Joined ${fmtDate(u.created_at)}</div></div><div class="activity-prompts">${u.prompt_count||0} prompts</div></div>`).join('');
+  el.innerHTML=recent.map((u,i)=>`<div class="activity-item"><div class="activity-avatar ${accentClass(i)}">${esc((u.username||'U')[0].toUpperCase())}</div><div class="activity-main"><div class="activity-name">${esc(u.username||'User')}</div><div class="activity-meta">Joined ${fmtDate(u.created_at)}</div></div><div class="activity-prompts">${u.prompt_count||0} prompts</div></div>`).join('');
 }
 
 let curPage=1;const PER=10;
@@ -94,7 +99,7 @@ function renderUsersTable(users){curPage=1;renderPage(users,1);}
 
 function renderPage(users,page){
   const start=(page-1)*PER;const pu=users.slice(start,start+PER);
-  document.getElementById('users-tbody').innerHTML=pu.length?pu.map((u,i)=>`<tr><td><div class="user-cell"><div class="user-avatar ${accentClass(start+i)}">${(u.username||'U')[0].toUpperCase()}</div><div><div class="user-name">${u.username||'—'}</div><div class="user-email">${u.email||'—'}</div></div></div></td><td class="user-joined">${fmtDate(u.created_at)}</td><td><span class="prompt-count">${u.prompt_count||0}</span></td><td>${u.is_spotify_connected?'<span class="badge green">✓ Connected</span>':'<span class="badge gray">Not connected</span>'}</td><td><button class="delete-btn" onclick="openDeleteModal(${u.id},'${(u.username||'').replace(/'/g,'')}')" >🗑 Delete</button></td></tr>`).join(''):'<tr><td colspan="5" class="table-empty-compact">No users found</td></tr>';
+  document.getElementById('users-tbody').innerHTML=pu.length?pu.map((u,i)=>`<tr><td><div class="user-cell"><div class="user-avatar ${accentClass(start+i)}">${esc((u.username||'U')[0].toUpperCase())}</div><div><div class="user-name">${esc(u.username||'—')}</div><div class="user-email">${esc(u.email||'—')}</div></div></div></td><td class="user-joined">${fmtDate(u.created_at)}</td><td><span class="prompt-count">${u.prompt_count||0}</span></td><td>${u.is_spotify_connected?'<span class="badge green">✓ Connected</span>':'<span class="badge gray">Not connected</span>'}</td><td><button class="delete-btn" onclick="openDeleteModal(${Number(u.id)})">🗑 Delete</button></td></tr>`).join(''):'<tr><td colspan="5" class="table-empty-compact">No users found</td></tr>';
   document.getElementById('users-count').textContent=`${users.length} user${users.length!==1?'s':''}`;
   const tot=Math.ceil(users.length/PER);
   document.getElementById('page-btns').innerHTML=Array.from({length:tot},(_,i)=>`<button class="page-btn ${i+1===page?'active':''}" onclick="changePage(${i+1})">${i+1}</button>`).join('');
@@ -102,7 +107,7 @@ function renderPage(users,page){
 
 function changePage(p){const q=document.getElementById('user-search').value.toLowerCase();const f=q?allUsers.filter(u=>(u.username||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q)):allUsers;curPage=p;renderPage(f,p);}
 
-function openDeleteModal(id,name){deleteUserId=id;document.getElementById('modal-text').textContent=`Delete "${name}"? This action cannot be undone.`;document.getElementById('delete-modal').classList.add('open');}
+function openDeleteModal(id){const user=allUsers.find(u=>u.id===id);const name=user?.username||'this user';deleteUserId=id;document.getElementById('modal-text').textContent=`Delete "${name}"? This action cannot be undone.`;document.getElementById('delete-modal').classList.add('open');}
 function closeModal(){document.getElementById('delete-modal').classList.remove('open');deleteUserId=null;}
 
 async function confirmDelete(){
@@ -125,7 +130,7 @@ function renderMoodAnalytics(){
   if(dCtx){if(mDC)mDC.destroy();mDC=new Chart(dCtx,{type:'doughnut',data:{labels:moodData.map(m=>m.detected_emotion),datasets:[{data:moodData.map(m=>m.count),backgroundColor:moodData.map(m=>EC[normalizeMoodKey(m.detected_emotion)]||'#9eff65'),borderColor:'#131920',borderWidth:3}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'right',labels:{color:'#6b7d8e',font:{size:10},padding:6,boxWidth:10}}}}});}
   const tot=moodData.reduce((s,m)=>s+m.count,0);const max=moodData[0]?.count||1;
   const list=document.getElementById('mood-detail-list');
-  list.innerHTML=moodData.map(m=>{const moodKey=normalizeMoodKey(m.detected_emotion);return `<div class="mood-detail-row"><span class="mood-detail-emoji">${EE[moodKey]||'🎵'}</span><div class="mood-detail-info"><div class="mood-detail-header"><span class="mood-detail-name">${m.detected_emotion}</span><span class="mood-detail-meta">${m.count} · ${(m.count/tot*100).toFixed(1)}%</span></div><div class="mood-bar-bg"><div class="mood-bar-fill ${moodFillClass(moodKey)}" data-width="${m.count/max*100}"></div></div></div></div>`;}).join('');
+  list.innerHTML=moodData.map(m=>{const moodKey=normalizeMoodKey(m.detected_emotion);return `<div class="mood-detail-row"><span class="mood-detail-emoji">${EE[moodKey]||'🎵'}</span><div class="mood-detail-info"><div class="mood-detail-header"><span class="mood-detail-name">${esc(m.detected_emotion)}</span><span class="mood-detail-meta">${m.count} · ${(m.count/tot*100).toFixed(1)}%</span></div><div class="mood-bar-bg"><div class="mood-bar-fill ${moodFillClass(moodKey)}" data-width="${m.count/max*100}"></div></div></div></div>`;}).join('');
   applyMoodFillWidths(list);
 }
 

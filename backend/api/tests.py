@@ -677,6 +677,16 @@ class AdminPanelAccessTests(TestCase):
         # The page no longer collects credentials of its own.
         self.assertNotContains(response, 'id="login-password"')
 
+    def test_template_comments_do_not_leak_into_the_page(self):
+        # A {# #} comment only works on one line. A multi-line one rendered as
+        # text and, with body as a flex row, pushed the dashboard ~260px right.
+        self.client.force_login(self.staff)
+
+        response = self.client.get('/admin-panel/')
+
+        self.assertNotContains(response, '{#')
+        self.assertNotContains(response, '{%')
+
     def test_root_url_routes_to_the_gated_dashboard(self):
         response = self.client.get('/')
 
