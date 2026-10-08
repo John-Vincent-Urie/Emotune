@@ -316,10 +316,10 @@ class SeededSupportResourceTests(TestCase):
         resources = APIClient().get('/api/support-resources/').json()['resources']
         dial = {r['name']: r['phone_uri'] for r in resources}
 
-        # In screen order: emergency, then the 24/7 national line, then the therapist.
+        # 911 and the NCMH Crisis Hotline (migration 0004) are deactivated by
+        # migration 0006 pending replacement contacts (owner decision,
+        # 2026-10-08), so only the therapist rows are visible() right now.
         self.assertEqual(list(dial.items()), [
-            ('Emergency services (911)', 'tel:911'),
-            ('NCMH Crisis Hotline', 'tel:1553'),
             ('Music Cares Studio (Globe)', 'tel:09173255789'),
             ('Music Cares Studio (Smart)', 'tel:09189296012'),
         ])
