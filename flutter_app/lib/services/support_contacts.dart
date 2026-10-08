@@ -1,45 +1,29 @@
-/// The support contacts the project owner verified on 2026-10-04, bundled in
-/// the app so the support screen and the check-in banner still list them when
-/// the backend cannot be reached.
+/// The support contacts bundled in the app so the support screen and the
+/// check-in banner still list someone when the backend cannot be reached.
 ///
-/// Same shape (SupportResource.to_payload) and order as backend migrations
-/// 0003/0004: emergency first, then the 24/7 hotline, then the therapist
-/// practice, which does not answer at 2am.
+/// Same shape as `SupportResource.to_payload`. Owner decision, 2026-10-08:
+/// 911 and the NCMH Crisis Hotline (backend migration 0004) are out of the
+/// shown contacts while replacement numbers are sourced and verified -- see
+/// backend migration 0006. That leaves no emergency/24-7-hotline entry here
+/// for now, which is why the Music Cares description below no longer tells
+/// people to "call emergency services first": there is nothing in this list
+/// for that sentence to point at.
 ///
 /// Do not add numbers here unless the project owner has verified them. Keep
-/// this list in step with those migrations.
+/// this list in step with the backend migrations.
 const List<Map<String, dynamic>> kBundledSupportContacts = [
-  {
-    'name': 'Emergency services (911)',
-    'kind': 'emergency',
-    'kind_label': 'Emergency services',
-    'description': 'If you or someone else is in immediate danger, call 911 now.',
-    'phone': '911',
-    'hours': '24/7',
-  },
-  {
-    'name': 'NCMH Crisis Hotline',
-    'kind': 'hotline',
-    'kind_label': 'Crisis hotline',
-    'description': 'National Center for Mental Health crisis line. Talk to '
-        'someone any time, day or night.',
-    'phone': '1553',
-    'hours': '24/7',
-  },
   {
     'name': 'Music Cares Studio (Globe)',
     'kind': 'counselor',
     'kind_label': 'Therapist / counselor',
-    'description': 'Therapist service. Not a 24/7 crisis line -- if you are in '
-        'immediate danger, call emergency services first.',
+    'description': 'Therapist service. Not a 24/7 crisis line.',
     'phone': '09173255789',
   },
   {
     'name': 'Music Cares Studio (Smart)',
     'kind': 'counselor',
     'kind_label': 'Therapist / counselor',
-    'description': 'Therapist service. Not a 24/7 crisis line -- if you are in '
-        'immediate danger, call emergency services first.',
+    'description': 'Therapist service. Not a 24/7 crisis line.',
     'phone': '09189296012',
   },
 ];

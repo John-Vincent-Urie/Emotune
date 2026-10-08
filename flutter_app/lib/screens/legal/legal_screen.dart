@@ -110,8 +110,9 @@ const List<_Section> _termsSections = [
         'not diagnose or treat anything. Music suggestions are not therapy.',
   ]),
   _Section('If you are in danger', [
-    'If you or someone else is in immediate danger, call 911. You can reach '
-        'the NCMH Crisis Hotline at 1553, 24 hours a day.',
+    'If you or someone else is in immediate danger, contact your local '
+        'emergency services right away. [Project owner: add verified '
+        'emergency and crisis-line numbers here once sourced.]',
     'EmoTune checks messages for signs that someone may be at risk and, if it '
         'finds them, shows support contacts instead of music. This check can '
         'miss things. Never rely on EmoTune to notice that you need help.',
@@ -151,7 +152,7 @@ const List<_Section> _privacySections = [
   _Section('Who else sees your text', [
     'Google Gemini: to choose songs, EmoTune may send what you typed, the '
         'detected emotion and your preferred artists to Google\'s Gemini AI '
-        'service. Your text may also be sent to Gemini for a safety check. '
+        'service. '
         'These requests contain the text only, not your name, email or '
         'account ID. Google handles that data under its own terms.',
     'Spotify: song searches and playback go through Spotify.',

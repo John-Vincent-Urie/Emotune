@@ -85,16 +85,16 @@ void main() {
   });
 
   group('bundled support contacts', () {
-    test('are exactly the four verified numbers, emergency first', () {
+    test('are exactly the two Music Cares numbers while 911/NCMH are out', () {
       expect(
         kBundledSupportContacts.map((c) => c['phone']),
-        ['911', '1553', '09173255789', '09189296012'],
+        ['09173255789', '09189296012'],
       );
     });
 
     test('stand in when the server sent none', () {
-      expect(supportContactsOrBundled(null), hasLength(4));
-      expect(supportContactsOrBundled(const []), hasLength(4));
+      expect(supportContactsOrBundled(null), hasLength(2));
+      expect(supportContactsOrBundled(const []), hasLength(2));
       final server = supportContactsOrBundled([
         {'name': 'Only server row', 'phone': '1553'},
       ]);
@@ -113,10 +113,6 @@ void main() {
       ),
     ));
 
-    expect(find.bySemanticsLabel('Call Emergency services (911), 911'),
-        findsOneWidget);
-    expect(find.bySemanticsLabel('Call NCMH Crisis Hotline, 1553'),
-        findsOneWidget);
     expect(find.bySemanticsLabel('Call Music Cares Studio (Globe), 09173255789'),
         findsOneWidget);
     expect(find.bySemanticsLabel('Call Music Cares Studio (Smart), 09189296012'),
@@ -143,9 +139,9 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('Emergency services (911)'), findsOneWidget);
-      expect(find.text('NCMH Crisis Hotline'), findsOneWidget);
-      expect(find.text('Call 1553'), findsOneWidget);
+      expect(find.text('Emergency services (911)'), findsNothing);
+      expect(find.text('NCMH Crisis Hotline'), findsNothing);
+      expect(find.text('Music Cares Studio (Globe)'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('Music Cares Studio (Smart)'),
         200,
