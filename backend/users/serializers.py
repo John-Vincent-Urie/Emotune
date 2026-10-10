@@ -6,6 +6,8 @@ from django.utils import timezone
 from rest_framework_simplejwt.exceptions import InvalidToken
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.settings import api_settings as jwt_settings
+from api.models import emotion_display_names
+
 from .models import FavoriteTrack, PromptHistory
 
 User = get_user_model()
@@ -159,7 +161,20 @@ class PasswordResetConfirmSerializer(PasswordResetVerifySerializer):
         return data
 
 
+def _display_name(serializer, emotion):
+    # Looked up once per response: the context is shared by every item of a list.
+    names = serializer.context.setdefault('emotion_display_names', None)
+    if names is None:
+        names = serializer.context['emotion_display_names'] = emotion_display_names()
+    return names.get(emotion)
+
+
 class FavoriteTrackSerializer(serializers.ModelSerializer):
+    emotion_display = serializers.SerializerMethodField()
+
+    def get_emotion_display(self, obj):
+        return _display_name(self, obj.emotion)
+
     class Meta:
         model = FavoriteTrack
         fields = '__all__'
@@ -169,6 +184,11 @@ class FavoriteTrackSerializer(serializers.ModelSerializer):
 
 
 class PromptHistorySerializer(serializers.ModelSerializer):
+    detected_emotion_display = serializers.SerializerMethodField()
+
+    def get_detected_emotion_display(self, obj):
+        return _display_name(self, obj.detected_emotion)
+
     class Meta:
         model = PromptHistory
         fields = '__all__'

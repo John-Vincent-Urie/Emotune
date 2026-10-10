@@ -118,7 +118,7 @@ migrations, never edited through an admin screen:
 Spotify's role is limited to stored metadata for playback. Each song's Spotify
 track ID, URL, album and artwork were found **once, offline** (exact title +
 artist match only, original recordings only) and stored on the row; no request
-searches Spotify. 111 of the 114 songs are matched (one, Merry-Go-Round of Life, to the composer's
+searches Spotify. 112 of the 114 songs are matched (one, Merry-Go-Round of Life, to the composer's
 official re-recording because the original soundtrack is not on Spotify). An unmatched song is still listed — the app shows it
 with a Spotify search link instead of a play button.
 
@@ -215,6 +215,7 @@ Also in `api`: `SupportResource` (crisis/support contacts) and `SupportEvent`
 | --- | --- |
 | `POST /analyze/` | Text → crisis check → emotion → all approved songs + `total` |
 | `POST /recommend-by-emotion/` | Emotion tab → that emotion's approved songs |
+| `GET /emotions/` | The 13 emotions in the therapist's order with display names (Motivated, Scared, …) |
 | `POST /feel-better/` | Should we show a check-in prompt? |
 | `POST /feel-better-response/` | Record the answer; a "yes" can switch to the support emotion's songs |
 | `GET /support-resources/` | Verified support contacts |

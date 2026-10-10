@@ -275,7 +275,7 @@ for several emotions appears once in each list.
 ### 5.3 Spotify's limited role
 
 Each song's Spotify track ID was found **once, offline**, by exact title +
-artist search and stored on the row (111 of 114 matched; original or official recordings only). Spotify is then used
+artist search and stored on the row (112 of 114 matched; original or official recordings only). Spotify is then used
 only to play those stored tracks in-app. An unmatched song is still listed, with
 a Spotify search link instead of a play button. Spotify never decides which
 songs are suitable for an emotion.
@@ -481,7 +481,7 @@ Naming these yourselves shows maturity. Ordered by severity.
    because all three route to the same de-escalating mode.
 6. **Explicit flags are not checked.** Only therapist-validated songs are shown,
    but Spotify's `explicit` flag is not stored or filtered.
-7. **3 of 114 songs have no Spotify match** (no original recording found), so they
+7. **2 of 114 songs have no Spotify match** (not found under the listed artist), so they
    cannot play in-app; the app offers a Spotify search instead. Spotify
    Development Mode also limits playback to allow-listed accounts.
 8. **The shift toward a support emotion happens only at check-ins,** not within a

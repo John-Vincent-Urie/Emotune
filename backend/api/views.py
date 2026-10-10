@@ -36,7 +36,7 @@ from .session_plan import (
 from ml.emotion_classifier import EMOTIONS, get_classifier, get_ai_response
 from ml.plutchik_mapper import build_plutchik_profile
 from users.models import PromptHistory
-from .models import SupportEvent, SupportResource, songs_for_emotion
+from .models import Emotion, SupportEvent, SupportResource, emotion_display_names, songs_for_emotion
 from .safety import (
     CONCERN_CHECK_IN_MESSAGE,
     SOMEONE_ELSE_CHECK_IN_MESSAGE,
@@ -479,6 +479,7 @@ def _build_emotion_response_payload(
     elif not user:
         history_id = None
 
+    display_names = emotion_display_names()
     payload = {
         'emotion': emotion,
         'emotion_info': (
@@ -495,11 +496,13 @@ def _build_emotion_response_payload(
         'top_emotions': [
             {
                 'emotion': item.get('emotion'),
+                'display_name': display_names.get(item.get('emotion')),
                 'confidence': round(float(item.get('confidence', 0.0)) * 100, 1),
             }
             for item in top_emotions
         ],
         'secondary_emotion': result.get('secondary_emotion'),
+        'secondary_emotion_display': display_names.get(result.get('secondary_emotion')),
         'plutchik_scores': {
             name: round(float(score) * 100, 1) for name, score in plutchik_scores.items()
         },
@@ -1344,6 +1347,15 @@ def spotify_disconnect(request):
 
 
 @api_view(['GET'])
+def emotions(request):
+    """The 13 emotions in the therapist's order, with their display names."""
+    return Response([
+        {'name': name, 'display_name': display_name}
+        for name, display_name in Emotion.objects.order_by('id').values_list('name', 'display_name')
+    ])
+
+
+@api_view(['GET'])
 @permission_classes([AllowAny])
 def support_resources(request):
     """Verified hotlines and counselors for the app's support screen.
@@ -1374,6 +1386,7 @@ def admin_dashboard(request):
     )
     
     # Mood distribution
+    display_names = emotion_display_names()
     mood_distribution = (
         PromptHistory.objects
         .values('detected_emotion')
@@ -1393,7 +1406,10 @@ def admin_dashboard(request):
     return Response({
         'total_users': total_users,
         'monthly_playlists': list(monthly_playlists),
-        'mood_distribution': list(mood_distribution),
+        'mood_distribution': [
+            {**row, 'display_name': display_names.get(row['detected_emotion'])}
+            for row in mood_distribution
+        ],
         'support_events_last_30_days': list(support_events),
     })
 

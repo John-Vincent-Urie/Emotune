@@ -5,7 +5,7 @@ HAPPY
 ● Shake It Off — Taylor Swift
 ● Paper Rings — Taylor Swift
 ● Salamin-Salamin — BINI
-● Awitin Mo at Isasayaw Ko — VST & Company
+● Awitin Mo, Isasayaw ko — VST & Company
 ● Walking On Sunshine — Katrina & The Waves
 ● Don't Stop Me Now — Queen
 ● Ligaya — Eraserheads

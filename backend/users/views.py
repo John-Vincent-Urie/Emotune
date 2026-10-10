@@ -9,6 +9,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model, authenticate
 from django.db.models import Count
 from django.utils import timezone
+from api.models import emotion_display_names
 from .emails import send_password_reset_code
 from .models import (
     EMOTION_CHOICES, FavoriteTrack, ListeningSession, PasswordResetCode,
@@ -329,7 +330,10 @@ def emotion_stats(request):
         .values('detected_emotion')\
         .annotate(count=Count('id'))\
         .order_by('-count')
-    return Response(list(stats))
+    display_names = emotion_display_names()
+    return Response([
+        {**row, 'display_name': display_names.get(row['detected_emotion'])} for row in stats
+    ])
 
 
 # A listen past this share of a track is the user staying with the pick.

@@ -103,6 +103,11 @@ class EmotionSong(models.Model):
         return f"{self.emotion.name} #{self.position}: {self.song}"
 
 
+def emotion_display_names():
+    """{label: therapist display name}, e.g. 'motivational' -> 'Motivated'."""
+    return dict(Emotion.objects.values_list('name', 'display_name'))
+
+
 def songs_for_emotion(emotion_name):
     """(Emotion or None, every active approved song for it in therapist order)."""
     emotion = Emotion.objects.filter(name=str(emotion_name or '').strip().lower()).first()
