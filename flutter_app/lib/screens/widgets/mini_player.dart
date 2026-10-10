@@ -18,9 +18,13 @@ class MiniPlayer extends StatelessWidget {
     final progress = player.duration.inSeconds > 0
         ? player.position.inSeconds / player.duration.inSeconds
         : 0.0;
-    final playbackStatus = _shouldShowPlaybackStatus(player)
-        ? player.playbackStatusShortLabel
-        : '';
+    // A failure used to leave only the artist here, so a silent player looked
+    // fine. Point at the full player, which explains the error.
+    final playbackStatus = player.errorMessage != null
+        ? "Couldn't play · tap for details"
+        : _shouldShowPlaybackStatus(player)
+            ? player.playbackStatusShortLabel
+            : '';
     final imageUrl = track['image']?.toString().trim() ?? '';
 
     return GestureDetector(

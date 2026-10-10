@@ -1,32 +1,19 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
-import '../../widgets/emotune_toggle.dart';
 
 class RecommendationSessionControls extends StatelessWidget {
   const RecommendationSessionControls({
     super.key,
     required this.sessionLengthMinutes,
     required this.onSessionLengthChanged,
-    required this.familiarity,
-    required this.onFamiliarityChanged,
-    required this.preferInstrumental,
-    required this.onPreferInstrumentalChanged,
-    required this.trainOnThisSession,
-    required this.onTrainOnThisSessionChanged,
     this.title = 'Session Studio',
     this.subtitle =
-        'Shape how long you want support, the taste of the playlist, and whether this session should teach personalization.',
+        'Shape how long you want support.',
   });
 
   final int? sessionLengthMinutes;
   final ValueChanged<int?> onSessionLengthChanged;
-  final String familiarity;
-  final ValueChanged<String> onFamiliarityChanged;
-  final bool preferInstrumental;
-  final ValueChanged<bool> onPreferInstrumentalChanged;
-  final bool trainOnThisSession;
-  final ValueChanged<bool> onTrainOnThisSessionChanged;
   final String title;
   final String subtitle;
 
@@ -35,12 +22,6 @@ class RecommendationSessionControls extends StatelessWidget {
     _NullableIntOption(value: 15, label: '15 min'),
     _NullableIntOption(value: 20, label: '20 min'),
     _NullableIntOption(value: 45, label: '45 min'),
-  ];
-
-  static const List<_StringOption> _familiarityOptions = [
-    _StringOption(value: 'balanced', label: 'Balanced'),
-    _StringOption(value: 'familiar', label: 'More familiar'),
-    _StringOption(value: 'discovery', label: 'More discovery'),
   ];
 
   @override
@@ -119,38 +100,6 @@ class RecommendationSessionControls extends StatelessWidget {
                 onTap: () => onSessionLengthChanged(option.value),
               );
             }).toList(),
-          ),
-          const SizedBox(height: 14),
-          const _FieldLabel(
-            label: 'Taste control',
-            helper:
-                'Balanced blends the EmoTune list, More familiar leans on songs '
-                "you've hearted, More discovery pulls fresh tracks.",
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _familiarityOptions.map((option) {
-              return _SegButton(
-                label: option.label,
-                selected: option.value == familiarity,
-                onTap: () => onFamiliarityChanged(option.value),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 6),
-          _ToggleRow(
-            title: 'Prefer instrumental',
-            subtitle: 'Rank instrumental tracks above vocal-led ones.',
-            value: preferInstrumental,
-            onChanged: onPreferInstrumentalChanged,
-          ),
-          _ToggleRow(
-            title: 'Train on this session',
-            subtitle: 'Turn off for a private or experimental session.',
-            value: trainOnThisSession,
-            onChanged: onTrainOnThisSessionChanged,
           ),
         ],
       ),
@@ -248,58 +197,6 @@ class _SegButton extends StatelessWidget {
   }
 }
 
-class _ToggleRow extends StatelessWidget {
-  const _ToggleRow({
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String title;
-  final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.emoColors;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: colors.textPrimary,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: colors.textSecondary,
-                    fontSize: 11.5,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          EmoTuneToggle(label: title, value: value, onChanged: onChanged),
-        ],
-      ),
-    );
-  }
-}
-
 class _NullableIntOption {
   const _NullableIntOption({
     required this.value,
@@ -307,15 +204,5 @@ class _NullableIntOption {
   });
 
   final int? value;
-  final String label;
-}
-
-class _StringOption {
-  const _StringOption({
-    required this.value,
-    required this.label,
-  });
-
-  final String value;
   final String label;
 }

@@ -123,7 +123,6 @@ class AuthProvider extends ChangeNotifier {
     String email,
     String password, {
     required bool acceptTerms,
-    bool personalizationOptIn = true,
   }) async {
     _isLoading = true;
     _error = null;
@@ -135,7 +134,6 @@ class AuthProvider extends ChangeNotifier {
         email,
         password,
         acceptTerms: acceptTerms,
-        personalizationOptIn: personalizationOptIn,
       );
       if (result.containsKey('access')) {
         final prefs = await SharedPreferences.getInstance();

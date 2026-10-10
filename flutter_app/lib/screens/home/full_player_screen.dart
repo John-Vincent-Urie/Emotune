@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../controllers/spotify_connection_controller.dart';
 import '../../providers/player_provider.dart';
 import '../../theme/app_theme.dart';
 
@@ -154,6 +155,16 @@ class FullPlayerScreen extends StatelessWidget {
   }
 
   Widget _buildStatusPill(PlayerProvider player) {
+    // Errors used to only hide this pill, so a failed play looked like silence
+    // with a Play button. Say what went wrong, and offer the fix when it is
+    // a missing Spotify link.
+    final error = player.errorMessage?.trim() ?? '';
+    if (error.isNotEmpty) {
+      return _PlaybackErrorCard(
+        message: error,
+        offerConnect: player.needsSpotifyConnection,
+      );
+    }
     if (_shouldHidePlaybackStatus(player)) {
       return const SizedBox.shrink();
     }
@@ -663,12 +674,7 @@ class _SessionPlanCard extends StatelessWidget {
         : 'Untimed support lane';
     final nextCheckIn = player.sessionNextCheckInTrack;
     final chips = <String>[
-      _familiarityLabel(player.familiarity),
-      // Balanced opens with the static per-emotion list, so say when the song
-      // playing is one of those picks.
       if (player.currentTrack?['is_music_doc_pick'] == true) 'EmoTune pick',
-      if (player.preferInstrumental) 'Instrumental bias',
-      if (!player.trainOnThisSession) 'Learning paused',
       if (player.isSessionComplete) 'Check-ins complete',
     ];
 
@@ -794,16 +800,6 @@ class _SessionPlanCard extends StatelessWidget {
     );
   }
 
-  String _familiarityLabel(String familiarity) {
-    switch (familiarity) {
-      case 'familiar':
-        return 'More familiar';
-      case 'discovery':
-        return 'More discovery';
-      default:
-        return 'Balanced taste';
-    }
-  }
 }
 
 class _ControlStrip extends StatelessWidget {
@@ -1057,10 +1053,17 @@ class _QueueRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            if (isCurrent)
-              Icon(
-                isPlaying ? Icons.volume_up_rounded : Icons.pause_circle_filled_rounded,
+            // A lime pause icon on a silent current row read as "playing".
+            if (isCurrent && isPlaying)
+              const Icon(
+                Icons.volume_up_rounded,
                 color: AppColors.accent,
+                size: 20,
+              )
+            else if (isCurrent)
+              Icon(
+                Icons.music_note_rounded,
+                color: Colors.white.withValues(alpha: 0.72),
                 size: 20,
               )
             else
@@ -1164,6 +1167,86 @@ class _MetaText extends StatelessWidget {
         color: Colors.white.withValues(alpha: 0.56),
         fontSize: 12,
         fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+}
+
+class _PlaybackErrorCard extends StatefulWidget {
+  const _PlaybackErrorCard({required this.message, required this.offerConnect});
+
+  final String message;
+  final bool offerConnect;
+
+  @override
+  State<_PlaybackErrorCard> createState() => _PlaybackErrorCardState();
+}
+
+class _PlaybackErrorCardState extends State<_PlaybackErrorCard> {
+  final _connection = SpotifyConnectionController();
+
+  @override
+  void dispose() {
+    _connection.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // The full player is always drawn on its own dark backdrop.
+    const errorText = Color(0xFFFFB4AB);
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFF6B6B).withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFFF6B6B).withValues(alpha: 0.45)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.error_outline, size: 18, color: errorText),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    widget.message,
+                    style: const TextStyle(
+                      color: errorText,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (widget.offerConnect) ...[
+              const SizedBox(height: 10),
+              AnimatedBuilder(
+                animation: _connection,
+                builder: (context, _) => FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.black,
+                  ),
+                  icon: const Icon(Icons.link_rounded, size: 18),
+                  label: Text(
+                    _connection.isConnecting ? 'Opening Spotify...' : 'Connect Spotify',
+                  ),
+                  onPressed: _connection.isConnecting
+                      ? null
+                      : () => _connection.connect(context),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

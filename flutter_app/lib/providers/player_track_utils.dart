@@ -14,8 +14,17 @@ const Set<String> supportedSpotifyItemTypes = {
   'show',
 };
 
+/// False only for a music.md song the backend could not find on Spotify
+/// (`playable: false`). It stays in the visible list, so the count matches
+/// the therapist's list, but it is never queued: its only action is opening
+/// Spotify search.
+bool isPlayable(Map<String, dynamic> track) => track['playable'] != false;
+
 Map<String, dynamic> normalizeTrack(Map<String, dynamic> rawTrack) {
   final track = Map<String, dynamic>.from(rawTrack);
+  // An unresolved song's id ("music-doc-unresolved-3") is not a Spotify id;
+  // building spotify:track:<it> from it would make a dead song look playable.
+  final unresolved = !isPlayable(track);
   final rawUri = track['uri']?.toString().trim() ?? '';
   final rawSpotifyUrl = track['spotify_url']?.toString().trim() ?? '';
   final rawType = track['item_type']?.toString().trim() ?? '';
@@ -46,14 +55,16 @@ Map<String, dynamic> normalizeTrack(Map<String, dynamic> rawTrack) {
     }
   }
 
-  if (uri.isEmpty &&
+  if (!unresolved &&
+      uri.isEmpty &&
       itemId.isNotEmpty &&
       (itemType.isEmpty || supportedSpotifyItemTypes.contains(itemType))) {
     final resolvedType = itemType.isNotEmpty ? itemType : 'track';
     uri = 'spotify:$resolvedType:$itemId';
   }
 
-  if (spotifyUrl.isEmpty &&
+  if (!unresolved &&
+      spotifyUrl.isEmpty &&
       itemId.isNotEmpty &&
       (itemType.isEmpty || supportedSpotifyItemTypes.contains(itemType))) {
     final resolvedType = itemType.isNotEmpty ? itemType : 'track';
@@ -84,7 +95,7 @@ List<Map<String, dynamic>> normalizeTrackList(List<dynamic> rawTracks) {
       .where((track) {
     final uri = track['uri']?.toString().trim() ?? '';
     final previewUrl = track['preview_url']?.toString().trim() ?? '';
-    return uri.isNotEmpty || previewUrl.isNotEmpty;
+    return uri.isNotEmpty || previewUrl.isNotEmpty || !isPlayable(track);
   }).toList();
 }
 
@@ -114,24 +125,6 @@ String normalizeOutcomeMode(String? value) {
   }
 }
 
-Map<String, dynamic> normalizeTasteProfile(
-  dynamic value, {
-  bool? trainOnThisSession,
-}) {
-  final raw =
-      value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
-  final familiarity =
-      raw['familiarity']?.toString().trim().toLowerCase() ?? 'balanced';
-  return <String, dynamic>{
-    'familiarity': switch (familiarity) {
-      'familiar' => 'familiar',
-      'discovery' => 'discovery',
-      _ => 'balanced',
-    },
-    'prefer_instrumental': raw['prefer_instrumental'] == true,
-    'train_session': trainOnThisSession ?? (raw['train_session'] != false),
-  };
-}
 
 String trackIdentity(Map<String, dynamic> rawTrack) {
   final track = normalizeTrack(rawTrack);

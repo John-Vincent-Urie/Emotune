@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +11,7 @@ import '../../theme/app_theme.dart';
 import 'widgets/home_empty_state.dart';
 import 'widgets/home_header.dart';
 import 'widgets/mood_composer.dart';
+import '../widgets/song_count_line.dart';
 import '../widgets/track_card.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/feel_better_dialog.dart';
@@ -26,7 +28,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
-  static const Duration _progressiveAppendDelay = Duration(milliseconds: 180);
   static const _session = RecommendationSessionController();
 
   final _promptCtrl = TextEditingController();
@@ -41,7 +42,6 @@ class _HomeScreenState extends State<HomeScreen>
   // Gentle check-in from the backend's concern tier; music still plays.
   Map<String, dynamic>? _supportCheckIn;
   List<Map<String, dynamic>> _tracks = [];
-  bool _loadingMoreTracks = false;
   int _requestSequence = 0;
   bool? _reduceMotion;
   bool _entranceStarted = false;
@@ -102,19 +102,27 @@ class _HomeScreenState extends State<HomeScreen>
           children: [
             // Brand header -- fixed above the body, so it stays put once the
             // results replace the empty state.
-            HomeHeader(entrance: _entrance, reduceMotion: reduceMotion),
+            // Dropped on short (landscape) screens: header, mini player and
+            // composer together left the results area with zero height.
+            if (MediaQuery.sizeOf(context).height >= 520)
+              HomeHeader(entrance: _entrance, reduceMotion: reduceMotion),
 
             // Chat/Result area
             Expanded(
               child: _isEmptyState
                   ? LayoutBuilder(
                       builder: (context, constraints) => SingleChildScrollView(
+                        // Room for the orb's glow: in landscape the content
+                        // outgrows the space and the scroll view's clip edge
+                        // cut the orb off.
+                        padding: const EdgeInsets.symmetric(vertical: 32),
                         child: ConstrainedBox(
                           // Centre in whatever space is left, but stay
                           // scrollable so the chips survive a short screen
                           // with the keyboard up.
-                          constraints:
-                              BoxConstraints(minHeight: constraints.maxHeight),
+                          constraints: BoxConstraints(
+                            minHeight: math.max(0, constraints.maxHeight - 64),
+                          ),
                           child: Center(
                             child: HomeEmptyState(
                               entrance: _entrance,
@@ -237,32 +245,9 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                       const SizedBox(height: 16),
                     ],
-                    if (_loadingMoreTracks) ...[
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: colors.accentText,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Loading the rest of your playlist...',
-                              style: TextStyle(
-                                color: colors.textSecondary,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                    ],
                     if (_tracks.isNotEmpty) ...[
+                      SongCountLine(result: _lastResult, shown: _tracks.length),
+                      const SizedBox(height: 10),
                       GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -354,14 +339,12 @@ class _HomeScreenState extends State<HomeScreen>
       _analyzeErrorIsNetwork = false;
       _isCrisis = false;
       _supportCheckIn = null;
-      _loadingMoreTracks = false;
     });
 
     try {
       final result = await ApiService.analyzeEmotion(
         text,
         sessionLengthMinutes: studio.sessionLengthMinutes,
-        tasteProfile: _currentTasteProfile(),
       );
       if (!mounted || requestId != _requestSequence) {
         return;
@@ -369,10 +352,6 @@ class _HomeScreenState extends State<HomeScreen>
       final normalizedTracks = PlayerProvider.normalizeTrackList(
         List<dynamic>.from(result['tracks'] ?? []),
       );
-      final continuationToken =
-          result['continuation_token']?.toString().trim() ?? '';
-      final loadingMoreTracks =
-          result['loading_more_tracks'] == true && continuationToken.isNotEmpty;
       final isCrisis = result['crisis'] == true;
       final checkIn = result['support_check_in'];
       setState(() {
@@ -382,7 +361,6 @@ class _HomeScreenState extends State<HomeScreen>
         _supportCheckIn =
             checkIn is Map ? Map<String, dynamic>.from(checkIn) : null;
         _tracks = normalizedTracks;
-        _loadingMoreTracks = loadingMoreTracks;
       });
       _promptCtrl.clear();
       if (isCrisis) {
@@ -399,14 +377,6 @@ class _HomeScreenState extends State<HomeScreen>
       if (!isCrisis && normalizedTracks.isNotEmpty) {
         unawaited(_autoplayInitialTrack(normalizedTracks, result));
       }
-      if (loadingMoreTracks) {
-        unawaited(
-          _loadMoreRecommendationTracks(
-            requestId: requestId,
-            continuationToken: continuationToken,
-          ),
-        );
-      }
     } on ApiException catch (e) {
       if (!mounted || requestId != _requestSequence) {
         return;
@@ -417,8 +387,7 @@ class _HomeScreenState extends State<HomeScreen>
         _analyzeError = e.message;
         // No status means the server was never reached.
         _analyzeErrorIsNetwork = e.statusCode == null;
-        _loadingMoreTracks = false;
-      });
+        });
     } catch (e) {
       if (!mounted || requestId != _requestSequence) {
         return;
@@ -428,8 +397,7 @@ class _HomeScreenState extends State<HomeScreen>
         _tracks = [];
         _analyzeError =
             'Could not analyze your prompt right now. Please try again.';
-        _loadingMoreTracks = false;
-      });
+        });
     } finally {
       if (mounted && requestId == _requestSequence) {
         setState(() => _isAnalyzing = false);
@@ -599,7 +567,6 @@ class _HomeScreenState extends State<HomeScreen>
       player,
       tracks,
       result,
-      _currentTasteProfile(),
       autoplay: false,
     );
     try {
@@ -607,102 +574,6 @@ class _HomeScreenState extends State<HomeScreen>
     } catch (_) {
       // Keep the UI responsive even if the first autoplay attempt fails.
     }
-  }
-
-  Future<void> _loadMoreRecommendationTracks({
-    required int requestId,
-    required String continuationToken,
-  }) async {
-    final hadTracksBefore = _tracks.isNotEmpty;
-    try {
-      final result = await ApiService.continueRecommendation(continuationToken);
-      if (!mounted || requestId != _requestSequence) {
-        return;
-      }
-
-      final incomingTracks = PlayerProvider.normalizeTrackList(
-        List<dynamic>.from(result['tracks'] ?? []),
-      );
-      final mergedTracks =
-          PlayerProvider.mergeTrackLists(_tracks, incomingTracks);
-      final newTracks = mergedTracks.skip(_tracks.length).toList();
-      final historyId = _session.historyIdFromResult(result);
-      final emotion = _session.playbackEmotionFromResult(result);
-      final player = context.read<PlayerProvider>();
-      var startedAutoplayFromContinuation = false;
-
-      if (newTracks.isEmpty) {
-        setState(() {
-          _lastResult = result;
-          _tracks = mergedTracks;
-          _loadingMoreTracks = false;
-          if ((result['ai_response']?.toString().trim().isNotEmpty ?? false)) {
-            _aiMessage = result['ai_response']?.toString();
-          }
-        });
-        return;
-      }
-
-      for (final track in newTracks) {
-        if (!mounted || requestId != _requestSequence) {
-          return;
-        }
-
-        final nextVisibleTracks = [..._tracks, track];
-        setState(() {
-          _lastResult = result;
-          _tracks = nextVisibleTracks;
-          if ((result['ai_response']?.toString().trim().isNotEmpty ?? false)) {
-            _aiMessage = result['ai_response']?.toString();
-          }
-        });
-
-        final shouldMergeActivePlaylist =
-            (historyId != null && player.historyId == historyId) ||
-                (historyId == null &&
-                    player.currentEmotion == emotion &&
-                    player.playlist.isNotEmpty);
-
-        if (!hadTracksBefore && !startedAutoplayFromContinuation) {
-          _session.loadPlaylistIntoPlayer(
-            player,
-            nextVisibleTracks,
-            result,
-            _currentTasteProfile(),
-            autoplay: true,
-          );
-          startedAutoplayFromContinuation = true;
-        } else if (shouldMergeActivePlaylist) {
-          _session.mergePlaylistIntoPlayer(
-            player,
-            nextVisibleTracks,
-            result,
-            _currentTasteProfile(),
-          );
-        }
-
-        await Future.delayed(_progressiveAppendDelay);
-      }
-
-      if (!mounted || requestId != _requestSequence) {
-        return;
-      }
-      setState(() => _loadingMoreTracks = false);
-    } on ApiException {
-      if (!mounted || requestId != _requestSequence) {
-        return;
-      }
-      setState(() => _loadingMoreTracks = false);
-    } catch (_) {
-      if (!mounted || requestId != _requestSequence) {
-        return;
-      }
-      setState(() => _loadingMoreTracks = false);
-    }
-  }
-
-  Map<String, dynamic> _currentTasteProfile() {
-    return context.read<RecommendationStudioProvider>().tasteProfile;
   }
 
   Future<void> _playTrack(int index) async {
@@ -713,7 +584,6 @@ class _HomeScreenState extends State<HomeScreen>
       tracks: _tracks,
       selectedTrack: track,
       lastResult: _lastResult,
-      currentTasteProfile: _currentTasteProfile(),
     );
   }
 
@@ -742,7 +612,6 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() {
       _lastResult = dialogResult;
       _tracks = transitionTracks;
-      _loadingMoreTracks = false;
       if (dialogResult['ai_response']?.toString().trim().isNotEmpty ?? false) {
         _aiMessage = dialogResult['ai_response']?.toString();
       }

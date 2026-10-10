@@ -31,25 +31,6 @@ class RecommendationSessionController {
     return Map<String, dynamic>.from(raw);
   }
 
-  Map<String, dynamic> tasteProfileFromResult(
-    Map<String, dynamic>? result,
-    Map<String, dynamic> currentTasteProfile,
-  ) {
-    final raw = result?['taste_profile'];
-    if (raw is! Map) {
-      return currentTasteProfile;
-    }
-    return Map<String, dynamic>.from(raw);
-  }
-
-  bool trainOnThisSessionFromResult(
-    Map<String, dynamic>? result,
-    Map<String, dynamic> currentTasteProfile,
-  ) {
-    return tasteProfileFromResult(result, currentTasteProfile)['train_session'] !=
-        false;
-  }
-
   /// [defaultEmotion] is the screen-specific fallback used when [result]
   /// carries no emotion at all (home uses 'mixed'; the recommendations
   /// screen uses the currently-selected emotion tab, falling back to
@@ -76,7 +57,7 @@ class RecommendationSessionController {
     PlayerProvider player,
     List<Map<String, dynamic>> tracks,
     Map<String, dynamic>? result,
-    Map<String, dynamic> currentTasteProfile, {
+    {
     String defaultEmotion = 'mixed',
     String? fallbackEmotion,
     bool autoplay = false,
@@ -91,33 +72,9 @@ class RecommendationSessionController {
       historyId: historyIdFromResult(result ?? const <String, dynamic>{}),
       autoplay: autoplay,
       sessionPlan: sessionPlanFromResult(result),
-      tasteProfile: tasteProfileFromResult(result, currentTasteProfile),
       outcomeMode: result?['outcome_mode']?.toString(),
       outcomeLabel: result?['outcome_label']?.toString(),
       outcomeDescription: result?['outcome_description']?.toString(),
-      trainOnThisSession:
-          trainOnThisSessionFromResult(result, currentTasteProfile),
-    );
-  }
-
-  void mergePlaylistIntoPlayer(
-    PlayerProvider player,
-    List<Map<String, dynamic>> tracks,
-    Map<String, dynamic>? result,
-    Map<String, dynamic> currentTasteProfile, {
-    String defaultEmotion = 'mixed',
-  }) {
-    player.mergePlaylistTracks(
-      tracks,
-      emotion: playbackEmotionFromResult(result, defaultEmotion: defaultEmotion),
-      historyId: historyIdFromResult(result ?? const <String, dynamic>{}),
-      sessionPlan: sessionPlanFromResult(result),
-      tasteProfile: tasteProfileFromResult(result, currentTasteProfile),
-      outcomeMode: result?['outcome_mode']?.toString(),
-      outcomeLabel: result?['outcome_label']?.toString(),
-      outcomeDescription: result?['outcome_description']?.toString(),
-      trainOnThisSession:
-          trainOnThisSessionFromResult(result, currentTasteProfile),
     );
   }
 
@@ -125,7 +82,11 @@ class RecommendationSessionController {
     List<Map<String, dynamic>> tracks,
     Map<String, dynamic> selectedTrack,
   ) {
-    final playlist = PlayerProvider.normalizeTrackList(tracks);
+    // The same filter PlayerProvider.loadPlaylist applies, so the index
+    // resolved here addresses the queue the player actually holds.
+    final playlist = PlayerProvider.normalizeTrackList(tracks)
+        .where(PlayerProvider.isPlayable)
+        .toList();
     // Compare against a normalized copy: every entry in [playlist] has had its
     // id and uri filled in from whichever identifier it arrived with, so a
     // selection still carrying only a spotify_url would never match a raw
@@ -182,12 +143,24 @@ class RecommendationSessionController {
     required List<Map<String, dynamic>> tracks,
     required Map<String, dynamic> selectedTrack,
     required Map<String, dynamic>? lastResult,
-    required Map<String, dynamic> currentTasteProfile,
     String defaultEmotion = 'mixed',
   }) async {
     final previewUrl = selectedTrack['preview_url']?.toString().trim() ?? '';
     final spotifyUri = selectedTrack['uri']?.toString().trim() ?? '';
     final spotifyUrl = selectedTrack['spotify_url']?.toString().trim() ?? '';
+
+    // A music.md song Spotify could not resolve has nothing to play; its card
+    // offers "Open in Spotify", which opens a search for it.
+    if (!PlayerProvider.isPlayable(selectedTrack)) {
+      if (spotifyUrl.isNotEmpty) {
+        await launchUrl(
+          Uri.parse(spotifyUrl),
+          mode: LaunchMode.externalApplication,
+        );
+      }
+      return;
+    }
+
     final trackList = playlistForSelection(tracks, selectedTrack);
     final hasSpotifyTarget = spotifyUri.isNotEmpty || spotifyUrl.isNotEmpty;
     final playbackEmotion =
@@ -199,7 +172,6 @@ class RecommendationSessionController {
         player,
         trackList,
         lastResult,
-        currentTasteProfile,
         defaultEmotion: defaultEmotion,
         fallbackEmotion: playbackEmotion,
         autoplay: false,
@@ -247,7 +219,6 @@ class RecommendationSessionController {
       player,
       trackList,
       lastResult,
-      currentTasteProfile,
       defaultEmotion: defaultEmotion,
       fallbackEmotion: playbackEmotion,
       autoplay: false,

@@ -509,7 +509,6 @@ class ApiService {
     String email,
     String password, {
     required bool acceptTerms,
-    bool personalizationOptIn = true,
   }) async {
     return _decodeObjectResponse(
       _sendRequest(
@@ -523,7 +522,6 @@ class ApiService {
             'password': password,
             'confirm_password': password,
             'accept_terms': acceptTerms,
-            'personalization_opt_in': personalizationOptIn,
           }),
         ),
       ),
@@ -659,19 +657,16 @@ class ApiService {
   /// from here would only let a stale client override the routing.
   static Map<String, dynamic> _recommendationOptionsPayload({
     int? sessionLengthMinutes,
-    Map<String, dynamic>? tasteProfile,
   }) {
     return {
       if (sessionLengthMinutes != null)
         'session_length_minutes': sessionLengthMinutes,
-      if (tasteProfile != null) 'taste_profile': tasteProfile,
     };
   }
 
   static Future<Map<String, dynamic>> analyzeEmotion(
     String text, {
     int? sessionLengthMinutes,
-    Map<String, dynamic>? tasteProfile,
   }) async {
     final headers = await authHeaders();
     return _decodeObjectResponse(
@@ -684,7 +679,6 @@ class ApiService {
             'text': text,
             ..._recommendationOptionsPayload(
               sessionLengthMinutes: sessionLengthMinutes,
-              tasteProfile: tasteProfile,
             ),
           }),
         ),
@@ -696,7 +690,6 @@ class ApiService {
     String emotion, {
     String? text,
     int? sessionLengthMinutes,
-    Map<String, dynamic>? tasteProfile,
   }) async {
     final headers = await authHeaders();
     return _decodeObjectResponse(
@@ -710,26 +703,7 @@ class ApiService {
             if (text != null && text.trim().isNotEmpty) 'text': text.trim(),
             ..._recommendationOptionsPayload(
               sessionLengthMinutes: sessionLengthMinutes,
-              tasteProfile: tasteProfile,
             ),
-          }),
-        ),
-      ),
-    );
-  }
-
-  static Future<Map<String, dynamic>> continueRecommendation(
-    String continuationToken,
-  ) async {
-    final headers = await authHeaders();
-    return _decodeObjectResponse(
-      _sendRequest(
-        '/recommendation-playlist/',
-        (uri) => _http.post(
-          uri,
-          headers: headers,
-          body: jsonEncode({
-            'continuation_token': continuationToken,
           }),
         ),
       ),
@@ -850,29 +824,6 @@ class ApiService {
     );
   }
 
-  static Future<List<dynamic>> searchArtists(String query) async {
-    final headers = await authHeaders();
-    return _decodeListResponse(
-      _sendRequest(
-        '/spotify/search-artists/',
-        (uri) => _http.get(uri, headers: headers),
-        queryParameters: {'q': query},
-      ),
-    );
-  }
-
-  static Future<void> updateArtists(List<String> artists) async {
-    final headers = await authHeaders();
-    await _sendAndValidate(
-      '/users/update-artists/',
-      (uri) => _http.put(
-        uri,
-        headers: headers,
-        body: jsonEncode({'preferred_artists': artists}),
-      ),
-    );
-  }
-
   /// Report a finished playback.
   ///
   /// [durationMs] is the track's full length, which lets the backend judge a
@@ -887,7 +838,6 @@ class ApiService {
     String artistName, {
     String itemType = 'track',
     int? historyId,
-    bool trainSession = true,
     int? durationMs,
     String endedReason = 'skipped',
   }) async {
@@ -905,7 +855,6 @@ class ApiService {
           'artist_name': artistName,
           'item_type': itemType,
           if (historyId != null) 'history_id': historyId,
-          'train_session': trainSession,
           if (durationMs != null) 'duration_ms': durationMs,
           'ended_reason': endedReason,
         }),

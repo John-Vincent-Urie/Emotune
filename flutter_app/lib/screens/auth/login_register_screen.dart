@@ -208,7 +208,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _acceptTerms = false;
-  bool _personalizationOptIn = true;
 
   @override
   void initState() {
@@ -259,7 +258,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return _AuthScaffold(
       title: 'Create your account',
       subtitle:
-          'We only ask for the basics here. You can tune personalization later.',
+          'We only ask for the basics here.',
       logoSize: 76,
       error: auth.error,
       onDismissError: auth.clearError,
@@ -367,16 +366,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
-              _ConsentTile(
-                title: 'Use my mood activity to personalize recommendations',
-                subtitle:
-                    'Optional. You can turn this off later for more private sessions.',
-                value: _personalizationOptIn,
-                enabled: !auth.isLoading,
-                onChanged: (value) =>
-                    setState(() => _personalizationOptIn = value),
-              ),
               const SizedBox(height: 28),
               EmoTunePrimaryButton(
                 label: 'Create account',
@@ -424,7 +413,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _emailCtrl.text.trim(),
       _passCtrl.text,
       acceptTerms: _acceptTerms,
-      personalizationOptIn: _personalizationOptIn,
     );
     if (!mounted) return;
     if (success) {
@@ -493,82 +481,85 @@ class _AuthScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.darkBg,
-      body: Stack(
-        children: [
-          const Positioned.fill(child: EmoTuneBackdrop()),
-          SafeArea(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: _kFormMaxWidth),
-                child: GestureDetector(
-                  // Tapping the background dismisses the keyboard, the standard
-                  // escape hatch on a form this tall.
-                  onTap: () => FocusScope.of(context).unfocus(),
-                  behavior: HitTestBehavior.opaque,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: IconButton(
-                            icon: const Icon(Icons.arrow_back),
-                            color: AppColors.accent,
-                            tooltip: 'Back',
-                            // After a session expiry the route stack was
-                            // cleared, so there is nothing to pop back to.
-                            onPressed: () => Navigator.canPop(context)
-                                ? Navigator.pop(context)
-                                : Navigator.pushReplacementNamed(
-                                    context,
-                                    '/welcome',
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        EmoTuneLogo(size: logoSize),
-                        const SizedBox(height: 28),
-                        Semantics(
-                          header: true,
-                          child: Text(
-                            title,
-                            style: emoTuneHeadlineFont(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                              height: 1.2,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: kAlwaysDarkSystemUi,
+      child: Scaffold(
+        backgroundColor: AppColors.darkBg,
+        body: Stack(
+          children: [
+            const Positioned.fill(child: EmoTuneBackdrop()),
+            SafeArea(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: _kFormMaxWidth),
+                  child: GestureDetector(
+                    // Tapping the background dismisses the keyboard, the standard
+                    // escape hatch on a form this tall.
+                    onTap: () => FocusScope.of(context).unfocus(),
+                    behavior: HitTestBehavior.opaque,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: IconButton(
+                              icon: const Icon(Icons.arrow_back),
+                              color: AppColors.accent,
+                              tooltip: 'Back',
+                              // After a session expiry the route stack was
+                              // cleared, so there is nothing to pop back to.
+                              onPressed: () => Navigator.canPop(context)
+                                  ? Navigator.pop(context)
+                                  : Navigator.pushReplacementNamed(
+                                      context,
+                                      '/welcome',
+                                    ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.66),
-                            fontSize: 13.5,
-                            height: 1.45,
+                          const SizedBox(height: 4),
+                          EmoTuneLogo(size: logoSize),
+                          const SizedBox(height: 28),
+                          Semantics(
+                            header: true,
+                            child: Text(
+                              title,
+                              style: emoTuneHeadlineFont(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                                height: 1.2,
+                              ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 24),
-                        child,
-                        // Below the form rather than above it: shown above, a
-                        // failed submit pushed the button ~80px down, right
-                        // under a second tap. Here it lands next to the button
-                        // the user just pressed and nothing above it moves.
-                        _ErrorBanner(message: error, onDismiss: onDismissError),
-                        const SizedBox(height: 24),
-                        footer,
-                      ],
+                          const SizedBox(height: 8),
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.66),
+                              fontSize: 13.5,
+                              height: 1.45,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          child,
+                          // Below the form rather than above it: shown above, a
+                          // failed submit pushed the button ~80px down, right
+                          // under a second tap. Here it lands next to the button
+                          // the user just pressed and nothing above it moves.
+                          _ErrorBanner(message: error, onDismiss: onDismissError),
+                          const SizedBox(height: 24),
+                          footer,
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

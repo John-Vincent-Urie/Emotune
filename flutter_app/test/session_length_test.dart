@@ -72,12 +72,6 @@ void main() {
             child: RecommendationSessionControls(
               sessionLengthMinutes: sessionLengthMinutes,
               onSessionLengthChanged: onSessionLengthChanged,
-              familiarity: 'balanced',
-              onFamiliarityChanged: (_) {},
-              preferInstrumental: false,
-              onPreferInstrumentalChanged: (_) {},
-              trainOnThisSession: true,
-              onTrainOnThisSessionChanged: (_) {},
             ),
           ),
         ),
@@ -153,7 +147,10 @@ void main() {
       expect(find.text('Check-In Rhythm'), findsNothing);
       expect(find.text('Every 3'), findsNothing);
       expect(find.text('Session length'), findsOneWidget);
-      expect(find.text('Taste control'), findsOneWidget);
+      // Removed 2026-10-10: the therapist's list plays in its own order.
+      expect(find.text('Taste control'), findsNothing);
+      expect(find.text('More familiar'), findsNothing);
+      expect(find.text('Prefer instrumental'), findsNothing);
     });
   });
 }

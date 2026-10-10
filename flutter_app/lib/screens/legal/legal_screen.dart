@@ -145,16 +145,14 @@ const List<_Section> _privacySections = [
         'reply and the songs it suggested. These are saved to your history so '
         'you can see them on the History tab.',
     'Listening: songs you favorite, how long you listen, and whether you said '
-        'you felt better, used to improve suggestions.',
+        'you felt better. The songs themselves come from a fixed, '
+        'therapist-approved list; this is not used to train a model.',
     'Spotify: if you connect Spotify, we store the access tokens Spotify gives '
         'us so EmoTune can play music for you.',
   ]),
   _Section('Who else sees your text', [
-    'Google Gemini: to choose songs, EmoTune may send what you typed, the '
-        'detected emotion and your preferred artists to Google\'s Gemini AI '
-        'service. '
-        'These requests contain the text only, not your name, email or '
-        'account ID. Google handles that data under its own terms.',
+    'What you type is analysed on EmoTune\'s own server. It is not sent to '
+        'an outside AI service; the songs come from a fixed list.',
     'Spotify: song searches and playback go through Spotify.',
     'We do not sell your data, and we do not share it with advertisers.',
   ]),
@@ -163,10 +161,6 @@ const List<_Section> _privacySections = [
         'happened. That count does not include what you wrote or who you are.',
   ]),
   _Section('Your choices', [
-    'Personalization: you can turn off "Mood-based personalization" in your '
-        'profile.',
-    'Private sessions: turn off "Train on this session" before you write, and '
-        'that session is not used to train suggestions.',
     '[Project owner: there is no in-app way yet to delete your history or '
         'account. Say how users can ask for deletion, and how long data is '
         'kept.]',

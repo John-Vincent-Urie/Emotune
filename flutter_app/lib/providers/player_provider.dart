@@ -46,15 +46,9 @@ class PlayerProvider extends ChangeNotifier {
   int _completedTrackCount = 0;
   int? _nextFeelBetterCheckpoint = 5;
   Map<String, dynamic>? _sessionPlan;
-  Map<String, dynamic> _tasteProfile = <String, dynamic>{
-    'familiarity': 'balanced',
-    'prefer_instrumental': false,
-    'train_session': true,
-  };
   String _outcomeMode = 'match_mood';
   String? _outcomeLabel;
   String? _outcomeDescription;
-  bool _trainOnThisSession = true;
   String? _errorMessage;
   String? _playbackStatusCode;
   String? _playbackStatusDetail;
@@ -87,6 +81,16 @@ class PlayerProvider extends ChangeNotifier {
   // SDK talks to the phone's native Spotify session directly and does not
   // depend on EmoTune's backend OAuth link, so caching those as a full
   // block would wrongly skip App Remote playback too.
+  /// Set when the backend reports this EmoTune account has no Spotify link
+  /// (`spotify_not_connected`). The player then says so and offers the
+  /// connect flow instead of failing in silence.
+  bool _needsSpotifyConnection = false;
+  bool get needsSpotifyConnection => _needsSpotifyConnection;
+
+  static const String _connectSpotifyMessage =
+      'Connect your Spotify account to play full songs. Tap "Connect Spotify" '
+      'below, or open Profile.';
+
   static const Set<String> _sessionFatalBlockingIssues = {
     'developer_allowlist_required',
     'premium_required',
@@ -111,21 +115,13 @@ class PlayerProvider extends ChangeNotifier {
   String? get currentEmotion => _currentEmotion;
   int? get historyId => _historyId;
   Map<String, dynamic>? get sessionPlan => _sessionPlan;
-  Map<String, dynamic> get tasteProfile => _tasteProfile;
   String get outcomeMode => _outcomeMode;
   String? get outcomeLabel => _outcomeLabel;
   String? get outcomeDescription => _outcomeDescription;
-  bool get trainOnThisSession => _trainOnThisSession;
-  String get familiarity =>
-      _tasteProfile['familiarity']?.toString() ?? 'balanced';
-  bool get preferInstrumental => _tasteProfile['prefer_instrumental'] == true;
   bool get hasActiveSessionPlan => _sessionPlan?['enabled'] == true;
   bool get hasRecommendationContext =>
       hasActiveSessionPlan ||
-      _outcomeMode != 'match_mood' ||
-      familiarity != 'balanced' ||
-      preferInstrumental ||
-      !_trainOnThisSession;
+      _outcomeMode != 'match_mood';
   bool get isSessionComplete => _sessionPlan?['completed'] == true;
   Duration get sessionProgressDuration =>
       Duration(seconds: track_utils.safeInt(_sessionPlan?['progress_seconds']));
@@ -208,23 +204,19 @@ class PlayerProvider extends ChangeNotifier {
           List<dynamic> rawTracks) =>
       track_utils.normalizeTrackList(rawTracks);
 
+  static bool isPlayable(Map<String, dynamic> track) =>
+      track_utils.isPlayable(track);
+
   static String trackIdentityOf(Map<String, dynamic> rawTrack) =>
       track_utils.trackIdentity(rawTrack);
 
   void _applyRecommendationContext({
     Map<String, dynamic>? sessionPlan,
-    Map<String, dynamic>? tasteProfile,
     String? outcomeMode,
     String? outcomeLabel,
     String? outcomeDescription,
-    bool? trainOnThisSession,
   }) {
     _sessionPlan = track_utils.normalizeObjectMap(sessionPlan);
-    _tasteProfile = track_utils.normalizeTasteProfile(
-      tasteProfile,
-      trainOnThisSession: trainOnThisSession,
-    );
-    _trainOnThisSession = _tasteProfile['train_session'] != false;
     _outcomeMode = track_utils.normalizeOutcomeMode(outcomeMode);
     _outcomeLabel = outcomeLabel?.trim().isNotEmpty == true
         ? outcomeLabel!.trim()
@@ -331,24 +323,24 @@ class PlayerProvider extends ChangeNotifier {
     int? historyId,
     bool autoplay = true,
     Map<String, dynamic>? sessionPlan,
-    Map<String, dynamic>? tasteProfile,
     String? outcomeMode,
     String? outcomeLabel,
     String? outcomeDescription,
-    bool? trainOnThisSession,
   }) {
-    _playlist = normalizeTrackList(tracks);
+    // Songs Spotify could not resolve stay on screen but never in the queue,
+    // so next/previous and autoplay only ever land on something playable.
+    _playlist = normalizeTrackList(tracks)
+        .where(track_utils.isPlayable)
+        .toList();
     _contextQueue = [];
     _currentContext = null;
     _currentEmotion = emotion;
     _historyId = historyId;
     _applyRecommendationContext(
       sessionPlan: sessionPlan,
-      tasteProfile: tasteProfile,
       outcomeMode: outcomeMode,
       outcomeLabel: outcomeLabel,
       outcomeDescription: outcomeDescription,
-      trainOnThisSession: trainOnThisSession,
     );
     _totalListenTime = track_utils.safeInt(_sessionPlan?['progress_seconds']);
     _completedTrackCount = track_utils.safeInt(_sessionPlan?['tracks_played']);
@@ -378,82 +370,6 @@ class PlayerProvider extends ChangeNotifier {
     } else {
       notifyListeners();
     }
-  }
-
-  void mergePlaylistTracks(
-    List<Map<String, dynamic>> tracks, {
-    String? emotion,
-    int? historyId,
-    Map<String, dynamic>? sessionPlan,
-    Map<String, dynamic>? tasteProfile,
-    String? outcomeMode,
-    String? outcomeLabel,
-    String? outcomeDescription,
-    bool? trainOnThisSession,
-  }) {
-    final previousPlaylistLength = _playlist.length;
-    final mergedPlaylist = mergeTrackLists(_playlist, tracks);
-    if (mergedPlaylist.isEmpty) {
-      if (emotion != null && emotion.trim().isNotEmpty) {
-        _currentEmotion = emotion.trim();
-      }
-      if (historyId != null) {
-        _historyId = historyId;
-      }
-      _applyRecommendationContext(
-        sessionPlan: sessionPlan,
-        tasteProfile: tasteProfile,
-        outcomeMode: outcomeMode,
-        outcomeLabel: outcomeLabel,
-        outcomeDescription: outcomeDescription,
-        trainOnThisSession: trainOnThisSession,
-      );
-      _nextFeelBetterCheckpoint =
-          _checkpointFromSessionPlan(_sessionPlan) ?? _nextFeelBetterCheckpoint;
-      notifyListeners();
-      return;
-    }
-
-    _playlist = mergedPlaylist;
-    if (emotion != null && emotion.trim().isNotEmpty) {
-      _currentEmotion = emotion.trim();
-    }
-    if (historyId != null) {
-      _historyId = historyId;
-    }
-    _applyRecommendationContext(
-      sessionPlan: sessionPlan,
-      tasteProfile: tasteProfile,
-      outcomeMode: outcomeMode,
-      outcomeLabel: outcomeLabel,
-      outcomeDescription: outcomeDescription,
-      trainOnThisSession: trainOnThisSession,
-    );
-    _nextFeelBetterCheckpoint =
-        _checkpointFromSessionPlan(_sessionPlan) ?? _nextFeelBetterCheckpoint;
-
-    if (_currentTrack != null) {
-      final currentIdentity = track_utils.trackIdentity(_currentTrack!);
-      final matchedIndex = _playlist.indexWhere(
-        (track) => track_utils.trackIdentity(track) == currentIdentity,
-      );
-      if (matchedIndex >= 0) {
-        _currentIndex = matchedIndex;
-        _playlist[matchedIndex] = {
-          ..._playlist[matchedIndex],
-          ...normalizeTrack(_currentTrack!),
-        };
-      } else if (_currentIndex >= _playlist.length) {
-        _currentIndex = _playlist.length - 1;
-      }
-    }
-
-    _extendPreviewQueueForMergedPlaylist(
-      previousPlaylistLength: previousPlaylistLength,
-      mergedPlaylist: _playlist,
-    );
-
-    notifyListeners();
   }
 
   Future<void> playTrackAtIndex(
@@ -515,9 +431,13 @@ class PlayerProvider extends ChangeNotifier {
       _isUsingSpotifyRemote = false;
       _isUsingSpotifyAppRemote = false;
       _isLoading = false;
-      _errorMessage = appRemoteError == webPlaybackError
-          ? webPlaybackError
-          : '$appRemoteError\n\nFallback: $webPlaybackError';
+      // A missing Spotify link explains both failures, and is the one thing
+      // the user can fix from here; lead with it rather than two raw errors.
+      _errorMessage = _needsSpotifyConnection
+          ? _connectSpotifyMessage
+          : appRemoteError == webPlaybackError
+              ? webPlaybackError
+              : '$appRemoteError\n\nFallback: $webPlaybackError';
       _setPlaybackStatus(
         _hasPreview(track) ? null : 'spotify_background_unavailable',
         _errorMessage,
@@ -1146,7 +1066,6 @@ class PlayerProvider extends ChangeNotifier {
       track['artist'] ?? '',
       itemType: itemType,
       historyId: _historyId,
-      trainSession: _trainOnThisSession,
       durationMs: durationMs > 0 ? durationMs : null,
       endedReason: endedReason,
     ));
@@ -1240,15 +1159,10 @@ class PlayerProvider extends ChangeNotifier {
             autoplay: false,
             sessionPlan:
                 track_utils.normalizeObjectMap(result['session_plan']) ?? _sessionPlan,
-            tasteProfile:
-                track_utils.normalizeObjectMap(result['taste_profile']) ?? _tasteProfile,
             outcomeMode: result['outcome_mode']?.toString() ?? _outcomeMode,
             outcomeLabel: result['outcome_label']?.toString() ?? _outcomeLabel,
             outcomeDescription: result['outcome_description']?.toString() ??
                 _outcomeDescription,
-            trainOnThisSession: (track_utils.normalizeObjectMap(result['taste_profile']) ??
-                    _tasteProfile)['train_session'] !=
-                false,
           );
           _nextFeelBetterCheckpoint = _checkpointFromResponse(result) ??
               _checkpointFromSessionPlan(_sessionPlan);
@@ -1342,25 +1256,34 @@ class PlayerProvider extends ChangeNotifier {
         return null;
       }
 
-      const message = 'Spotify could not start playback on this phone yet.';
-      _spotifyAvailability.markAuthorizationBlocked(message);
-      return message;
+      // Not marked blocked: a session-long block here skipped App Remote on
+      // every later tap, so Spotify's Allow prompt never came back and the
+      // phone stayed silent. The service's interactive-auth cooldown already
+      // stops a failed approval from bouncing the user in and out of Spotify.
+      return 'Spotify could not start playback on this phone yet. '
+          'Tap play again and choose Allow if Spotify asks.';
     } on SpotifyRemoteException catch (error) {
       if (error.code == 'spotify_not_installed') {
         _spotifyAvailability.markBlocked(error.message);
-      } else if (error.code != 'auth_cooldown' &&
-          error.requiresInteractiveAuthorization) {
-        // Spotify's approval screen ran and rejected playback, so repeating
-        // the attempt on the next track only bounces the user back into
-        // Spotify. Stop until the account issue is fixed and the user retries.
-        _spotifyAvailability.markAuthorizationBlocked(error.message);
       }
-      return error.message;
+      return _appRemoteErrorMessage(error);
     } on ApiException catch (error) {
       return error.message;
     } catch (_) {
       return 'Spotify playback could not be started on this phone right now.';
     }
+  }
+
+  /// Spotify's own error codes read like logs. AUTHENTICATION_SERVICE_UNAVAILABLE
+  /// came back on QA's phone when the approval flow ran: Spotify could not
+  /// confirm the login, which the user fixes inside Spotify.
+  String _appRemoteErrorMessage(SpotifyRemoteException error) {
+    final raw = '${error.message} ${error.nativeErrorType ?? ''}'.toUpperCase();
+    if (raw.contains('AUTHENTICATION_SERVICE_UNAVAILABLE')) {
+      return "Spotify couldn't confirm your login. Open Spotify, make sure "
+          "you're logged in, then try again.";
+    }
+    return error.message;
   }
 
   bool _shouldRetrySpotifyAppRemote(SpotifyRemoteException error) {
@@ -1373,6 +1296,7 @@ class PlayerProvider extends ChangeNotifier {
     Map<String, dynamic> track, {
     String? detail,
   }) {
+    _needsSpotifyConnection = false;
     _isUsingSpotifyRemote = true;
     _isUsingSpotifyAppRemote = true;
     _isPlaying = true;
@@ -1417,6 +1341,15 @@ class PlayerProvider extends ChangeNotifier {
         'device=${result['selected_device_name']}',
       );
       if (result['ok'] == true) {
+        // Spotify can accept the request and still play nothing (QA saw
+        // ok=true, then is_playing=false with no item), and the player used to
+        // say "playing in background" over silence. Only claim playback once
+        // Spotify reports a track actually playing.
+        if (!await _confirmWebApiPlaybackStarted()) {
+          return 'Spotify accepted the request but nothing is playing. Open '
+              'Spotify on this phone, play any song once, then try again.';
+        }
+        _needsSpotifyConnection = false;
         _isUsingSpotifyRemote = true;
         _isUsingSpotifyAppRemote = false;
         _isPlaying = true;
@@ -1434,6 +1367,10 @@ class PlayerProvider extends ChangeNotifier {
         return null;
       }
       final blockingIssue = result['blocking_issue']?.toString().trim() ?? '';
+      if (blockingIssue == 'spotify_not_connected') {
+        _needsSpotifyConnection = true;
+        return _connectSpotifyMessage;
+      }
       final message = track_utils.composeSpotifyControlMessage(
         result,
         defaultMessage: 'Spotify could not start playback on this device yet.',
@@ -1450,6 +1387,34 @@ class PlayerProvider extends ChangeNotifier {
       return 'Spotify playback could not be started right now.';
     }
   }
+
+  /// Polls Spotify's current playback for up to [_webApiConfirmWindow] after a
+  /// Web API play, true once it reports a track playing.
+  Future<bool> _confirmWebApiPlaybackStarted() async {
+    final deadline = DateTime.now().add(_webApiConfirmWindow);
+    while (true) {
+      try {
+        final status = await ApiService.getSpotifyPlaybackDebugStatus();
+        final current = status['currently_playing'];
+        if (current is Map &&
+            current['ok'] == true &&
+            current['is_playing'] == true &&
+            ((current['item_uri']?.toString().trim().isNotEmpty ?? false) ||
+                (current['item_id']?.toString().trim().isNotEmpty ?? false))) {
+          return true;
+        }
+      } catch (_) {
+        // A failed status read is not proof of playback; keep trying.
+      }
+      if (DateTime.now().isAfter(deadline)) {
+        return false;
+      }
+      await Future.delayed(_webApiConfirmInterval);
+    }
+  }
+
+  static const Duration _webApiConfirmWindow = Duration(seconds: 3);
+  static const Duration _webApiConfirmInterval = Duration(milliseconds: 700);
 
   void _setPlaybackStatus(String? code, [String? detail]) {
     _playbackStatusCode = code;
@@ -1962,78 +1927,6 @@ class PlayerProvider extends ChangeNotifier {
     }
     _activePreviewSourceIndex = sourceIndex;
     _onTrackCompleted();
-  }
-
-  void _extendPreviewQueueForMergedPlaylist({
-    required int previousPlaylistLength,
-    required List<Map<String, dynamic>> mergedPlaylist,
-  }) {
-    if (mergedPlaylist.length <= previousPlaylistLength) {
-      return;
-    }
-
-    final previewQueue = _previewQueueSource;
-    if (previewQueue == null ||
-        _previewSourceIndexByPlaylistIndex.length != previousPlaylistLength) {
-      // Same reason as the addAll failure below: a rebuild hands the player a
-      // fresh source and just_audio carries `playing` across setAudioSource,
-      // so without an anchor the audio jumped to the first preview in the list
-      // while the UI still showed the track the user picked.
-      _configurePreviewQueueForPlaylist(
-        mergedPlaylist,
-        initialPlaylistIndex: _currentIndex,
-        initialPosition: _position,
-      );
-      return;
-    }
-
-    final existingPreviewSourceCount = _previewSourceIndexByPlaylistIndex
-        .where((index) => index != null)
-        .length;
-    final appendedSources = <AudioSource>[];
-    for (var index = previousPlaylistLength;
-        index < mergedPlaylist.length;
-        index += 1) {
-      final previewUrl =
-          mergedPlaylist[index]['preview_url']?.toString().trim() ?? '';
-      if (previewUrl.isEmpty) {
-        _previewSourceIndexByPlaylistIndex.add(null);
-        continue;
-      }
-
-      _previewSourceIndexByPlaylistIndex.add(
-        existingPreviewSourceCount + appendedSources.length,
-      );
-      appendedSources.add(
-        AudioSource.uri(
-          Uri.parse(previewUrl),
-          tag: track_utils.trackIdentity(mergedPlaylist[index]),
-        ),
-      );
-    }
-
-    if (appendedSources.isEmpty) {
-      return;
-    }
-
-    final pendingPreparation = _previewQueueReady ?? Future<void>.value();
-    _previewQueueReady = pendingPreparation.then((_) async {
-      if (_previewQueueSource != previewQueue) {
-        return;
-      }
-      try {
-        await previewQueue.addAll(appendedSources);
-      } catch (_) {
-        // Rebuilding hands the player a fresh source, which would restart the
-        // queue from the top; keep it on the track that is playing.
-        _configurePreviewQueueForPlaylist(
-          mergedPlaylist,
-          initialPlaylistIndex: _currentIndex,
-          initialPosition: _position,
-        );
-      }
-    });
-    unawaited(_previewQueueReady!);
   }
 
   Future<void> _preparePreviewQueue(

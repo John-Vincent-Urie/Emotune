@@ -9,6 +9,7 @@ import '../../theme/app_theme.dart';
 import '../../providers/player_provider.dart';
 import '../../widgets/emotion_chip.dart';
 import '../../widgets/emotune_page_header.dart';
+import '../widgets/song_count_line.dart';
 import '../widgets/track_card.dart';
 
 class RecommendationsScreen extends StatefulWidget {
@@ -25,7 +26,6 @@ class RecommendationsScreen extends StatefulWidget {
 
 class _RecommendationsScreenState extends State<RecommendationsScreen> {
   static const String _defaultEmotion = 'happy';
-  static const Duration _progressiveAppendDelay = Duration(milliseconds: 180);
   static const _session = RecommendationSessionController();
 
   final List<String> _emotions = [
@@ -48,7 +48,6 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
   Map<String, dynamic>? _lastResult;
   List<dynamic> _tracks = [];
   bool _loading = false;
-  bool _loadingMoreTracks = false;
   String? _errorMessage;
   int _requestSequence = 0;
 
@@ -137,73 +136,32 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                if (_loadingMoreTracks) ...[
-                                  SizedBox(
-                                    width: 28,
-                                    height: 28,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      color: context.emoColors.accentText,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'Finding songs for this mood...',
-                                    style: TextStyle(
-                                      color: isDark
-                                          ? Colors.white54
-                                          : Colors.black54,
-                                    ),
-                                  ),
-                                ] else ...[
-                                  Icon(Icons.music_note,
-                                      size: 60,
-                                      color: isDark
-                                          ? Colors.white12
-                                          : Colors.black12),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    _selectedEmotion == null
-                                        ? 'Select a mood above'
-                                        : 'No recommendations found for this mood yet',
-                                    style: TextStyle(
-                                        color: context.emoColors.textSecondary),
-                                  ),
-                                ],
+                                Icon(Icons.music_note,
+                                    size: 60,
+                                    color: isDark
+                                        ? Colors.white12
+                                        : Colors.black12),
+                                const SizedBox(height: 12),
+                                Text(
+                                  _selectedEmotion == null
+                                      ? 'Select a mood above'
+                                      : 'No recommendations found for this mood yet',
+                                  style: TextStyle(
+                                      color: context.emoColors.textSecondary),
+                                ),
                               ],
                             ),
                           )
                         : Column(
                             children: [
-                              if (_loadingMoreTracks)
-                                Padding(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                                  child: Row(
-                                    children: [
-                                      SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: context.emoColors.accentText,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          'Loading more songs for this mood...',
-                                          style: TextStyle(
-                                            color: isDark
-                                                ? Colors.white54
-                                                : Colors.black54,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                                child: SongCountLine(
+                                  result: _lastResult,
+                                  shown: _tracks.length,
                                 ),
+                              ),
                               Expanded(
                                 child: GridView.builder(
                                   padding: const EdgeInsets.all(16),
@@ -244,7 +202,6 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
       _loading = true;
       _tracks = [];
       _errorMessage = null;
-      _loadingMoreTracks = false;
     });
 
     try {
@@ -252,7 +209,6 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
         emotion,
         text: 'Play songs that fit a $emotion mood.',
         sessionLengthMinutes: studio.sessionLengthMinutes,
-        tasteProfile: _currentTasteProfile(),
       );
       if (!mounted || requestId != _requestSequence) {
         return;
@@ -260,25 +216,12 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
       final normalizedTracks = PlayerProvider.normalizeTrackList(
         List<dynamic>.from(result['tracks'] ?? []),
       );
-      final continuationToken =
-          result['continuation_token']?.toString().trim() ?? '';
-      final loadingMoreTracks =
-          result['loading_more_tracks'] == true && continuationToken.isNotEmpty;
       setState(() {
         _lastResult = result;
         _tracks = normalizedTracks;
         _loading = false;
         _errorMessage = null;
-        _loadingMoreTracks = loadingMoreTracks;
       });
-      if (loadingMoreTracks) {
-        unawaited(
-          _loadMoreRecommendationTracks(
-            requestId: requestId,
-            continuationToken: continuationToken,
-          ),
-        );
-      }
     } on ApiException catch (e) {
       if (!mounted || requestId != _requestSequence) {
         return;
@@ -287,7 +230,6 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
         _loading = false;
         _lastResult = null;
         _errorMessage = e.message;
-        _loadingMoreTracks = false;
       });
     } catch (e) {
       if (!mounted || requestId != _requestSequence) {
@@ -297,108 +239,8 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
         _loading = false;
         _lastResult = null;
         _errorMessage = 'Could not load recommendations right now.';
-        _loadingMoreTracks = false;
       });
     }
-  }
-
-  Future<void> _loadMoreRecommendationTracks({
-    required int requestId,
-    required String continuationToken,
-  }) async {
-    try {
-      final result = await ApiService.continueRecommendation(continuationToken);
-      if (!mounted || requestId != _requestSequence) {
-        return;
-      }
-
-      final incomingTracks = PlayerProvider.normalizeTrackList(
-        List<dynamic>.from(result['tracks'] ?? []),
-      );
-      final mergedTracks =
-          PlayerProvider.mergeTrackLists(_tracks, incomingTracks);
-      final newTracks = mergedTracks.skip(_tracks.length).toList();
-      final emotion = _session.playbackEmotionFromResult(
-        result,
-        defaultEmotion: _selectedEmotion ?? 'mixed',
-      );
-      final historyId = _session.historyIdFromResult(result);
-      final player = context.read<PlayerProvider>();
-
-      if (newTracks.isEmpty) {
-        final shouldMergeActivePlaylist =
-            (historyId != null && player.historyId == historyId) ||
-                (historyId == null &&
-                    player.currentEmotion == emotion &&
-                    player.playlist.isNotEmpty);
-        setState(() {
-          _lastResult = result;
-          _tracks = mergedTracks;
-          _loadingMoreTracks = false;
-        });
-        if (shouldMergeActivePlaylist) {
-          _session.mergePlaylistIntoPlayer(
-            player,
-            mergedTracks.cast<Map<String, dynamic>>(),
-            result,
-            _currentTasteProfile(),
-            defaultEmotion: _selectedEmotion ?? 'mixed',
-          );
-        }
-        return;
-      }
-
-      for (final track in newTracks) {
-        if (!mounted || requestId != _requestSequence) {
-          return;
-        }
-
-        final nextVisibleTracks = PlayerProvider.normalizeTrackList([
-          ..._tracks,
-          track,
-        ]);
-        setState(() {
-          _lastResult = result;
-          _tracks = nextVisibleTracks;
-        });
-
-        final shouldMergeActivePlaylist =
-            (historyId != null && player.historyId == historyId) ||
-                (historyId == null &&
-                    player.currentEmotion == emotion &&
-                    player.playlist.isNotEmpty);
-        if (shouldMergeActivePlaylist) {
-          _session.mergePlaylistIntoPlayer(
-            player,
-            nextVisibleTracks,
-            result,
-            _currentTasteProfile(),
-            defaultEmotion: _selectedEmotion ?? 'mixed',
-          );
-        }
-
-        await Future.delayed(_progressiveAppendDelay);
-      }
-
-      if (!mounted || requestId != _requestSequence) {
-        return;
-      }
-      setState(() => _loadingMoreTracks = false);
-    } on ApiException {
-      if (!mounted || requestId != _requestSequence) {
-        return;
-      }
-      setState(() => _loadingMoreTracks = false);
-    } catch (_) {
-      if (!mounted || requestId != _requestSequence) {
-        return;
-      }
-      setState(() => _loadingMoreTracks = false);
-    }
-  }
-
-  Map<String, dynamic> _currentTasteProfile() {
-    return context.read<RecommendationStudioProvider>().tasteProfile;
   }
 
   Future<void> _playFrom(int index) async {
@@ -413,7 +255,6 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
       tracks: normalizedTracks,
       selectedTrack: selectedTrack,
       lastResult: _lastResult,
-      currentTasteProfile: _currentTasteProfile(),
       defaultEmotion: _selectedEmotion ?? 'mixed',
     );
   }

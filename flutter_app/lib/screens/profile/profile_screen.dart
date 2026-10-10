@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/spotify_connection_controller.dart';
@@ -19,55 +18,18 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  List<dynamic> _artists = [];
-  List<dynamic> _searchResults = [];
-  final _artistSearchCtrl = TextEditingController();
   final _spotifyConnection = SpotifyConnectionController();
-  bool _isSavingArtists = false;
 
   @override
   void initState() {
     super.initState();
     _spotifyConnection.addListener(_onSpotifyConnectionChanged);
-    _loadArtists();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final user = Provider.of<AuthProvider>(context).user;
-    _syncArtistsFromUser(user);
-  }
-
-  void _loadArtists() {
-    final auth = context.read<AuthProvider>();
-    final user = auth.user;
-    if (user != null) {
-      setState(() {
-        _artists = List.from(user['preferred_artists'] ?? []);
-      });
-    }
-  }
-
-  void _syncArtistsFromUser(Map<String, dynamic>? user) {
-    if (_isSavingArtists) {
-      return;
-    }
-
-    final preferredArtists = List<String>.from(
-      user?['preferred_artists'] ?? const <String>[],
-    );
-    if (listEquals(_artists.cast<String>(), preferredArtists)) {
-      return;
-    }
-    _artists = preferredArtists;
   }
 
   @override
   void dispose() {
     _spotifyConnection.removeListener(_onSpotifyConnectionChanged);
     _spotifyConnection.dispose();
-    _artistSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -142,118 +104,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
 
-                    const _SectionTitle('Preferred artists'),
-                    _SettingsCard(
-                      padding: const EdgeInsets.all(14),
-                      children: [
-                        Text(
-                          "Artists we'll prioritize in recommendations.",
-                          style: TextStyle(
-                            color: colors.textSecondary,
-                            fontSize: 11.5,
-                            height: 1.4,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        _SearchBox(
-                          controller: _artistSearchCtrl,
-                          enabled: !_isSavingArtists,
-                          onChanged: _searchArtists,
-                        ),
-                        if (_searchResults.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: colors.cardAlt,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: colors.divider),
-                            ),
-                            child: Column(
-                              children: _searchResults.take(5).map<Widget>((artist) {
-                                final name = artist['name'] as String;
-                                final saved = _artists.contains(name);
-                                return ListTile(
-                                  dense: true,
-                                  leading: CircleAvatar(
-                                    radius: 16,
-                                    backgroundImage: artist['image'] != null
-                                        ? NetworkImage(artist['image'])
-                                        : null,
-                                    backgroundColor:
-                                        AppColors.accent.withValues(alpha: 0.2),
-                                    child: artist['image'] == null
-                                        ? Text(
-                                            name.isNotEmpty ? name[0] : '?',
-                                            style: const TextStyle(
-                                                color: AppColors.accentDark),
-                                          )
-                                        : null,
-                                  ),
-                                  title: Text(
-                                    name,
-                                    style: TextStyle(color: colors.textPrimary),
-                                  ),
-                                  trailing: saved
-                                      ? Icon(Icons.check,
-                                          color: colors.accentText)
-                                      : IconButton(
-                                          icon: Icon(Icons.add,
-                                              color: colors.accentText),
-                                          onPressed: _isSavingArtists
-                                              ? null
-                                              : () => _addArtist(name),
-                                        ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ],
-                        if (_artists.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: _artists.map<Widget>((a) {
-                              return _ArtistChip(
-                                label: a.toString(),
-                                onRemove: _isSavingArtists
-                                    ? null
-                                    : () => _removeArtist(a.toString()),
-                              );
-                            }).toList(),
-                          ),
-                        ],
-                      ],
-                    ),
-
-                    const _SectionTitle('Privacy & personalization'),
-                    _SettingsCard(
-                      children: [
-                        _SettingsRow(
-                          icon: Icons.auto_awesome_rounded,
-                          title: 'Mood-based personalization',
-                          subtitle:
-                              'Lets EmoTune learn from your sessions to improve future picks.',
-                          trailing: EmoTuneToggle(
-                            label: 'Mood-based personalization',
-                            value: user['personalization_opt_in'] != false,
-                            onChanged: _updatePersonalizationOptIn,
-                          ),
-                        ),
-                      ],
-                    ),
-
                     const _SectionTitle('Recommendation studio'),
                     RecommendationSessionControls(
                       sessionLengthMinutes: studio.sessionLengthMinutes,
                       onSessionLengthChanged: studio.setSessionLengthMinutes,
-                      familiarity: studio.familiarity,
-                      onFamiliarityChanged: studio.setFamiliarity,
-                      preferInstrumental: studio.preferInstrumental,
-                      onPreferInstrumentalChanged: studio.setPreferInstrumental,
-                      trainOnThisSession: studio.trainOnThisSession,
-                      onTrainOnThisSessionChanged: studio.setTrainOnThisSession,
-                      title: 'Shape session timing and taste',
+                      title: 'Shape session timing',
                       subtitle: 'Applies across Home and Discover.',
                     ),
 
@@ -320,103 +175,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _searchArtists(String query) async {
-    if (query.length < 2) {
-      setState(() => _searchResults = []);
-      return;
-    }
-    try {
-      final results = await ApiService.searchArtists(query);
-      setState(() {
-        _searchResults = results;
-      });
-    } catch (e) {
-      setState(() => _searchResults = []);
-    }
-  }
-
-  Future<void> _addArtist(String artist) async {
-    if (_artists.contains(artist)) {
-      _artistSearchCtrl.clear();
-      setState(() => _searchResults = []);
-      return;
-    }
-
-    final previousArtists = List<String>.from(_artists.cast<String>());
-    final nextArtists = [...previousArtists, artist];
-    _artistSearchCtrl.clear();
-    setState(() => _searchResults = []);
-    await _persistArtists(nextArtists, previousArtists: previousArtists);
-  }
-
-  Future<void> _removeArtist(String artist) async {
-    final previousArtists = List<String>.from(_artists.cast<String>());
-    final nextArtists =
-        previousArtists.where((item) => item != artist).toList();
-    await _persistArtists(nextArtists, previousArtists: previousArtists);
-  }
-
-  Future<void> _persistArtists(
-    List<String> nextArtists, {
-    required List<String> previousArtists,
-  }) async {
-    final auth = context.read<AuthProvider>();
-    setState(() {
-      _artists = List<String>.from(nextArtists);
-      _isSavingArtists = true;
-    });
-
-    try {
-      await ApiService.updateArtists(nextArtists);
-      final user = auth.user;
-      if (user != null) {
-        auth.refreshUser({
-          ...user,
-          'preferred_artists': List<String>.from(nextArtists),
-        });
-      }
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _artists = List<String>.from(previousArtists);
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not save preferred artists right now.'),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSavingArtists = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _updatePersonalizationOptIn(bool enabled) async {
-    final success = await context
-        .read<AuthProvider>()
-        .updateProfile({'personalization_opt_in': enabled});
-    if (!mounted) {
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success
-              ? (enabled
-                  ? 'Mood-based personalization is on.'
-                  : 'Mood-based personalization is off.')
-              : 'Could not update personalization right now.',
         ),
       ),
     );
@@ -644,28 +402,22 @@ class _SectionTitle extends StatelessWidget {
 /// The rounded, bordered card that groups settings rows, matching the HTML
 /// mockup's `.settings-card`.
 class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({
-    required this.children,
-    this.padding,
-  });
+  const _SettingsCard({required this.children});
 
   final List<Widget> children;
-  final EdgeInsetsGeometry? padding;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.emoColors;
     return Container(
       width: double.infinity,
-      padding: padding ?? const EdgeInsets.symmetric(horizontal: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         color: colors.card,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: colors.divider),
       ),
-      child: padding != null
-          ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: children)
-          : Column(
+      child: Column(
               children: [
                 for (var i = 0; i < children.length; i++)
                   Container(
@@ -755,89 +507,6 @@ class _SettingsRow extends StatelessWidget {
       return row;
     }
     return InkWell(onTap: onTap, child: row);
-  }
-}
-
-class _SearchBox extends StatelessWidget {
-  const _SearchBox({
-    required this.controller,
-    required this.enabled,
-    required this.onChanged,
-  });
-
-  final TextEditingController controller;
-  final bool enabled;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.emoColors;
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.inputBackground,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          Icon(Icons.search_rounded, size: 16, color: colors.textSecondary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              enabled: enabled,
-              style: TextStyle(color: colors.textPrimary, fontSize: 13),
-              decoration: InputDecoration(
-                hintText: 'Search an artist...',
-                hintStyle: TextStyle(color: colors.textSecondary),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              onChanged: onChanged,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ArtistChip extends StatelessWidget {
-  const _ArtistChip({required this.label, this.onRemove});
-
-  final String label;
-  final VoidCallback? onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.emoColors;
-    return Container(
-      padding: const EdgeInsets.only(left: 12, right: 6, top: 6, bottom: 6),
-      decoration: BoxDecoration(
-        color: colors.cardAlt,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colors.divider),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: colors.textPrimary,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: 4),
-          GestureDetector(
-            onTap: onRemove,
-            child: Icon(Icons.close_rounded, size: 15, color: colors.textSecondary),
-          ),
-        ],
-      ),
-    );
   }
 }
 
