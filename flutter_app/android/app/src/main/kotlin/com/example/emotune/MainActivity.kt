@@ -1,9 +1,12 @@
 package com.example.emotune
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.telecom.TelecomManager
 import android.util.Log
 import com.spotify.android.appremote.api.ConnectionParams
 import com.spotify.android.appremote.api.Connector
@@ -27,6 +30,7 @@ class MainActivity : FlutterActivity(), EventChannel.StreamHandler {
         private const val TAG = "EmoTuneSpotify"
         private const val METHOD_CHANNEL = "emotune/spotify_remote"
         private const val EVENT_CHANNEL = "emotune/spotify_remote_events"
+        private const val DIALER_CHANNEL = "emotune/dialer"
         private const val SPOTIFY_PACKAGE_NAME = "com.spotify.music"
         private const val APP_REMOTE_AUTH_REQUEST_CODE = 0x5150
         private const val SPOTIFY_FOREGROUND_DELAY_MS = 1500L
@@ -66,6 +70,48 @@ class MainActivity : FlutterActivity(), EventChannel.StreamHandler {
 
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL)
             .setStreamHandler(this)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DIALER_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                if (call.method != "dial") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                result.success(openDialer(call.argument<String>("number").orEmpty()))
+            }
+    }
+
+    /**
+     * Opens the phone app with [number] typed in. The user still presses call:
+     * ACTION_DIAL, never ACTION_CALL.
+     *
+     * url_launcher sends tel: as ACTION_VIEW, which every app registering tel:
+     * answers, so a crisis-line tap opened an "Open with: Zoom / Phone" chooser
+     * with Zoom first. Aiming the intent at the default dialer skips the
+     * chooser; without one, a plain ACTION_DIAL still reaches dialers rather
+     * than most VoIP apps.
+     */
+    private fun openDialer(number: String): Boolean {
+        if (number.isBlank()) return false
+        val dial = Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val dialerPackage = getSystemService(TelecomManager::class.java)
+                ?.defaultDialerPackage
+            if (!dialerPackage.isNullOrEmpty()) {
+                try {
+                    startActivity(Intent(dial).setPackage(dialerPackage))
+                    return true
+                } catch (error: ActivityNotFoundException) {
+                    // Fall through to the unaimed intent below.
+                }
+            }
+        }
+        return try {
+            startActivity(dial)
+            true
+        } catch (error: ActivityNotFoundException) {
+            false
+        }
     }
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink) {

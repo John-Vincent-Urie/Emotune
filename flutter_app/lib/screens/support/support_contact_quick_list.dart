@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../services/support_contacts.dart';
+import '../../services/dialer.dart';
 import '../../theme/app_theme.dart';
 
 /// Tap-to-dial rows for the contacts that have a phone number, compact enough
@@ -38,13 +37,7 @@ class _ContactRow extends StatelessWidget {
   String _field(String key) => resource[key]?.toString().trim() ?? '';
 
   Future<void> _dial(BuildContext context, String phone) async {
-    var opened = false;
-    try {
-      opened = await launchUrl(
-        dialUri(phone),
-        mode: LaunchMode.externalApplication,
-      );
-    } catch (_) {}
+    final opened = await openDialer(phone);
     if (!opened && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not open the dialer. The number is $phone.')),

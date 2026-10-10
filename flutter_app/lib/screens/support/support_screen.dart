@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/api_service.dart';
+import '../../services/dialer.dart';
 import '../../services/support_contacts.dart';
 import '../../theme/app_theme.dart';
 
@@ -81,6 +82,15 @@ class _SupportScreenState extends State<SupportScreen> {
       setState(() => _resources = supportContactsOrBundled(fetched));
     } catch (_) {
       // Offline or failing: the bundled contacts are already on screen.
+    }
+  }
+
+  Future<void> _dial(String phone) async {
+    final opened = await openDialer(phone);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open the dialer. The number is $phone.')),
+      );
     }
   }
 
@@ -227,7 +237,7 @@ class _SupportScreenState extends State<SupportScreen> {
                   label: 'Call ${field('name')}, $phone',
                   // Read the contact's name with the number, not just
                   // "Call 1553"; the tap moves here with the label.
-                  onTap: () => _launch(dialUri(phone)),
+                  onTap: () => _dial(phone),
                   excludeSemantics: true,
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
@@ -236,7 +246,7 @@ class _SupportScreenState extends State<SupportScreen> {
                     ),
                     icon: const Icon(Icons.call, size: 18),
                     label: Text('Call $phone'),
-                    onPressed: () => _launch(dialUri(phone)),
+                    onPressed: () => _dial(phone),
                   ),
                 ),
               if (sms.isNotEmpty)

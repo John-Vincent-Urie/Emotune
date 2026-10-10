@@ -2,10 +2,13 @@ import 'package:emotune/screens/legal/legal_screen.dart';
 import 'package:emotune/screens/support/support_contact_quick_list.dart';
 import 'package:emotune/screens/support/support_screen.dart';
 import 'package:emotune/services/api_service.dart';
+import 'package:emotune/services/dialer.dart';
 import 'package:emotune/services/support_contacts.dart';
 import 'package:emotune/theme/app_theme.dart';
 import 'package:emotune/widgets/emotion_chip.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -167,7 +170,7 @@ void main() {
     });
   });
 
-  testWidgets('privacy policy is in the app, marked draft, and names Gemini',
+  testWidgets('privacy policy is in the app, marked draft, and says text stays on the server',
       (tester) async {
     await tester.pumpWidget(MaterialApp(
       theme: buildDarkTheme(),
@@ -175,12 +178,34 @@ void main() {
     ));
 
     expect(find.textContaining('DRAFT'), findsOneWidget);
+    // The Gemini music picker was removed with the static song list, so
+    // nothing is sent to an outside AI service any more.
     await tester.scrollUntilVisible(
-      find.textContaining('Google Gemini'),
+      find.textContaining("analysed on EmoTune's own server"),
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.textContaining('not your name, email or account ID'),
-        findsOneWidget);
+    expect(find.textContaining('Gemini'), findsNothing);
+  });
+
+  test('on Android a call tap goes to the native dialer, digits only',
+      () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    const channel = MethodChannel('emotune/dialer');
+    final calls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      return true;
+    });
+    addTearDown(() => TestDefaultBinaryMessengerBinding
+        .instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null));
+
+    expect(await openDialer('0917-325-5789'), isTrue);
+    expect(calls.single.method, 'dial');
+    expect(calls.single.arguments, {'number': '09173255789'});
   });
 }

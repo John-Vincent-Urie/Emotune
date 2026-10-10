@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
@@ -193,6 +194,19 @@ class EmoTuneColors extends ThemeExtension<EmoTuneColors> {
     );
   }
 }
+
+/// System bars for the screens that are dark whatever the theme (splash,
+/// welcome, login, register, reset). Without it, light mode's dark status
+/// icons and light navigation bar sat on the dark backdrop.
+const SystemUiOverlayStyle kAlwaysDarkSystemUi = SystemUiOverlayStyle(
+  statusBarColor: Colors.transparent,
+  statusBarIconBrightness: Brightness.light,
+  statusBarBrightness: Brightness.dark,
+  systemNavigationBarColor: AppColors.darkBg,
+  systemNavigationBarIconBrightness: Brightness.light,
+  systemNavigationBarDividerColor: Colors.transparent,
+  systemNavigationBarContrastEnforced: false,
+);
 
 extension EmoTuneColorsContext on BuildContext {
   EmoTuneColors get emoColors => EmoTuneColors.of(this);

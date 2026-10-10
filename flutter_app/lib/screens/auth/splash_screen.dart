@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
@@ -64,43 +65,46 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.darkBg,
-      body: Stack(
-        children: [
-          const Positioned.fill(child: EmoTuneBackdrop(showParticles: false)),
-          Center(
-            child: FadeTransition(
-              opacity: _fadeAnim,
-              child: ScaleTransition(
-                scale: _scaleAnim,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const EmoTuneLogo(size: 130),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Let your mood decide your music',
-                      style: GoogleFonts.manrope(
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                        fontStyle: FontStyle.italic,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: kAlwaysDarkSystemUi,
+      child: Scaffold(
+        backgroundColor: AppColors.darkBg,
+        body: Stack(
+          children: [
+            const Positioned.fill(child: EmoTuneBackdrop(showParticles: false)),
+            Center(
+              child: FadeTransition(
+                opacity: _fadeAnim,
+                child: ScaleTransition(
+                  scale: _scaleAnim,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const EmoTuneLogo(size: 130),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Let your mood decide your music',
+                        style: GoogleFonts.manrope(
+                          color: AppColors.textSecondary,
+                          fontSize: 14,
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 48),
-                    SizedBox(
-                      width: 200,
-                      child: EmoTuneSecondaryButton(
-                        label: 'Continue',
-                        onPressed: _continue,
+                      const SizedBox(height: 48),
+                      SizedBox(
+                        width: 200,
+                        child: EmoTuneSecondaryButton(
+                          label: 'Continue',
+                          onPressed: _continue,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

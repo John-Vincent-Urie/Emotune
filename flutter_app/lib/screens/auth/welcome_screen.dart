@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../theme/app_theme.dart';
@@ -115,36 +116,39 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   Widget build(BuildContext context) {
     final reduce = _reduceMotion ?? false;
 
-    return Scaffold(
-      backgroundColor: AppColors.darkBg,
-      body: Stack(
-        children: [
-          const Positioned.fill(child: EmoTuneBackdrop()),
-          Positioned.fill(
-            child: SafeArea(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    child: ConstrainedBox(
-                      constraints:
-                          BoxConstraints(minHeight: constraints.maxHeight),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 400),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 32, vertical: 40),
-                            child: _content(reduce),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: kAlwaysDarkSystemUi,
+      child: Scaffold(
+        backgroundColor: AppColors.darkBg,
+        body: Stack(
+          children: [
+            const Positioned.fill(child: EmoTuneBackdrop()),
+            Positioned.fill(
+              child: SafeArea(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      child: ConstrainedBox(
+                        constraints:
+                            BoxConstraints(minHeight: constraints.maxHeight),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 400),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 32, vertical: 40),
+                              child: _content(reduce),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

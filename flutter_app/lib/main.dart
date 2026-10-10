@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/recommendation_studio_provider.dart';
@@ -98,7 +99,29 @@ class _EmoTuneAppState extends State<EmoTuneApp> {
         '/home': (_) => const MainShell(),
       },
       builder: (context, child) {
-        return child!;
+        // Android's navigation bar does not follow the app theme on its own.
+        // Only the navigation-bar fields: the status bar stays with each
+        // screen, since the auth screens are dark whatever the theme.
+        //
+        // The theme comes from ThemeProvider, not Theme.of(context): this
+        // builder's context sits above MaterialApp's theme, so it always read
+        // light, and dark mode got dark icons. On Android 15+ the bar is drawn
+        // over the app and its colour is ignored; with dark icons Android then
+        // added a light contrast scrim -- the light strip under the dark app.
+        // Disabling the enforced scrim lets the app's own background show.
+        final isDark = themeProvider.isDark;
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: SystemUiOverlayStyle(
+            systemNavigationBarColor: isDark
+                ? EmoTuneColors.dark.background
+                : EmoTuneColors.light.background,
+            systemNavigationBarIconBrightness:
+                isDark ? Brightness.light : Brightness.dark,
+            systemNavigationBarDividerColor: Colors.transparent,
+            systemNavigationBarContrastEnforced: false,
+          ),
+          child: child!,
+        );
       },
     );
   }
