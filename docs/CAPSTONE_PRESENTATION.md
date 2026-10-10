@@ -40,11 +40,14 @@ recommend by listening history and genre, not by how the listener feels right
 now — and they have no notion of whether a playlist is helping or making things
 worse.
 
-**EmoTune.** A mobile app where the user types how they feel (English or Taglish;
-Tagalog support is still weak — §10.4). A fine-tuned BERT model classifies the feeling into one of **13
-emotions**, the backend builds a Spotify playlist grounded in music-therapy
-principles (the **iso-principle**: meet the mood, then gently shift it), and the
-app checks in during the session to ask whether it is helping.
+**EmoTune.** EmoTune uses a BERT-based emotion classifier to identify the
+emotion expressed in a student's text (English or Taglish; Tagalog support is
+still weak — §10.4). The backend maps the predicted emotion to a fixed collection
+of songs validated by a music therapist and retrieves all active songs approved
+for that emotion. The Flutter application displays the complete matching
+collection and allows the student to choose a song. The system does not use a
+machine-learning model to rank or personalize songs. During a session the app
+checks in to ask whether the music is helping.
 
 **What makes it more than a mood-to-genre lookup:**
 
@@ -53,7 +56,8 @@ app checks in during the session to ask whether it is helping.
   of looping on them.
 - A crisis-language safety net that stops the app from answering a crisis with a
   playlist.
-- A ranker that learns from what users actually finish listening to.
+- A song collection validated by a music therapist, shown in full: the student
+  chooses, not an algorithm.
 
 ---
 
@@ -62,39 +66,36 @@ app checks in during the session to ask whether it is helping.
 | Part | Stack | Responsibility |
 | --- | --- | --- |
 | `flutter_app/` | Flutter (Dart), Provider | Mobile client: mood entry, playback, favorites, history, profile, session controls |
-| `backend/` | Django 4.2 + Django REST Framework, SimpleJWT | Emotion classification, crisis check, Spotify integration, ranking, persistence, admin |
-| `ml_model/` | PyTorch, Hugging Face Transformers, scikit-learn | Offline training: BERT model, dataset cleaning, ranker weight fitting, baselines |
-| External | Spotify Web API + Spotify App Remote SDK | Music catalog, personalization, playback on the device |
+| `backend/` | Django 4.2 + Django REST Framework, SimpleJWT, MySQL | Emotion classification, crisis check, the therapist-approved song collection, Spotify auth/playback, persistence, admin |
+| `ml_model/` | PyTorch, Hugging Face Transformers, scikit-learn | Offline training: BERT model, dataset cleaning, baselines |
+| External | Spotify Web API + Spotify App Remote SDK | Playback of the approved songs on the device (never song selection) |
 
 ### End-to-end request flow
 
 ```
-User: "I feel overwhelmed with everything I need to finish."
+Student: "I feel overwhelmed with everything I need to finish."
    │
    ▼
-Flutter ── POST /api/analyze/ { text, taste_profile, session_length } ──►
+Flutter ── POST /api/analyze/ { text, session_length } ──►
    │
 Django:
-   0. Crisis-language check (safety.py) ── match? ──► support message, NO music
-   1. Emotion classifier  → emotion + confidence + all 13 scores
-   2. Plutchik mapper     → 8-emotion profile (explainability only)
-   3. Outcome routing     → match_mood or calm_me_down
-   4. Supportive response text
-   5. Candidate retrieval → shared pool + live Spotify search + personalization + curated list
-   6. Linear ranker       → ordered playlist + one selected track
-   7. Taste control       → enforce familiar / balanced / discovery promises
-   8. Save PromptHistory
+   0. Validate the text (non-empty, at most 2,000 characters)
+   1. Crisis-language check (safety.py) ── match? ──► support message, NO music
+   2. Emotion classifier  → emotion + confidence + all 13 scores
+   3. Map the label to its Emotion record (the label is the record's name)
+   4. Query the database  → every active approved Song for that Emotion,
+                            in the therapist's order (EmotionSong.position)
+   5. Supportive response text; optional gentle check-in (concern tier)
+   6. Save PromptHistory
    │
    ▼
-Flutter plays the first track immediately, then fetches the full playlist
-(POST /api/recommendation-playlist/ with a signed continuation token),
-reports listen time, and shows check-in prompts.
+Flutter shows ALL returned songs (+ total). The student picks one; matched songs
+play in-app via Spotify, unmatched ones open a Spotify search. The app reports
+listen time and shows check-in prompts.
 ```
 
-**Progressive loading.** Stage 1 returns one playable track quickly; stage 2
-builds the full playlist with a bigger time budget. The continuation token is
-**signed** (`django.core.signing`) and expires, so a client cannot tamper with
-the emotion or mode between stages.
+The list arrives complete in one response: the lookup is a database query and
+makes no Spotify call, so the song details still show if Spotify is down.
 
 ---
 
@@ -247,64 +248,45 @@ an emotion (`POST /api/recommend-by-emotion/`).
 
 ---
 
-## 5. Music recommendation
+## 5. Music selection — the therapist-approved collection
 
-### 5.1 Candidate sources
+### 5.1 The collection
 
-1. **Shared emotion pool** (`EmotionTrackPool`) — a per-emotion cache of what
-   Spotify returns for that emotion with no personal input. Shared across users
-   because it contains nothing personal. Fresh < 6 h, stale-but-served until the
-   max age, then ignored and rebuilt. Warmed by
-   `python manage.py refresh_emotion_pools`.
-2. **Live Spotify search** — per-emotion query profiles (keywords + genres) in
-   `backend/api/spotify/constants.py`, plus preferred artists.
-3. **Personalization** — the user's Spotify top tracks, saved tracks and recently
-   played (only if they connected Spotify and opted in).
-4. **Curated list** — `docs/music.md`, a hand-picked English + Filipino list per
-   emotion, reviewed against content-safety criteria (§8.3).
-5. **Curated fallbacks** — Spotify playlists returned when the API is
-   unavailable, so the user always gets something playable.
-
-### 5.2 Ranking — the linear picker
-
-`backend/api/picker_ranker.py` scores each candidate as a weighted sum of 8
-features:
+`docs/music.md` is the music therapist's approved list: **13 emotions, 125
+emotion–song approvals, 114 distinct songs** (some songs are approved for more
+than one emotion). It is stored in three tables and seeded by data migration —
+a frozen copy, so the database never silently drifts from what was approved:
 
 ```
-emotion_alignment, personalization, popularity, availability,
-is_preferred, familiar_source, discovery_fit, instrumental_fit
+Emotion (name = BERT label, display_name)
+   1 ──< EmotionSong (position = therapist order) >── 1  Song (title, artist,
+                                                        spotify_track_id, spotify_url,
+                                                        album, image, is_active)
 ```
 
-- **Weights are data, not code.** `ml_model/train_picker_ranker.py` fits them
-  offline from real listening outcomes (label = the track the user actually
-  listened through). The new weights are written only if they beat the defaults
-  on held-out prompts, split by prompt (never by row) to prevent leakage.
-- There are **190** logged prompt rows so far
-  (`ml_model/artifacts/music_picker_training.jsonl`). No trained weights file is
-  deployed yet, so the app currently ranks with the hand-tuned defaults.
-- **Why not collaborative filtering?** LightFM was evaluated and removed: it does
-  not build on Python 3.12, so it never actually ran. The linear model is fast,
-  explainable, and trainable with the data a capstone can collect.
+### 5.2 Selection is a query, not a model
 
-### 5.3 Taste control (runs after ranking)
+For a detected emotion the backend returns every active song mapped to it, in
+the therapist's order. Nothing scores, filters or reorders songs per user. The
+mapping is tested directly: all of the emotion's active songs are returned,
+none from another emotion, inactive songs are excluded, and a song approved
+for several emotions appears once in each list.
 
-- **Balanced** — the curated `docs/music.md` list for the emotion leads, capped at
-  half the playlist.
-- **More familiar** — favorites saved under this emotion lead, with room left for
-  new songs.
-- **More discovery** — curated staples filtered out.
-- **Prefer instrumental** — biases toward instrumental tracks and skips the
-  (vocal) curated list.
+### 5.3 Spotify's limited role
 
-"Ranking decides quality; taste control decides what the user was promised."
+Each song's Spotify track ID was found **once, offline**, by exact title +
+artist search and stored on the row (111 of 114 matched; original or official recordings only). Spotify is then used
+only to play those stored tracks in-app. An unmatched song is still listed, with
+a Spotify search link instead of a play button. Spotify never decides which
+songs are suitable for an emotion.
 
-### 5.4 Optional LLM search planner
+### 5.4 What was removed (2026-10-10 refactor)
 
-An LLM (Gemini-configurable) can suggest extra Spotify search queries from the
-user's own words. It is **strictly additive and off by default**
-(`LLM_MUSIC_PICKER_ENABLED=false`): its queries are appended, the ranker still
-decides the order, and any failure or timeout silently falls back to the
-built-in queries.
+LightFM (collaborative filtering; it never ran on Python 3.12 and was already out
+of the code), the linear ranker and its training, the optional LLM search
+planner, Spotify search-based retrieval with its shared candidate pools,
+personalization from Spotify history, progressive loading, and the taste
+controls (More familiar / More discovery / Prefer instrumental).
 
 ---
 
@@ -322,46 +304,31 @@ Rationale and citations: `docs/music_therapy_guidelines.md`.
 | **Mood-regulation strategies** (Saarikallio & Erkkilä, 2007) | Each emotion names its goal: Solace, Discharge, Revival, Diversion… |
 | **Anger & extreme music** (Sharman & Dingle, 2015) | Matching anger is fine *if the session then moves toward calm* — the risk is dwelling, not matching |
 
-### 6.2 Outcome routing — chosen by the classifier, not the user
+### 6.2 Session modes — chosen by the classifier, not the user
 
-| Mode | Intent | Emotions |
+| Mode | Check-in cadence | Emotions |
 | --- | --- | --- |
-| **Match my mood** | Mirror and sustain | happy, surprising, motivational, calm, romantic, nostalgic, mixed |
-| **Calm me down** | Meet, then de-escalate | sad, stressed, depressing, angry, fear, lonely |
+| **Match my mood** | every 5 tracks | happy, surprising, motivational, calm, romantic, nostalgic, mixed |
+| **Calm me down** | every 3 tracks | sad, stressed, depressing, angry, fear, lonely |
 
-The manual mode switch was **removed from the app on purpose**: a distressed
-user should not be able to opt into a session that only amplifies the feeling.
+A mode shapes the listening session (check-in wording and cadence). It does not
+change the songs: those are always the approved list for the detected emotion.
 
-### 6.3 The iso-principle arc
+### 6.3 The iso-principle, in practice
 
-`calm_me_down` moves through three phases as the user listens:
-
-| Phase | Pull toward calm | Intent |
-| --- | --- | --- |
-| settle | 0.40 | Meet the listener where they are |
-| support | 0.58 | Transition |
-| close | 0.78 | Arrive at a steadier state |
-
-| Reading | settle | support | close |
-| --- | --- | --- | --- |
-| angry 0.9 | angry | calm | calm |
-| lonely 0.9 | lonely | calm | calm |
-| sad 0.9 | sad | sad | calm |
-
-**Safety property:** emotions with no seat in the calm target (angry, depressing,
-lonely) are discounted twice, so even a 0.99-confidence `angry` reading can lead
-only at the start and can never keep the playlist on aggressive content. Tested
-up to 0.99 confidence in `api/test_outcome_routing.py`.
-
-`settle` is deliberately 0.40, not 0 — a pure match would hand someone who said
-they feel hopeless a playlist that only deepens it.
+The iso-principle — meet the mood first, then shift — is applied through the
+check-in, not by blending songs. The session starts with the approved songs for
+the emotion the student expressed. For a high-confidence sad, stressed,
+depressing or angry reading, the app later asks "Are you feeling better right
+now?"; answering yes switches the list to a support emotion's approved songs
+(calm, or motivational for angry), again in the therapist's order.
 
 ### 6.4 Check-ins ("Are you feeling better?")
 
-A session has a length (Auto / 15 / 20 / 45 min) and a check-in rhythm (every 3
-tracks for calm-me-down, 5 for match-my-mood). At a checkpoint the app asks; the
-answer (`/api/feel-better-response/`) can move the playlist to the next phase or
-close the session. The answer is also stored as outcome data.
+A session has a length (Auto / 15 / 20 / 45 min) and a check-in rhythm (§6.2).
+At a checkpoint the app asks; the answer (`/api/feel-better-response/`) can
+switch to the support emotion's list or close the session. The answer is stored
+per session.
 
 ---
 
@@ -370,13 +337,13 @@ close the session. The answer is also stored as outcome data.
 | Area | Features |
 | --- | --- |
 | **Onboarding / auth** | Welcome & splash screens, register (terms acceptance required), login, logout, **forgot password with a 6-digit email code**, change password, password strength meter |
-| **Home** | Mood composer (free text, English/Taglish), detected emotion + confidence chip, supportive message, instant first track, progressive full playlist, empty state and header |
-| **Session studio** | Session length, taste control (Balanced / More familiar / More discovery), prefer instrumental, "train on this session" toggle |
-| **Recommendations tab** | Pick an emotion directly and get a playlist |
+| **Home** | Mood composer (free text, English/Taglish), detected emotion + confidence chip, supportive message, the complete approved song list for that emotion |
+| **Session studio** | Session length and check-in frequency |
+| **Recommendations tab** | Pick an emotion directly and see its approved songs |
 | **Player** | Spotify App Remote playback, mini player + full player, queue, skip/seek/volume, playability tracking |
-| **Favorites** | Heart a track; tagged with the emotion it was saved under so "More familiar" can bring it back |
+| **Favorites** | Heart a playable song; tagged with the emotion it was saved under |
 | **History** | Past prompts, detected emotions, playlists, emotion statistics |
-| **Profile** | Bio, avatar, preferred artists, Spotify connect/disconnect, personalization opt-in, theme |
+| **Profile** | Bio, avatar, preferred artists, Spotify connect/disconnect, theme |
 | **Admin** | Staff dashboard and user management (`/admin-panel/`, admin-only APIs) |
 | **Design** | Unified EmoTune dark design system across all screens |
 
@@ -430,8 +397,9 @@ proxy for self-harm risk. Risk is judged on the text itself.
 
 ### 8.3 Protecting what they hear — content safety for curated music
 
-Every list in `docs/music.md` is reviewed against five criteria. A track is
-disqualified if it:
+Every list in `docs/music.md` was reviewed against five criteria and then
+validated by the music therapist; only that validated list is ever shown. A
+track is disqualified if it:
 
 1. Matches the literal word instead of the emotional need (the old `fear` list
    was horror songs — *Thriller*, *Disturbia* — for an anxious listener; replaced
@@ -454,47 +422,37 @@ than changed unilaterally.
 | **Password reset** | 6-digit code generated with `secrets`, **only the hash is stored**, 10-minute expiry, max 5 attempts, response never reveals whether an email has an account |
 | **Passwords** | Django's hashed storage; similarity, common-password and numeric-only validators |
 | **Authorization** | Every personal endpoint requires login; users can only reach their own history and sessions; admin APIs require staff |
-| **Consent** | Terms must be accepted at registration (timestamp stored); personalization opt-in; per-session "train on this session" toggle excludes a session from learning |
-| **Spotify** | OAuth with a signed state parameter; tokens refreshed server-side; disconnect endpoint; the shared pool stores no personal data |
+| **Consent** | Terms must be accepted at registration (timestamp stored); no personalization or training on listening data. |
+| **Spotify** | OAuth with a signed state parameter; tokens refreshed server-side; disconnect endpoint; no Spotify listening history is read |
 | **Transport / headers** | In production: HTTPS redirect, HSTS (1 year), secure + HttpOnly + SameSite cookies, `X-Frame-Options: DENY`, nosniff, strict referrer policy |
 | **CORS** | Open only in debug; startup refuses the unsafe "all origins + credentials" combination in production |
-| **Tamper-proofing** | Continuation tokens are signed and expire |
-| **Resilience** | Every layer degrades instead of failing: BERT → GoEmotions → keywords; pool → live search → curated fallbacks |
+| **Resilience** | Every layer degrades instead of failing: BERT → GoEmotions → keywords; songs come from the database, so Spotify outages never hide them |
 
 ---
 
 ## 9. Testing and QA
 
-**Automated tests (run 2026-09-23):**
+**Automated tests (backend, run 2026-10-10 after the refactor):** 186 tests, all
+passing, with outbound network blocked; Django system and migration checks clean.
+Flutter test results are to be refreshed after the app's matching update.
 
-| Suite | Result |
-| --- | --- |
-| Backend (Django) — 273 tests | 272 pass. The 1 failure is a test-configuration issue (the local `.env` changes a cache setting the test assumes), not a product bug |
-| Flutter widget tests — 36 tests | 33 pass. The 3 failures are out-of-date tests written for the old session-controls labels before the design-system update |
-| `flutter analyze` | No issues |
-| Django system + migration checks | Clean |
-
-Test coverage by area:
+Backend coverage by area:
 
 | Area | Tests |
 | --- | --- |
-| Core API, recommendations, pool (`api/tests.py`) | 111 |
-| Taste control | 33 |
-| Outcome routing / iso arc | 27 |
-| Picker ranker + training | 25 |
-| Listening-session logging | 14 |
+| Core API: analysis, song lookup, Spotify auth/playback, admin (`api/tests.py`) | 70 |
+| **Crisis safety** | **31** |
+| Users / auth | 24 |
+| Listening-session logging | 12 |
 | Session length | 11 |
-| Taste signals | 11 |
-| Users / auth | 10 |
-| **Crisis safety** | **9** |
-| **Password reset** | **9** |
-| LLM search plan | 8 |
+| **Password reset** | **11** |
+| Session modes | 8 |
+| Settings / security | 8 |
+| Spotify rate limiting | 6 |
 | Spotify failure classification | 5 |
 
 **Manual live-API QA** confirmed: correct 401/403 handling, a user cannot reach
-another user's session (404), tampered continuation tokens rejected, the
-password reset does not reveal accounts, and the full playlist arrives about 4 s
-after the first track.
+another user's session (404), and the password reset does not reveal accounts.
 
 ---
 
@@ -521,19 +479,17 @@ Naming these yourselves shows maturity. Ordered by severity.
    labelled Filipino data in the final stage, and a Filipino-only test split.
 5. **stressed / sad / depressing confusion** — the weakest labels. Mitigated
    because all three route to the same de-escalating mode.
-6. **No explicit-content filter** on live Spotify search results. Only the
-   curated seed tracks are reviewed; `explicit` flags are not checked.
-7. **Spotify rate limiting.** When Spotify returns 429, the app keeps sending
-   searches instead of backing off, and users get generic fallback playlists.
-   Spotify Development Mode also limits the app to allow-listed accounts.
-8. **Ranker not yet trained** on real outcomes — runs on hand-tuned defaults until
-   enough listening data is collected (190 rows logged so far).
-9. **The iso arc advances only at check-ins,** not within a single playlist; a
-   user who never answers a check-in stays in the "settle" phase.
-10. **Minor:** the feel-better endpoints return HTTP 500 on a non-numeric
-   `history_id` (should be 400); password minimum is 6 characters; Spotify tokens
-   are stored unencrypted in the database; no maximum prompt length.
-11. **Not a clinical tool.** EmoTune is a wellbeing aid, not therapy or diagnosis.
+6. **Explicit flags are not checked.** Only therapist-validated songs are shown,
+   but Spotify's `explicit` flag is not stored or filtered.
+7. **3 of 114 songs have no Spotify match** (no original recording found), so they
+   cannot play in-app; the app offers a Spotify search instead. Spotify
+   Development Mode also limits playback to allow-listed accounts.
+8. **The shift toward a support emotion happens only at check-ins,** not within a
+   list; a student who never answers a check-in stays on the first list.
+9. **Minor:** the feel-better endpoints return HTTP 500 on a non-numeric
+   `history_id` (should be 400); Spotify tokens are stored unencrypted in the
+   database.
+10. **Not a clinical tool.** EmoTune is a wellbeing aid, not therapy or diagnosis.
     Therapeutic judgment calls (which songs validate sadness without
     romanticizing despair, when to escalate) need clinician review.
 
@@ -543,10 +499,7 @@ Naming these yourselves shows maturity. Ordered by severity.
   response? Is a phrase list defensible at all, or should it always be paired
   with a model?
 - Which Philippine crisis line should the app show, and how is it kept current?
-- Are the settle / support / close weights (0.40 / 0.58 / 0.78) reasonable?
-  How many tracks should "meeting the mood" last?
-- Is "Let's bring the energy down gently" the right opening for a sad or lonely
-  listener, who is already low-energy?
+- How many tracks should "meeting the mood" last before the first check-in?
 - A lyric review of the flagged Filipino tracks in `depressing` and `angry`.
 - Should explicit tracks be filtered for all users or only on request?
 
@@ -563,14 +516,14 @@ Naming these yourselves shows maturity. Ordered by severity.
 5. **Data cleaning** — the dropped synthetic `sadness` class is a strong story (§3.3)
 6. **Results** — 85% accuracy / 0.852 F1, per-label table, honest caveats (§3.5)
 7. **Runtime fallback chain** (§4)
-8. **Recommendation pipeline** — pool, search, personalization, ranker, taste control (§5)
-9. **Therapy foundations** — iso-principle and the outcome routing (§6.1–6.2)
-10. **The iso arc** — settle → support → close table (§6.3)
+8. **The song collection** — therapist list → database mapping, no ranking (§5)
+9. **Therapy foundations** — iso-principle and the session modes (§6.1–6.2)
+10. **Check-ins and the support switch** (§6.3–6.4)
 11. **Live demo** (below)
 12. **Safety: protecting the person** — crisis layer + session design (§8.1–8.2)
 13. **Safety: protecting what they hear** — content criteria, the `fear` list fix (§8.3)
 14. **Safety: protecting their data** — the security table (§8.4)
-15. **Testing** — 273 backend + 36 Flutter tests, QA results (§9)
+15. **Testing** — 186 backend tests, QA results (§9)
 16. **Limitations and next steps** (§10)
 17. **Q&A**
 
@@ -578,8 +531,9 @@ Naming these yourselves shows maturity. Ordered by severity.
 
 1. Register (show the terms checkbox) → log in.
 2. Type *"I have too many deadlines and no time"* → detected `stressed`, supportive
-   text, first track plays at once, full playlist loads behind it.
-3. Open the session studio → switch to *More discovery*, show the playlist change.
+   text, and all 10 approved stressed songs, in the therapist's order.
+3. Pick a song from the list and play it; point out an unmatched song's Spotify
+   search link.
 4. Type *"Grabe ang daming deadlines, stressed na ako"* → Taglish input
    (`stressed`, 0.97). Do **not** demo pure Tagalog — see §10.4.
    For `nostalgic`, use *"I miss my childhood days so much"* (0.99).
@@ -599,7 +553,7 @@ demo from an allow-listed account.
 
 **Why BERT and not an LLM API?** It runs locally at no per-request cost, needs
 no network for classification, keeps user text private, and is fine-tuned for
-our 13 labels and Taglish input. An LLM is optional and additive only (§5.4).
+our 13 labels and Taglish input.
 
 **Why 13 labels instead of the 6 basic emotions?** Music choice depends on
 distinctions like lonely vs. sad or stressed vs. fear, which call for different
@@ -607,13 +561,12 @@ music. A reduced 8-label set is documented (`docs/EMOTION_LABELS.md`) in case
 accuracy needs to trade off against granularity.
 
 **How do you know the playlist helps?** Check-in answers and listen-through
-behavior are stored per session; that is also the label the ranker trains on. A
-formal user study is future work.
+behavior are stored per session. A formal user study is future work; therapist
+approval validates the song collection, not its clinical effectiveness.
 
 **What happens if the model is down or Spotify is down?** Every layer falls
-back: GoEmotions or keywords for classification; the pool, curated lists or
-fallback playlists for music. A broken component costs quality, never the
-request.
+back: GoEmotions or keywords for classification. Songs come from the database,
+so a Spotify outage only disables in-app playback — the list still shows.
 
 **Isn't it dangerous for an app to respond to someone in crisis?** That is why
 crisis text never reaches the music pipeline — the app steps aside and points to
@@ -621,8 +574,8 @@ human help. We also know the current detector is incomplete (§10.1) and treat
 that as the top open item.
 
 **Why was the manual mood-mode switch removed?** So a distressed user cannot opt
-into a session that only amplifies the feeling; the classifier routes them to
-de-escalation.
+into a session that only amplifies the feeling; the classifier sets the session
+mode, and the check-in can move them to a support emotion's approved songs.
 
 **Does it work in Filipino?** Partly. Taglish with English emotion words works
 well; pure Tagalog is weak (5 of 7 misclassified in a spot check), because the
