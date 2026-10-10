@@ -10,7 +10,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from users.models import ListeningSession, PromptHistory, UserPreference
+from users.models import ListeningSession, PromptHistory
 
 User = get_user_model()
 
@@ -57,19 +57,11 @@ class ListenLoggingTests(TestCase):
         self.assertEqual(session.listen_duration, 7)
         self.assertFalse(session.completed)
 
-    def test_a_skip_does_not_count_as_a_preference(self):
-        """Recording a skip must not teach the personalizer that you like it."""
-        self._report(duration=7, duration_ms=210000, ended_reason='skipped')
-        self.assertEqual(UserPreference.objects.count(), 0)
-
     def test_a_played_through_track_is_a_positive(self):
         response = self._report(duration=200, duration_ms=210000, ended_reason='completed')
 
         self.assertTrue(response.json()['completed'])
         self.assertTrue(ListeningSession.objects.get().completed)
-        preference = UserPreference.objects.get()
-        self.assertEqual(preference.play_count, 1)
-        self.assertEqual(preference.total_listen_time, 200)
 
     def test_one_prompt_can_hold_a_positive_and_a_negative(self):
         """A candidate set only becomes a training group with both labels."""
@@ -120,16 +112,6 @@ class ListenLoggingTests(TestCase):
         session = ListeningSession.objects.get()
         self.assertEqual(session.listen_duration, 195)
         self.assertTrue(session.completed)
-
-    def test_an_opted_out_session_records_nothing(self):
-        self.history.music_picker_data = {'personalization': {'train_session': False}}
-        self.history.save(update_fields=['music_picker_data'])
-
-        response = self._report(duration=200, duration_ms=210000)
-
-        self.assertEqual(response.json()['status'], 'tracking_disabled')
-        self.assertEqual(ListeningSession.objects.count(), 0)
-        self.assertEqual(UserPreference.objects.count(), 0)
 
     def test_a_playlist_link_is_not_a_listen(self):
         response = self._report(item_type='playlist')

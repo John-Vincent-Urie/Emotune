@@ -133,12 +133,12 @@ class CrisisResponseViewTests(TestCase):
         )
         self.client.force_authenticate(user=self.user)
 
-    @patch('api.views.spotify_service.get_recommendations_with_details')
+    @patch('api.views.songs_for_emotion')
     @patch('api.views.get_classifier')
     def test_analyze_emotion_short_circuits_on_crisis_text(
         self,
         mock_get_classifier,
-        mock_get_recommendations_with_details,
+        mock_songs_for_emotion,
     ):
         response = self.client.post(
             '/api/analyze/',
@@ -152,7 +152,7 @@ class CrisisResponseViewTests(TestCase):
         self.assertEqual(payload['tracks'], [])
         self.assertIn('please contact your local emergency number', payload['ai_response'])
         mock_get_classifier.assert_not_called()
-        mock_get_recommendations_with_details.assert_not_called()
+        mock_songs_for_emotion.assert_not_called()
         # A crisis prompt is not logged into prompt history as ordinary content.
         self.assertEqual(PromptHistory.objects.count(), 0)
 
@@ -177,12 +177,12 @@ class CrisisResponseViewTests(TestCase):
         # fabricate a number that was never configured/verified.
         self.assertNotIn('1553', response.json()['ai_response'])
 
-    @patch('api.views.spotify_service.get_recommendations_with_details')
+    @patch('api.views.songs_for_emotion')
     @patch('api.views.get_classifier')
     def test_recommend_by_emotion_short_circuits_on_crisis_text(
         self,
         mock_get_classifier,
-        mock_get_recommendations_with_details,
+        mock_songs_for_emotion,
     ):
         response = self.client.post(
             '/api/recommend-by-emotion/',
@@ -195,15 +195,13 @@ class CrisisResponseViewTests(TestCase):
         self.assertTrue(payload['crisis'])
         self.assertEqual(payload['tracks'], [])
         mock_get_classifier.assert_not_called()
-        mock_get_recommendations_with_details.assert_not_called()
+        mock_songs_for_emotion.assert_not_called()
 
     # Patched like its siblings: unpatched, this test fetched a real Spotify
     # token and searched with the dev credentials on every suite run.
-    @patch('api.views.spotify_service.get_recommendations_with_details')
-    def test_recommend_by_emotion_ignores_template_default_text(self, mock_recs):
+    def test_recommend_by_emotion_ignores_template_default_text(self):
         """The templated default ('Play songs for a sad mood.') must never trip
         the crisis check -- only caller-supplied text is inspected."""
-        mock_recs.side_effect = RuntimeError('spotify unavailable')
         response = self.client.post(
             '/api/recommend-by-emotion/',
             {'emotion': 'sad'},
@@ -387,11 +385,9 @@ class ConcernResponseViewTests(TestCase):
         )
         self.client.force_authenticate(user=self.user)
 
-    @patch('api.views.spotify_service.get_recommendations_with_details')
     @patch('api.views.get_classifier')
-    def test_hopeless_phrase_keeps_music_and_adds_check_in(self, mock_get_classifier, mock_recs):
+    def test_hopeless_phrase_keeps_music_and_adds_check_in(self, mock_get_classifier):
         mock_get_classifier.return_value.predict.return_value = _prediction('sad', 'high')
-        mock_recs.side_effect = RuntimeError('spotify unavailable')
 
         payload = self.client.post(
             '/api/analyze/', {'text': "I don't know what to do anymore"}, format='json',
@@ -405,11 +401,9 @@ class ConcernResponseViewTests(TestCase):
         mock_get_classifier.assert_called_once()
         self.assertEqual(SupportEvent.objects.get().level, 'concern')
 
-    @patch('api.views.spotify_service.get_recommendations_with_details')
     @patch('api.views.get_classifier')
-    def test_confident_depressing_prediction_adds_check_in(self, mock_get_classifier, mock_recs):
+    def test_confident_depressing_prediction_adds_check_in(self, mock_get_classifier):
         mock_get_classifier.return_value.predict.return_value = _prediction('depressing', 'high')
-        mock_recs.side_effect = RuntimeError('spotify unavailable')
 
         payload = self.client.post(
             '/api/analyze/', {'text': 'everything feels grey lately'}, format='json',
@@ -417,13 +411,11 @@ class ConcernResponseViewTests(TestCase):
 
         self.assertEqual(payload['support_check_in']['trigger'], 'model')
 
-    @patch('api.views.spotify_service.get_recommendations_with_details')
     @patch('api.views.get_classifier')
-    def test_worry_about_a_friend_gets_the_hotlines_and_its_own_words(self, mock_get_classifier, mock_recs):
+    def test_worry_about_a_friend_gets_the_hotlines_and_its_own_words(self, mock_get_classifier):
         """Owner decision 2026-10-06: third-party disclosures must get the hotline list."""
         SupportResource.objects.create(name='Hotline', kind='hotline', phone='1553', is_verified=True)
         mock_get_classifier.return_value.predict.return_value = _prediction('fear', 'high')
-        mock_recs.side_effect = RuntimeError('spotify unavailable')
 
         payload = self.client.post(
             '/api/analyze/',
@@ -438,11 +430,9 @@ class ConcernResponseViewTests(TestCase):
         self.assertIn('worried about someone', check_in['message'])
         self.assertIn('tel:1553', [r['phone_uri'] for r in check_in['resources']])
 
-    @patch('api.views.spotify_service.get_recommendations_with_details')
     @patch('api.views.get_classifier')
-    def test_own_hopelessness_keeps_self_wording(self, mock_get_classifier, mock_recs):
+    def test_own_hopelessness_keeps_self_wording(self, mock_get_classifier):
         mock_get_classifier.return_value.predict.return_value = _prediction('sad', 'high')
-        mock_recs.side_effect = RuntimeError('spotify unavailable')
 
         payload = self.client.post(
             '/api/analyze/', {'text': "I don't know what to do anymore"}, format='json',
@@ -452,11 +442,9 @@ class ConcernResponseViewTests(TestCase):
         self.assertEqual(payload['support_check_in']['about'], 'self')
         self.assertTrue(payload['support_check_in']['resources'] is not None)
 
-    @patch('api.views.spotify_service.get_recommendations_with_details')
     @patch('api.views.get_classifier')
-    def test_ordinary_text_has_no_risk_fields(self, mock_get_classifier, mock_recs):
+    def test_ordinary_text_has_no_risk_fields(self, mock_get_classifier):
         mock_get_classifier.return_value.predict.return_value = _prediction('happy', 'high')
-        mock_recs.side_effect = RuntimeError('spotify unavailable')
 
         payload = self.client.post(
             '/api/analyze/', {'text': 'great day at the beach'}, format='json',
@@ -466,9 +454,7 @@ class ConcernResponseViewTests(TestCase):
         self.assertNotIn('support_check_in', payload)
         self.assertFalse(SupportEvent.objects.exists())
 
-    @patch('api.views.spotify_service.get_recommendations_with_details')
-    def test_picking_the_depressing_tab_is_not_a_concern(self, mock_recs):
-        mock_recs.side_effect = RuntimeError('spotify unavailable')
+    def test_picking_the_depressing_tab_is_not_a_concern(self):
 
         payload = self.client.post(
             '/api/recommend-by-emotion/', {'emotion': 'depressing'}, format='json',

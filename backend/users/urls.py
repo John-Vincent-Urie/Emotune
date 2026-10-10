@@ -18,7 +18,6 @@ urlpatterns = [
     path('password-reset/', views.password_reset_request, name='password_reset_request'),
     path('password-reset/verify/', views.password_reset_verify, name='password_reset_verify'),
     path('password-reset/confirm/', views.password_reset_confirm, name='password_reset_confirm'),
-    path('update-artists/', views.update_artists, name='update_artists'),
     path('favorites/', views.favorites, name='favorites'),
     path('favorites/<str:track_id>/', views.remove_favorite, name='remove_favorite'),
     path('history/', views.history, name='history'),

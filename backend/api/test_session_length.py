@@ -8,24 +8,8 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 
 from users.models import PromptHistory
-from api.recommendation_session import (
-    build_session_plan,
-    should_persist_recommendation_context,
-    update_session_plan_progress,
-)
+from api.session_plan import build_session_plan, update_session_plan_progress
 
-
-TRACKS = {
-    'tracks': [{
-        'id': 't1', 'item_type': 'track', 'name': 'A', 'artist': 'B',
-        'album': 'C', 'image': '', 'preview_url': None, 'duration_ms': 180000,
-        'spotify_url': 'https://open.spotify.com/track/t1',
-        'uri': 'spotify:track:t1', 'recommendation_source': 'spotify_catalog',
-    }],
-    'source': 'spotify', 'used_fallback': False, 'fallback_reason': None,
-    'personalized': False, 'personalization_sources': [],
-    'personalization_missing_scopes': [],
-}
 
 PREDICTION = {
     'emotion': 'calm', 'confidence': 0.9,
@@ -74,14 +58,6 @@ class SessionLengthUnitTests(APITestCase):
         )
         self.assertEqual(plan['check_in_after_tracks'], 3)
 
-    def test_session_length_alone_marks_context_worth_persisting(self):
-        self.assertTrue(should_persist_recommendation_context(
-            outcome_mode='match_mood', session_length_minutes=15, taste_profile={},
-        ))
-        self.assertFalse(should_persist_recommendation_context(
-            outcome_mode='match_mood', session_length_minutes=0, taste_profile={},
-        ))
-
     def test_progress_moves_through_phases(self):
         plan = build_session_plan(
             outcome_mode='match_mood', session_length_minutes=15,
@@ -102,9 +78,8 @@ class SessionLengthApiTests(APITestCase):
         )
         self.client.force_authenticate(user=self.user)
 
-    @patch('api.views.spotify_service.get_recommendations_with_details', return_value=TRACKS)
     @patch('api.views.get_classifier')
-    def test_analyze_with_only_session_length(self, mock_classifier, _mock_tracks):
+    def test_analyze_with_only_session_length(self, mock_classifier):
         mock_classifier.return_value.predict.return_value = PREDICTION
         response = self.client.post(
             '/api/analyze/',
@@ -116,14 +91,16 @@ class SessionLengthApiTests(APITestCase):
         self.assertEqual(body['outcome_mode'], 'match_mood')
         self.assertIsNotNone(body['session_plan'])
         self.assertEqual(body['session_plan']['target_minutes'], 15)
+        # The songs are calm's whole therapist-approved list, from the database.
+        self.assertEqual(body['total'], 10)
+        self.assertEqual(len(body['tracks']), 10)
         history = PromptHistory.objects.get(user=self.user)
         self.assertEqual(
             history.music_picker_data['session_plan']['target_minutes'], 15,
         )
 
-    @patch('api.views.spotify_service.get_recommendations_with_details', return_value=TRACKS)
     @patch('api.views.get_classifier')
-    def test_analyze_without_session_length_has_no_plan(self, mock_classifier, _mock_tracks):
+    def test_analyze_without_session_length_has_no_plan(self, mock_classifier):
         mock_classifier.return_value.predict.return_value = PREDICTION
         response = self.client.post(
             '/api/analyze/', {'text': 'winding down'}, format='json',
@@ -131,8 +108,7 @@ class SessionLengthApiTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.json()['session_plan'])
 
-    @patch('api.views.spotify_service.get_recommendations_with_details', return_value=TRACKS)
-    def test_recommend_by_emotion_with_only_session_length(self, _mock_tracks):
+    def test_recommend_by_emotion_with_only_session_length(self):
         response = self.client.post(
             '/api/recommend-by-emotion/',
             {'emotion': 'calm', 'session_length_minutes': 45},
@@ -143,9 +119,14 @@ class SessionLengthApiTests(APITestCase):
         self.assertEqual(body['session_plan']['target_minutes'], 45)
         self.assertEqual(PromptHistory.objects.filter(user=self.user).count(), 1)
 
-    @patch('api.views.spotify_service.get_recommendations_with_details', return_value=TRACKS)
+    def test_browsing_a_tab_without_a_session_saves_no_history(self):
+        response = self.client.post('/api/recommend-by-emotion/', {'emotion': 'calm'}, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(PromptHistory.objects.filter(user=self.user).exists())
+
     @patch('api.views.get_classifier')
-    def test_feel_better_tracks_session_progress(self, mock_classifier, _mock_tracks):
+    def test_feel_better_tracks_session_progress(self, mock_classifier):
         mock_classifier.return_value.predict.return_value = PREDICTION
         analyze = self.client.post(
             '/api/analyze/',
@@ -183,9 +164,46 @@ class SessionLengthApiTests(APITestCase):
         self.assertEqual(at_target['session_plan']['phase'], 'close')
         self.assertEqual(at_target['session_plan']['progress_seconds'], 900)
 
-    @patch('api.views.spotify_service.get_recommendations_with_details', return_value=TRACKS)
     @patch('api.views.get_classifier')
-    def test_invalid_session_length_is_ignored(self, mock_classifier, _mock_tracks):
+    def test_session_cadence_wins_over_the_recovery_interval(self, mock_classifier):
+        # A high-confidence stressed reading starts a recovery plan (every 5
+        # tracks) and calm_me_down's session plan (every 3). The app schedules
+        # its next call from next_checkpoint_tracks, so both fields must follow
+        # the session, which comes first.
+        mock_classifier.return_value.predict.return_value = {
+            **PREDICTION,
+            'emotion': 'stressed', 'confidence': 0.97,
+            'all_scores': {'stressed': 0.97, 'calm': 0.03},
+            'top_emotions': [{'emotion': 'stressed', 'confidence': 0.97}],
+        }
+        analyze = self.client.post(
+            '/api/analyze/',
+            {'text': 'too many deadlines', 'session_length_minutes': 15},
+            format='json',
+        ).json()
+        self.assertEqual(analyze['outcome_mode'], 'calm_me_down')
+        self.assertTrue(analyze['recovery_plan'])
+
+        early = self.client.post(
+            '/api/feel-better/',
+            {'history_id': analyze['history_id'], 'duration': 60, 'tracks_played': 1},
+            format='json',
+        ).json()
+
+        self.assertFalse(early['should_prompt'])
+        self.assertEqual(early['check_interval_tracks'], 3)
+        self.assertEqual(early['next_checkpoint_tracks'], 3)
+
+    def test_non_numeric_history_id_is_a_bad_request(self):
+        for path in ('/api/feel-better/', '/api/feel-better-response/', '/api/users/listen-time/'):
+            for bad in ('abc', '1; drop', -3, 0):
+                response = self.client.post(
+                    path, {'history_id': bad, 'track_id': 't', 'duration': 'x'}, format='json',
+                )
+                self.assertEqual(response.status_code, 400, (path, bad))
+
+    @patch('api.views.get_classifier')
+    def test_invalid_session_length_is_ignored(self, mock_classifier):
         mock_classifier.return_value.predict.return_value = PREDICTION
         for bad in ('', None, 'abc', -5):
             response = self.client.post(

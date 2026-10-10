@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework_simplejwt.exceptions import InvalidToken
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.settings import api_settings as jwt_settings
-from .models import FavoriteTrack, PromptHistory, UserPreference
+from .models import FavoriteTrack, PromptHistory
 
 User = get_user_model()
 
@@ -23,8 +23,6 @@ class UserSerializer(serializers.ModelSerializer):
             'is_spotify_connected',
             'is_staff',
             'is_superuser',
-            'preferred_artists',
-            'personalization_opt_in',
             'terms_accepted_at',
             'created_at',
         ]
@@ -55,7 +53,6 @@ class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)
     accept_terms = serializers.BooleanField(write_only=True)
-    personalization_opt_in = serializers.BooleanField(required=False, default=True)
 
     class Meta:
         model = User
@@ -65,7 +62,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             'password',
             'confirm_password',
             'accept_terms',
-            'personalization_opt_in',
         ]
 
     def validate(self, data):
@@ -97,7 +93,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             username=validated_data['username'],
             email=validated_data['email'],
             password=validated_data['password'],
-            personalization_opt_in=validated_data.get('personalization_opt_in', True),
             terms_accepted_at=timezone.now(),
         )
         return user
@@ -179,9 +174,3 @@ class PromptHistorySerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['user', 'created_at']
 
-
-class UserPreferenceSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UserPreference
-        fields = '__all__'
-        read_only_fields = ['user']

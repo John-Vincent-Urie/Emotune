@@ -14,7 +14,7 @@ class RegistrationTests(TestCase):
     def setUp(self):
         self.client = APIClient()
 
-    def test_register_stores_terms_acceptance_and_personalization_preference(self):
+    def test_register_stores_terms_acceptance(self):
         response = self.client.post(
             '/api/users/register/',
             {
@@ -23,7 +23,6 @@ class RegistrationTests(TestCase):
                 'password': 'quiet-harbor-42',
                 'confirm_password': 'quiet-harbor-42',
                 'accept_terms': True,
-                'personalization_opt_in': False,
             },
             format='json',
         )
@@ -31,11 +30,11 @@ class RegistrationTests(TestCase):
         self.assertEqual(response.status_code, 201)
         body = response.json()
         self.assertEqual(body['user']['username'], 'Avery')
-        self.assertFalse(body['user']['personalization_opt_in'])
+        # Mood-based personalization was removed (2026-10-10).
+        self.assertNotIn('personalization_opt_in', body['user'])
         self.assertIsNotNone(body['user']['terms_accepted_at'])
 
         user = User.objects.get(email='avery@example.com')
-        self.assertFalse(user.personalization_opt_in)
         self.assertIsNotNone(user.terms_accepted_at)
 
     def _register(self, display_name, email):
@@ -109,7 +108,6 @@ class RegistrationTests(TestCase):
                 'password': 'quiet-harbor-42',
                 'confirm_password': 'quiet-harbor-42',
                 'accept_terms': False,
-                'personalization_opt_in': True,
             },
             format='json',
         )

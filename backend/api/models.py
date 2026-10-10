@@ -1,46 +1,119 @@
 """
 Database models for the api app.
 
-This holds the shared emotion track pool (the pre-warmed candidate cache that
-keeps per-request Spotify catalog searches off the critical path) and the
+The therapist-validated song collection (Emotion, Song, EmotionSong) and the
 crisis-support directory and event counter used by api/safety.py. Every
-user-facing model (history, favorites, preferences) lives in the users app.
+user-facing model (history, favorites) lives in the users app.
 """
+from urllib.parse import quote
+
 from django.db import models
-from django.utils import timezone
 
 
-class EmotionTrackPool(models.Model):
-    """Pre-fetched Spotify catalog candidates for one emotion.
+class Emotion(models.Model):
+    """One of the 13 labels the BERT classifier emits (ml/emotion_labels.py).
 
-    Rows are shared by every user because they hold only the emotion-baseline
-    half of a recommendation -- what `_build_recommendation_queries` returns
-    for an emotion with no user-specific inputs (no preferred artists, no LLM
-    queries, no seed track/artist, no playlist category). Per-user
-    personalization still runs live on every request and gets blended on top
-    of these candidates, so a pool hit never flattens one user's
-    recommendations into another's.
-
-    This is a short-lived cache, not a local mirror of the Spotify catalog:
-    rows past SPOTIFY_TRACK_POOL_MAX_AGE_SECONDS are ignored and refetched.
+    `name` is the classifier's label exactly, so no LABEL_n mapping is needed;
+    `display_name` is the heading the therapist's list uses ("Motivated" for
+    motivational, "Scared" for fear, ...).
     """
 
-    emotion = models.CharField(max_length=50, unique=True)
-    tracks = models.JSONField(default=list)
-    queries_used = models.JSONField(default=list, blank=True)
-    refreshed_at = models.DateTimeField(default=timezone.now, db_index=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    name = models.CharField(max_length=50, unique=True)
+    display_name = models.CharField(max_length=50)
+    description = models.TextField(blank=True)
 
     class Meta:
-        db_table = 'emotion_track_pools'
-        ordering = ['emotion']
+        db_table = 'emotions'
+        ordering = ['id']
 
     def __str__(self):
-        return f"{self.emotion} ({len(self.tracks or [])} tracks)"
+        return self.name
+
+
+class Song(models.Model):
+    """A therapist-approved song. Spotify fields are empty when the song could
+    not be matched on Spotify; it is still shown, just not playable in-app."""
+
+    title = models.CharField(max_length=300)
+    artist = models.CharField(max_length=300)
+    spotify_track_id = models.CharField(max_length=64, blank=True, null=True)
+    spotify_url = models.URLField(blank=True, null=True)
+    album = models.CharField(max_length=300, blank=True)
+    image = models.URLField(blank=True)
+    duration_ms = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    emotions = models.ManyToManyField(Emotion, through='EmotionSong', related_name='songs')
+
+    class Meta:
+        db_table = 'songs'
+        ordering = ['title', 'id']
+        constraints = [
+            models.UniqueConstraint(fields=['title', 'artist'], name='unique_song_title_artist'),
+        ]
+
+    def __str__(self):
+        return f"{self.title} - {self.artist}"
 
     @property
-    def age_seconds(self):
-        return max((timezone.now() - self.refreshed_at).total_seconds(), 0.0)
+    def uri(self):
+        return f"spotify:track:{self.spotify_track_id}" if self.spotify_track_id else ''
+
+    def as_track(self, position):
+        """The track shape the app reads (agreed with the frontend, 2026-10-10)."""
+        playable = bool(self.spotify_track_id)
+        return {
+            'id': self.spotify_track_id or f'song-{self.id}',
+            'item_type': 'track',
+            'name': self.title,
+            'artist': self.artist,
+            'album': self.album,
+            'image': self.image,
+            'uri': self.uri,
+            # An unmatched song still gets a way in: a static Spotify search
+            # link (no API call), so the student can look it up themselves.
+            'spotify_url': (
+                self.spotify_url
+                or f"https://open.spotify.com/search/{quote(f'{self.title} {self.artist}'.strip())}"
+            ),
+            'duration_ms': self.duration_ms,
+            'preview_url': None,
+            'recommendation_source': 'therapist_list',
+            'song_id': self.id,
+            'position': position,
+            'playable': playable,
+        }
+
+
+class EmotionSong(models.Model):
+    """A therapist-approved emotion-song pairing. `position` is the song's place
+    in that emotion's list in docs/music.md, which is the order the app shows."""
+
+    emotion = models.ForeignKey(Emotion, on_delete=models.CASCADE, related_name='song_links')
+    song = models.ForeignKey(Song, on_delete=models.CASCADE, related_name='emotion_links')
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        db_table = 'emotion_songs'
+        ordering = ['emotion', 'position']
+        constraints = [
+            models.UniqueConstraint(fields=['emotion', 'song'], name='unique_emotion_song'),
+        ]
+
+    def __str__(self):
+        return f"{self.emotion.name} #{self.position}: {self.song}"
+
+
+def songs_for_emotion(emotion_name):
+    """(Emotion or None, every active approved song for it in therapist order)."""
+    emotion = Emotion.objects.filter(name=str(emotion_name or '').strip().lower()).first()
+    if emotion is None:
+        return None, []
+    links = (
+        EmotionSong.objects.filter(emotion=emotion, song__is_active=True)
+        .select_related('song')
+        .order_by('position', 'song_id')
+    )
+    return emotion, [link.song.as_track(link.position) for link in links]
 
 
 class SupportResource(models.Model):

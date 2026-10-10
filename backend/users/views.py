@@ -12,7 +12,7 @@ from django.utils import timezone
 from .emails import send_password_reset_code
 from .models import (
     EMOTION_CHOICES, FavoriteTrack, ListeningSession, PasswordResetCode,
-    PromptHistory, UserPreference,
+    PromptHistory,
 )
 from .throttles import (
     LoginEmailThrottle, LoginIPThrottle, PasswordChangeThrottle,
@@ -24,7 +24,7 @@ from .serializers import (
     UserSerializer, RegisterSerializer, ChangePasswordSerializer,
     FavoriteTrackSerializer, PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer, PasswordResetVerifySerializer,
-    PromptHistorySerializer, UserPreferenceSerializer
+    PromptHistorySerializer
 )
 
 logger = logging.getLogger(__name__)
@@ -272,15 +272,6 @@ def password_reset_confirm(request):
     return Response({'message': 'Password updated. You can log in with it now.'})
 
 
-@api_view(['PUT'])
-def update_artists(request):
-    """Update preferred artists"""
-    artists = request.data.get('preferred_artists', [])
-    request.user.preferred_artists = artists
-    request.user.save()
-    return Response({'preferred_artists': artists})
-
-
 # Favorites
 def _normalized_favorite_emotion(value):
     """Keep only emotions the recommender knows; anything else is untagged."""
@@ -364,13 +355,11 @@ def _listen_was_meaningful(listen_seconds, track_length_seconds):
 def update_listen_time(request):
     """Record how a playback ended.
 
-    Every playback of a real track is written to ListeningSession, including
-    short ones. That is deliberate: a skip is the only negative example the
-    music picker's ranker ever sees, and dropping short listens here is what
-    left the training set with 12 rows that were all positives.
-
-    Preference counters are a different question and keep their own bar -- a
-    four-second skip must not teach the personalizer that you like a track.
+    Advances the listening session's progress (the session card and the
+    feel-better check-ins read it) and keeps the listening history. Nothing here
+    trains or personalizes anything any more: the songs are the therapist's
+    fixed list, so the old preference counters and "train on this session"
+    switch went with the ranking (2026-10-10).
     """
     track_id = request.data.get('track_id')
     emotion = request.data.get('emotion')
@@ -379,13 +368,26 @@ def update_listen_time(request):
     artist_name = request.data.get('artist_name', '')
     item_type = str(request.data.get('item_type', 'track') or 'track').strip().lower()
     history_id = request.data.get('history_id')
-    train_session = request.data.get('train_session', True)
     ended_reason = str(request.data.get('ended_reason', '') or '').strip().lower()
 
     try:
         track_length_seconds = max(int(request.data.get('duration_ms') or 0), 0) / 1000.0
     except (TypeError, ValueError):
         track_length_seconds = 0.0
+    try:
+        duration = max(int(duration or 0), 0)
+    except (TypeError, ValueError):
+        duration = 0
+    if history_id not in (None, ''):
+        try:
+            history_id = int(history_id)
+        except (TypeError, ValueError):
+            history_id = 0
+        if history_id <= 0:
+            return Response(
+                {'error': 'history_id must be a positive whole number.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     prompt_history = None
     if history_id:
@@ -409,10 +411,6 @@ def update_listen_time(request):
         prompt_history.music_picker_data = music_picker_data
         prompt_history.save(update_fields=['session_duration', 'music_picker_data'])
 
-        personalization = music_picker_data.get('personalization')
-        if isinstance(personalization, dict) and personalization.get('train_session') is False:
-            train_session = False
-
     if (
         not track_id
         or not emotion
@@ -421,9 +419,6 @@ def update_listen_time(request):
     ):
         return Response({'status': 'skipped'})
 
-    if str(train_session).strip().lower() in {'false', '0', 'no'}:
-        return Response({'status': 'tracking_disabled'})
-
     listen_seconds = max(int(duration or 0), 0)
     played_through = (
         ended_reason == 'completed'
@@ -431,9 +426,7 @@ def update_listen_time(request):
     )
 
     if prompt_history is not None:
-        # Written for every playback, however short. The candidates that were
-        # offered alongside this one are already on the prompt, so one row here
-        # turns a whole candidate set into a labelled training group.
+        # Listening history: every playback of a real track, however short.
         ListeningSession.objects.update_or_create(
             user=request.user,
             prompt_history=prompt_history,
@@ -445,17 +438,4 @@ def update_listen_time(request):
             },
         )
 
-    if not played_through:
-        # A skip is recorded above, but it is not evidence of a preference.
-        return Response({'status': 'recorded', 'completed': False})
-
-    pref, _created = UserPreference.objects.get_or_create(
-        user=request.user,
-        emotion=emotion,
-        spotify_track_id=track_id,
-        defaults={'track_name': track_name, 'artist_name': artist_name}
-    )
-    pref.play_count += 1
-    pref.total_listen_time += listen_seconds
-    pref.save()
-    return Response({'status': 'updated', 'completed': True})
+    return Response({'status': 'recorded', 'completed': played_through})

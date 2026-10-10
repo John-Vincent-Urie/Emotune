@@ -5,7 +5,6 @@ urlpatterns = [
     # Core
     path('analyze/', views.analyze_emotion, name='analyze_emotion'),
     path('recommend-by-emotion/', views.recommend_by_emotion, name='recommend_by_emotion'),
-    path('recommendation-playlist/', views.recommendation_playlist, name='recommendation_playlist'),
     path('feel-better/', views.check_feel_better, name='feel_better'),
     path('feel-better-response/', views.feel_better_response, name='feel_better_response'),
     path('support-resources/', views.support_resources, name='support_resources'),
@@ -18,8 +17,6 @@ urlpatterns = [
     path('spotify/prepare-playback/', views.spotify_prepare_playback, name='spotify_prepare_playback'),
     path('spotify/player-control/', views.spotify_player_control, name='spotify_player_control'),
     path('spotify/disconnect/', views.spotify_disconnect, name='spotify_disconnect'),
-    path('spotify/search-artists/', views.search_artists, name='search_artists'),
-    path('spotify/search-tracks/', views.search_tracks, name='search_tracks'),
     
     # Admin
     path('admin/dashboard/', views.admin_dashboard, name='admin_dashboard'),

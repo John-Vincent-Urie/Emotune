@@ -51,12 +51,6 @@ def _required_playback_scopes():
 def _requested_scopes():
     return _normalize_scopes(getattr(settings, 'SPOTIFY_SCOPE', ''))
 
-def _personalization_scope_map():
-    return {
-        'top_tracks': 'user-top-read',
-        'saved_tracks': 'user-library-read',
-        'recently_played': 'user-read-recently-played',
-    }
 
 def _token_payload_summary(payload):
     payload = payload if isinstance(payload, dict) else {}
@@ -420,19 +414,6 @@ def _canonical_track_title(value):
     return title
 
 
-# Spotify search also returns spoken or video companion tracks ("Shake It Off -
-# Commentary", "Choker / ... - Livestream Version", "the cure - performance
-# video"). They are not songs to play someone in a mood.
-_NON_MUSIC_TITLE = re.compile(
-    r'\b(?:commentary|interview|podcast|reaction|livestream|live stream|performance video|music video|'
-    r'behind the scenes|track by track|voice memo)\b',
-    re.IGNORECASE,
-)
-
-
-def _is_non_music_track(track):
-    return isinstance(track, dict) and bool(_NON_MUSIC_TITLE.search(str(track.get('name') or '')))
-
 def _unique_text_values(values):
     unique_values = []
     seen_values = set()
@@ -572,123 +553,3 @@ def _format_nested_track_items(
             normalized['spotify_added_at'] = item.get(added_at_key)
         formatted.append(normalized)
     return formatted
-
-def _history_allows_learning(history):
-    if history is None:
-        return True
-    music_picker_data = (
-        history.music_picker_data
-        if isinstance(history.music_picker_data, dict)
-        else {}
-    )
-    personalization = music_picker_data.get('personalization')
-    return not (
-        isinstance(personalization, dict)
-        and personalization.get('train_session') is False
-    )
-
-def _normalize_taste_profile(taste_profile):
-    working = taste_profile if isinstance(taste_profile, dict) else {}
-    familiarity = str(working.get('familiarity') or 'balanced').strip().lower()
-    if familiarity not in {'balanced', 'familiar', 'discovery'}:
-        familiarity = 'balanced'
-    return {
-        'familiarity': familiarity,
-        'prefer_instrumental': bool(working.get('prefer_instrumental', False)),
-    }
-
-def _taste_discovery_bonus(track, taste_profile):
-    familiarity = taste_profile.get('familiarity')
-    source = str(track.get('recommendation_source') or '').strip().lower()
-    if familiarity == 'discovery':
-        if source in {'spotify_catalog', 'curated_fallback'}:
-            return 0.14, 'taste:discovery'
-        if source in {'spotify_top_tracks', 'spotify_saved_tracks', 'user_preference', 'favorite_track'}:
-            return -0.08, 'taste:discovery'
-    if familiarity == 'familiar':
-        if source in {'spotify_top_tracks', 'spotify_saved_tracks', 'user_preference', 'favorite_track'}:
-            return 0.12, 'taste:familiar'
-        if source in {'spotify_catalog', 'curated_fallback'}:
-            return -0.06, 'taste:familiar'
-    return 0.0, None
-
-INSTRUMENTAL_TERMS = (
-    'instrumental',
-    'instrumentals',
-    'ambient',
-    'piano',
-    'study',
-    'focus',
-    'meditation',
-    'meditative',
-    'sleep',
-    'classical',
-    'orchestral',
-    'soundtrack',
-    'score',
-    'lofi',
-    'lo-fi',
-    'lo fi',
-)
-
-# Words that mark a recording as vocal-led or vocal-heavy. "ft." is here
-# because that is how the app's own playlist document writes a feature credit.
-VOCAL_TERMS = (
-    'feat.',
-    'feat',
-    'ft.',
-    'featuring',
-    'vocal',
-    'vocals',
-    'karaoke',
-    'live',
-    'remix',
-)
-
-
-def _term_pattern(terms):
-    """Match whole words only.
-
-    Substring matching used to read "Alive" as a live recording and
-    "Sleepless" as sleep music, so every term is anchored to word boundaries
-    that tolerate the punctuation in "feat." and "lo-fi".
-    """
-    return re.compile(
-        r'(?<![a-z0-9])(?:%s)(?![a-z0-9])'
-        % '|'.join(re.escape(term) for term in sorted(terms, key=len, reverse=True))
-    )
-
-
-_INSTRUMENTAL_PATTERN = _term_pattern(INSTRUMENTAL_TERMS)
-_VOCAL_PATTERN = _term_pattern(VOCAL_TERMS)
-
-
-def _taste_instrumental_signal(text_blob, taste_profile):
-    """How instrumental a track reads: ``1``, ``-1``, or ``0`` when unknown.
-
-    Returns ``(signal, reason)``. The signal is unscaled on purpose -- callers
-    score on different ranges and need the same reading of the track, not the
-    same number.
-    """
-    if not taste_profile.get('prefer_instrumental'):
-        return 0, None
-
-    normalized_blob = str(text_blob or '').strip().lower()
-    instrumental_hit = bool(_INSTRUMENTAL_PATTERN.search(normalized_blob))
-    vocal_hit = bool(_VOCAL_PATTERN.search(normalized_blob))
-
-    if instrumental_hit and not vocal_hit:
-        return 1, 'taste:instrumental'
-    if vocal_hit and not instrumental_hit:
-        return -1, 'taste:less_instrumental_fit'
-    return 0, None
-
-
-def _taste_instrumental_bonus(text_blob, taste_profile, *, weight=0.8):
-    """The instrumental signal scaled for the candidate ranker's score range.
-
-    Candidate scores there run from roughly 1 to 5, where source weight alone
-    spans 0.8 to 3.4, so the old +/-0.18 nudge could only break exact ties.
-    """
-    signal, reason = _taste_instrumental_signal(text_blob, taste_profile)
-    return signal * weight, reason
