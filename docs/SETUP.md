@@ -19,43 +19,69 @@ relative to the script, so this holds for anyone who cloned the repo -- no
 hardcoded path. Create it first: with no `backend/venv` on disk the scripts
 fall through to their normal import error.
 
-Warm the shared per-emotion candidate pools once the Spotify credentials are in
-place, then keep them warm on a schedule (cron, a systemd timer, or Task
-Scheduler on Windows):
-
-```bash
-python manage.py refresh_emotion_pools
-```
-
-Recommendations are served from these pools instead of waiting on a chain of
-live Spotify searches. A cold pool is not fatal -- the first requests fall back
-to live search and warm it themselves -- but a pool built by this command is
-much deeper, so playlists keep varying between sessions. Configure it with the
-`SPOTIFY_TRACK_POOL_*` variables in `.env.example`.
+The songs come from the therapist-approved collection in the database (tables
+`emotions`, `songs`, `emotion_songs`), seeded from `docs/music.md` by migration
+`api/0008_seed_therapist_songs` -- `migrate` is all it needs; no Spotify call
+picks songs. To change the collection, add a new data migration (a migration
+must replay the same data forever, so don't edit the seed one).
 
 Backend base URL:
 
 - local machine: `http://127.0.0.1:8000/api`
 - Android emulator: `http://10.0.2.2:8000/api`
 
-### Ranking is built in -- nothing extra to install
+### Running the backend in Docker
 
-The music picker ranks candidates with `backend/api/picker_ranker.py`, a linear
-model scored as one dot product per track. It has no native extension and no
-per-request model fitting, so `pip install -r requirements.txt` is all it needs.
-
-Its weights are data, not code. With no artifact on disk the built-in defaults
-reproduce the hand-tuned blend the picker shipped with. To fit them from real
-listening outcomes instead:
+Instead of the venv, the backend can run in a container (Docker Engine with the
+Compose plugin; on Ubuntu see https://docs.docker.com/engine/install/ubuntu/).
+From the repository root, with `.env` in place:
 
 ```bash
-backend/venv/bin/python ml_model/train_picker_ranker.py
+docker compose up --build -d      # serves http://127.0.0.1:8000, same URLs as above
+docker compose logs -f backend
+docker compose exec backend python manage.py createsuperuser
+docker compose down               # stops it; the database volumes are kept
 ```
 
-That writes `ml_model/artifacts/picker_weights.json`, but only if the fitted
-weights beat the current defaults on held-out prompts. Point
-`PICKER_RANKER_WEIGHTS_PATH` elsewhere to load a different artifact, or set
-`PICKER_RANKER_ENABLED=false` to fall back to the built-in defaults.
+Docker runs three services: the backend, **MySQL 8.4** (`db`) and **phpMyAdmin**.
+Before the first `up`, add the MySQL credentials to `.env` (choose your own
+password; it is fixed when the MySQL volume is first created):
+
+```
+MYSQL_DATABASE=emotune
+MYSQL_USER=emotune
+MYSQL_PASSWORD=<a strong password>
+```
+
+There is no root password to set: MySQL generates a random one at first start
+(shown once in `docker compose logs db` as `GENERATED ROOT PASSWORD`). Nothing
+in the project needs it.
+
+- **phpMyAdmin:** http://127.0.0.1:8081. Log in with `MYSQL_USER` /
+  `MYSQL_PASSWORD`. It is bound to localhost only.
+- MySQL itself listens on `127.0.0.1:3307` (localhost only) for host tools and
+  for running the tests against MySQL from the venv:
+  `DJANGO_DB_ENGINE=mysql MYSQL_HOST=127.0.0.1 MYSQL_PORT=3307 MYSQL_USER=... MYSQL_PASSWORD=... python manage.py test`.
+  Without `DJANGO_DB_ENGINE=mysql` the venv and the tests use SQLite as before.
+- Memory is capped for this laptop: a 128 MB InnoDB buffer pool, no
+  performance_schema, a 512 MB container limit.
+
+What differs from the venv setup:
+
+- It serves with gunicorn (one worker, four threads, since each worker loads its
+  own copy of the emotion models) and WhiteNoise for the admin's static files.
+- The database is MySQL in the `emotune-mysql` volume, not `backend/db.sqlite3`.
+  Migrations run on every start. Uploaded profile pictures stay in the
+  `emotune-data` volume, which also keeps the pre-MySQL SQLite database
+  (`/data/db.sqlite3`) as a backup. To copy data from a SQLite database into
+  MySQL, dump it with `manage.py dumpdata --natural-foreign --natural-primary
+  --exclude contenttypes --exclude auth.permission` and load it with
+  `manage.py loaddata` against the MySQL settings.
+- The models are not in the image. `backend/ml/models` is mounted read-only,
+  so `ML_MODEL_PATH` must be relative (`ml/models/...`) or point under
+  `/app/backend/ml/models`. The host's Hugging Face cache is mounted for the
+  GoEmotions fallback (override with `HF_CACHE_DIR`).
+- Set `EMOTUNE_PORT=8001` if a local `runserver` already holds port 8000.
 
 ## 2. Flutter Setup
 
@@ -198,20 +224,29 @@ Response:
   "confidence_band": "high",
   "prediction_fallback_used": false,
   "needs_review": false,
-  "tracks_source": "spotify",
-  "tracks_fallback_used": false
+  "tracks": [
+    {"song_id": 41, "position": 1, "name": "...", "artist": "...",
+     "uri": "spotify:track:...", "playable": true}
+  ],
+  "total": 10,
+  "tracks_source": "therapist_list"
 }
 ```
 
-### Spotify Search Failure
+`tracks` is every active approved song for the emotion, in the therapist's
+order. A song with no stored Spotify match has `"playable": false`, `"uri":
+null` and a Spotify search link in `spotify_url`.
 
-When Spotify blocks or rejects a request, search endpoints now return structured error details instead of an empty list.
+### Spotify Failures
+
+When Spotify blocks or rejects a playback or auth request, the endpoint returns
+structured error details. The song list itself never depends on Spotify.
 
 Example:
 
 ```json
 {
-  "error": "Spotify track search failed.",
+  "error": "Spotify playback failed.",
   "spotify": {
     "status_code": 403,
     "reason": "developer_allowlist_required",
