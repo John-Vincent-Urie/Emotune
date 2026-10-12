@@ -39,3 +39,4 @@ backend/ml/models/bert_emotion_model/
 *.safetensors
 *.pt
 *.bin
+test-reports/

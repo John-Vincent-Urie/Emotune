@@ -31,6 +31,9 @@ from users.models import PromptHistory
 User = get_user_model()
 
 
+# Pin the redirect URI so a developer's .env (e.g. a tunnel URL) cannot change
+# the expected value in these tests.
+@override_settings(SPOTIFY_REDIRECT_URI='http://127.0.0.1:8000/api/spotify/callback/')
 class SpotifyOAuthTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -359,7 +362,7 @@ class SpotifyOAuthTests(TestCase):
                 'The user is not registered for this application. '
                 'Please check your settings on developer dashboard.'
             ),
-            'error_code': 'None',
+            'error_code': None,
             'response_json': {
                 'error': {
                     'status': 403,
@@ -1091,7 +1094,7 @@ class SpotifyAuthPlaybackTests(TestCase):
                 'The user is not registered for this application. '
                 'Please check your settings on developer dashboard.'
             ),
-            'error_code': 'None',
+            'error_code': None,
             'reason': 'developer_allowlist_required',
             'response_text': (
                 'The user is not registered for this application. '

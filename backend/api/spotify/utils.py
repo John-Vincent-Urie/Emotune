@@ -90,7 +90,10 @@ def _extract_error_details(payload, response_text=''):
         error_message = str(response_text or '').strip()
 
     return {
-        'error_code': str(error_code).strip() or None,
+        # str(None) would be the text 'None', so a missing code stays None.
+        'error_code': (
+            str(error_code).strip() or None if error_code is not None else None
+        ),
         'error_message': error_message[:1000] or None,
     }
 
@@ -435,7 +438,9 @@ def _normalize_playable_item(item, default_source='spotify'):
         return None
 
     item_id = str(normalized.get('id') or '').strip()
-    item_type = str(normalized.get('item_type') or '').strip() or 'track'
+    # Left blank until the URI and URL have had their say: defaulting to
+    # 'track' here made an album or playlist URL build a spotify:track: URI.
+    item_type = str(normalized.get('item_type') or '').strip()
     uri = str(normalized.get('uri') or '').strip()
     spotify_url = str(normalized.get('spotify_url') or '').strip()
 
@@ -477,7 +482,7 @@ def _normalize_playable_item(item, default_source='spotify'):
         return None
 
     normalized['id'] = item_id or uri or spotify_url or normalized.get('name') or 'spotify-item'
-    normalized['item_type'] = item_type
+    normalized['item_type'] = item_type or 'track'
     normalized['name'] = str(normalized.get('name') or 'Spotify recommendation')
     normalized['artist'] = artist_name or 'Spotify'
     normalized['album'] = str(normalized.get('album') or '')
