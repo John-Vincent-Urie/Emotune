@@ -11,6 +11,7 @@ import '../../widgets/emotion_chip.dart';
 import '../../widgets/emotune_page_header.dart';
 import '../widgets/song_count_line.dart';
 import '../widgets/track_card.dart';
+import '../../theme/emotion_names.dart';
 
 class RecommendationsScreen extends StatefulWidget {
   const RecommendationsScreen({
@@ -104,7 +105,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
               itemBuilder: (ctx, i) {
                 final em = _emotions[i];
                 return EmotionChip(
-                  label: '${em[0].toUpperCase()}${em.substring(1)}',
+                  label: emotionDisplayName(em),
                   color: AppColors.emotionColors[em] ?? AppColors.accent,
                   selected: _selectedEmotion == em,
                   onTap: () => _selectEmotion(em),

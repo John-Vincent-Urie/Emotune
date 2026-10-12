@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../controllers/spotify_connection_controller.dart';
 import '../../providers/player_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/emotion_names.dart';
 
 class FullPlayerScreen extends StatelessWidget {
   const FullPlayerScreen({super.key});
@@ -273,7 +274,7 @@ class FullPlayerScreen extends StatelessWidget {
     }
 
     final emotion = player.currentEmotion ?? 'mixed';
-    final label = '${emotion[0].toUpperCase()}${emotion.substring(1)}';
+    final label = emotionDisplayName(emotion);
     if (queue.length > 1) {
       return '$label Mix';
     }

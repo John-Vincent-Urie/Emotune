@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
+import '../../theme/emotion_names.dart';
 
 /// "10 therapist-approved songs for happy" above a song grid.
 ///
@@ -18,12 +19,13 @@ class SongCountLine extends StatelessWidget {
     final rawTotal = result?['total'];
     final total = rawTotal is num ? rawTotal.toInt() : shown;
     final info = result?['emotion_info'];
-    // The model's name ("motivational"), not music.md's display name
-    // ("Motivated"): the Discover tabs and the result chip use the model's,
-    // and the two disagree for four emotions.
-    final emotion = (info is Map ? info['name'] : null)?.toString().trim() ??
-        result?['emotion']?.toString().trim() ??
-        '';
+    // The therapist's name, as on the Discover tabs ("Motivated", not the
+    // model key "motivational").
+    final emotion = emotionDisplayName(
+      result?['emotion']?.toString() ??
+          (info is Map ? info['name']?.toString() : null),
+      serverDisplayName: info is Map ? info['display_name'] : null,
+    );
     final noun = total == 1 ? 'song' : 'songs';
     final label = emotion.isEmpty
         ? '$total therapist-approved $noun'

@@ -4,6 +4,7 @@ import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/emotion_chip.dart';
 import 'package:intl/intl.dart';
+import '../../theme/emotion_names.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key, this.isActive = false});
@@ -219,7 +220,10 @@ class _HistoryScreenState extends State<HistoryScreen>
                     // The mood color stays on the tint and border; as text
                     // several moods fell under 3:1 in one theme or the other.
                     child: Text(
-                      emotion.toUpperCase(),
+                      emotionDisplayName(
+                        emotion,
+                        serverDisplayName: item['detected_emotion_display'],
+                      ).toUpperCase(),
                       style: TextStyle(
                           color: context.emoColors.textPrimary,
                           fontSize: 11,
@@ -339,7 +343,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                           color: color, shape: BoxShape.circle)),
                   const SizedBox(width: 6),
                   Text(
-                    '${emotion[0].toUpperCase()}${emotion.substring(1)} ($count)',
+                    '${emotionDisplayName(emotion, serverDisplayName: s['display_name'])} ($count)',
                     style: TextStyle(
                         color: isDark ? Colors.white70 : Colors.black54,
                         fontSize: 13),

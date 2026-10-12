@@ -1,5 +1,6 @@
 import 'package:emotune/screens/widgets/song_count_line.dart';
 import 'package:emotune/theme/app_theme.dart';
+import 'package:emotune/theme/emotion_names.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -12,23 +13,7 @@ void main() {
     ));
   }
 
-  testWidgets('uses the server total and the emotion display name',
-      (tester) async {
-    await pump(tester, {
-      'emotion': 'happy',
-      'emotion_info': {'id': 1, 'name': 'happy', 'display_name': 'Happy'},
-      'total': 10,
-    }, shown: 9);
-    expect(find.text('10 therapist-approved songs for happy'), findsOneWidget);
-  });
-
-  testWidgets('falls back to the songs shown and the plain emotion',
-      (tester) async {
-    await pump(tester, {'emotion': 'calm'}, shown: 1);
-    expect(find.text('1 therapist-approved song for calm'), findsOneWidget);
-  });
-
-  testWidgets('names the emotion the way the Discover tabs do', (tester) async {
+  testWidgets('uses the server total and display name', (tester) async {
     await pump(tester, {
       'emotion': 'motivational',
       'emotion_info': {
@@ -37,8 +22,24 @@ void main() {
         'display_name': 'Motivated',
       },
       'total': 10,
-    });
-    expect(find.text('10 therapist-approved songs for motivational'),
+    }, shown: 9);
+    expect(find.text('10 therapist-approved songs for motivated'),
         findsOneWidget);
+  });
+
+  testWidgets('falls back to the songs shown and the therapist name',
+      (tester) async {
+    await pump(tester, {'emotion': 'fear'}, shown: 1);
+    expect(find.text('1 therapist-approved song for scared'), findsOneWidget);
+  });
+
+  test('every model key maps to the therapist name', () {
+    expect(emotionDisplayName('motivational'), 'Motivated');
+    expect(emotionDisplayName('fear'), 'Scared');
+    expect(emotionDisplayName('depressing'), 'Depressed');
+    expect(emotionDisplayName('surprising'), 'Surprised');
+    expect(emotionDisplayName('happy'), 'Happy');
+    expect(emotionDisplayName('calm', serverDisplayName: 'Calm'), 'Calm');
+    expect(kEmotionDisplayNames, hasLength(13));
   });
 }

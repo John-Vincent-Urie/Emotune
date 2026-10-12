@@ -18,6 +18,7 @@ import '../widgets/feel_better_dialog.dart';
 import '../support/support_contact_quick_list.dart';
 import '../support/support_screen.dart';
 import '../../services/support_contacts.dart';
+import '../../theme/emotion_names.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -228,7 +229,7 @@ class _HomeScreenState extends State<HomeScreen>
                                     // border; as text it fell to 1.3:1
                                     // (happy, light) and 1.9:1 (fear, dark).
                                     child: Text(
-                                      '${_lastResult!['emotion'].toString().toUpperCase()} '
+                                      '${emotionDisplayName(_lastResult!['emotion']?.toString(), serverDisplayName: (_lastResult!['emotion_info'] is Map) ? (_lastResult!['emotion_info'] as Map)['display_name'] : null).toUpperCase()} '
                                       '${_lastResult!['confidence']}%',
                                       style: TextStyle(
                                         color: colors.textPrimary,

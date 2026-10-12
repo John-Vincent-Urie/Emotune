@@ -87,6 +87,54 @@ class PlayerProvider extends ChangeNotifier {
   bool _needsSpotifyConnection = false;
   bool get needsSpotifyConnection => _needsSpotifyConnection;
 
+  /// Whether the signed-in EmoTune account has a Spotify link, fed from
+  /// AuthProvider; null while no profile is loaded. App Remote can play
+  /// through the phone's own Spotify session even after the user disconnects
+  /// Spotify from EmoTune, so playback is refused here when this is false.
+  bool? _spotifyAccountLinked;
+
+  void setSpotifyAccountLinked(bool? linked) {
+    if (_spotifyAccountLinked == linked) {
+      return;
+    }
+    final wasLinked = _spotifyAccountLinked == true;
+    _spotifyAccountLinked = linked;
+    if (wasLinked && linked == false) {
+      unawaited(_stopForSpotifyUnlink());
+    }
+  }
+
+  Future<void> _stopForSpotifyUnlink() async {
+    if (_isUsingSpotifyAppRemote || _isUsingSpotifyRemote) {
+      await _spotifyRemote.pause();
+      await _spotifyRemote.disconnect();
+    }
+    await _stopPreviewPlayback();
+    _isUsingSpotifyRemote = false;
+    _isUsingSpotifyAppRemote = false;
+    _isPlaying = false;
+    _isLoading = false;
+    _needsSpotifyConnection = true;
+    _errorMessage = _connectSpotifyMessage;
+    _setPlaybackStatus('spotify_not_connected', _errorMessage);
+    notifyListeners();
+  }
+
+  bool _refuseUnlinkedSpotifyPlayback() {
+    if (_spotifyAccountLinked != false) {
+      return false;
+    }
+    _isUsingSpotifyRemote = false;
+    _isUsingSpotifyAppRemote = false;
+    _isPlaying = false;
+    _isLoading = false;
+    _needsSpotifyConnection = true;
+    _errorMessage = _connectSpotifyMessage;
+    _setPlaybackStatus('spotify_not_connected', _errorMessage);
+    notifyListeners();
+    return true;
+  }
+
   static const String _connectSpotifyMessage =
       'Connect your Spotify account to play full songs. Tap "Connect Spotify" '
       'below, or open Profile.';
@@ -403,6 +451,10 @@ class PlayerProvider extends ChangeNotifier {
     _setPlaybackStatus(null);
     notifyListeners();
 
+    if (_refuseUnlinkedSpotifyPlayback()) {
+      return;
+    }
+
     if (preferInstantPreview && _hasPreview(track)) {
       unawaited(_warmSpotifyPlaybackForTrack(track));
       await _playPreview(track);
@@ -452,6 +504,9 @@ class PlayerProvider extends ChangeNotifier {
   }
 
   Future<void> playQueueItem(Map<String, dynamic> track, int index) async {
+    if (_refuseUnlinkedSpotifyPlayback()) {
+      return;
+    }
     if (_contextQueue.isEmpty) {
       await playTrackAtIndex(index);
       return;
@@ -508,6 +563,9 @@ class PlayerProvider extends ChangeNotifier {
   }
 
   Future<void> togglePlayPause() async {
+    if (!_isPlaying && _refuseUnlinkedSpotifyPlayback()) {
+      return;
+    }
     if (_isUsingSpotifyRemote &&
         _supportsSpotifyRemotePlayback(_currentTrack)) {
       final wasPlaying = _isPlaying;
@@ -991,7 +1049,10 @@ class PlayerProvider extends ChangeNotifier {
   }
 
   void _onTrackCompleted() {
-    if (_isAdvancingTrack) {
+    // A track that failed to start never "finished". QA's phone showed the
+    // player hopping to the next song by itself while every play failed,
+    // pulling Spotify's auth screen up again each time; stop on the error.
+    if (_isAdvancingTrack || _errorMessage != null) {
       return;
     }
     _isAdvancingTrack = true;

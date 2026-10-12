@@ -25,7 +25,18 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => PlayerProvider()),
+        // The player refuses Spotify playback, and stops it on disconnect,
+        // whenever the signed-in account has no Spotify link.
+        ChangeNotifierProxyProvider<AuthProvider, PlayerProvider>(
+          create: (_) => PlayerProvider(),
+          update: (_, auth, player) {
+            final user = auth.user;
+            return player!
+              ..setSpotifyAccountLinked(
+                user == null ? null : user['is_spotify_connected'] == true,
+              );
+          },
+        ),
         ChangeNotifierProvider<RecommendationStudioProvider>.value(
           value: recommendationStudioProvider,
         ),
