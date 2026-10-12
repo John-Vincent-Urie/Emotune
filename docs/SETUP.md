@@ -1,4 +1,13 @@
 # Developer Setup
+sudo tailscale funnel reset. To start it again: sudo tailscale funnel --bg 8000.
+
+sudo tailscale funnel reset
+sudo tailscale funnel --bg --set-path /api http://127.0.0.1:8000/api  #making the admin not public
+
+cd flutter_app
+flutter build apk --release --split-per-abi \
+  --dart-define=API_BASE_URL=https://uriediska.taila4d721.ts.net/api
+
 
 ## 1. Backend Setup
 
@@ -9,6 +18,9 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py runserver 0.0.0.0:8000
+
+
+docker compose exec manage.py createsuperuser #create admin
 ```
 
 Activating is a convenience, not a requirement. `backend/manage.py` and every
@@ -106,6 +118,100 @@ For a physical Android phone connected over USB:
 ```bash
 adb reverse tcp:8000 tcp:8000
 ```
+
+### Installing the app on an Android phone
+
+Enable **Developer options → USB debugging** on the phone, plug it in, set the
+USB mode to **File transfer**, and accept the "Allow USB debugging?" prompt.
+Check that the phone is listed as `device`:
+
+```bash
+adb devices
+```
+
+Build a debug APK. `flutter_app/android/gradle.properties` asks Gradle for an
+8 GB heap (`-Xmx8G`), which runs out of memory on an 8 GB laptop that is also
+running Docker. On such a machine, change that line before building (the
+Gradle daemon only reads its memory limit from this file):
+
+```
+org.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=512m -XX:ReservedCodeCacheSize=256m
+```
+
+```bash
+cd flutter_app
+flutter pub get
+flutter build apk --debug
+```
+
+Install it (`-r` replaces an existing install and keeps the app's data), then
+connect the phone to the backend over USB:
+
+```bash
+adb install -r build/app/outputs/flutter-apk/app-debug.apk
+adb reverse tcp:8000 tcp:8000
+
+flutter build apk --debug --dart-define=API_BASE_URL=https://uriediska.taila4d721.ts.net/api
+
+```
+
+Run `adb reverse` again whenever the phone is unplugged and plugged back in.
+
+#### Using the phone without the USB cable (Cloudflare quick tunnel)
+
+A quick tunnel gives the Docker backend a temporary public HTTPS address, so
+the phone can reach it over Wi-Fi or mobile data.
+
+1. Install `cloudflared` (once):
+
+   ```bash
+   curl -L -o cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+   sudo dpkg -i cloudflared.deb
+   ```
+
+2. Let Django accept tunnel hosts and turn debug pages off while the backend is
+   public. Set these in `.env` (DEBUG off requires CORS-allow-all to be off):
+
+   ```
+   DJANGO_DEBUG=false
+   DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost,.trycloudflare.com
+   DJANGO_CSRF_TRUSTED_ORIGINS=https://*.trycloudflare.com
+   DJANGO_CORS_ALLOW_ALL_ORIGINS=false
+   DJANGO_TRUST_PROXY_SSL_HEADER=true
+   DJANGO_SECURE_SSL_REDIRECT=false
+   DJANGO_SESSION_COOKIE_SECURE=false
+   DJANGO_CSRF_COOKIE_SECURE=false
+   ```
+
+   ```bash
+   docker compose up -d --force-recreate backend
+   ```
+
+3. Start the tunnel and keep the terminal open. If the address does not
+   connect (Cloudflare error 1033), add `--protocol http2`:
+
+   ```bash
+   cloudflared tunnel --url http://localhost:8000
+   ```
+
+   It prints an address like `https://some-random-words.trycloudflare.com`.
+
+4. Build the app with that address and install it as above:
+
+   ```bash
+   flutter build apk --debug \
+     --dart-define=API_BASE_URL=https://some-random-words.trycloudflare.com/api
+   adb install -r build/app/outputs/flutter-apk/app-debug.apk
+   ```
+
+The quick-tunnel address changes every time `cloudflared` restarts, and the
+app has it built in, so restarting the tunnel means rebuilding and
+reinstalling. Stop the tunnel (Ctrl+C) when you are not testing, and set
+`DJANGO_DEBUG=true` again (with `--force-recreate backend`) for normal
+development.
+
+In-app playback also needs the app's package and signing fingerprint registered
+in the Spotify Dashboard; see [Spotify and the signing fingerprint](#spotify-and-the-signing-fingerprint).
 
 ## 3. Environment Variables
 
