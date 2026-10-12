@@ -215,7 +215,11 @@ void main() {
       expect(find.text('Already have an account?'), findsOneWidget);
 
       await _tap(tester, find.text('Log in'));
-      expect(find.text('Welcome back'), findsOneWidget);
+      expect(find.text('Forgot password?'), findsOneWidget);
+      // Both removed at the owner's request.
+      expect(find.text('Welcome back'), findsNothing);
+      expect(find.text('Log in to pick up your listening where you left off.'),
+          findsNothing);
     });
   });
 

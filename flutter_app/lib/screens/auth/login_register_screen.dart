@@ -88,8 +88,6 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.watch<AuthProvider>();
 
     return _AuthScaffold(
-      title: 'Welcome back',
-      subtitle: 'Log in to pick up your listening where you left off.',
       logoSize: 88,
       error: auth.error,
       onDismissError: auth.clearError,
@@ -462,8 +460,8 @@ String? _validatePassword(String? value) {
 /// The frame both auth screens share: one column, one job, capped width.
 class _AuthScaffold extends StatelessWidget {
   const _AuthScaffold({
-    required this.title,
-    required this.subtitle,
+    this.title,
+    this.subtitle,
     required this.child,
     required this.footer,
     required this.logoSize,
@@ -471,8 +469,10 @@ class _AuthScaffold extends StatelessWidget {
     this.onDismissError,
   });
 
-  final String title;
-  final String subtitle;
+  // Both null on Login: the owner asked for no "Welcome back" heading and no
+  // subtitle there.
+  final String? title;
+  final String? subtitle;
   final Widget child;
   final Widget footer;
   final double logoSize;
@@ -521,28 +521,32 @@ class _AuthScaffold extends StatelessWidget {
                           const SizedBox(height: 4),
                           EmoTuneLogo(size: logoSize),
                           const SizedBox(height: 28),
-                          Semantics(
-                            header: true,
-                            child: Text(
-                              title,
-                              style: emoTuneHeadlineFont(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                                height: 1.2,
+                          if (title != null) ...[
+                            Semantics(
+                              header: true,
+                              child: Text(
+                                title!,
+                                style: emoTuneHeadlineFont(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                  height: 1.2,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            subtitle,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.66),
-                              fontSize: 13.5,
-                              height: 1.45,
+                            const SizedBox(height: 8),
+                          ],
+                          if (subtitle != null) ...[
+                            Text(
+                              subtitle!,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.66),
+                                fontSize: 13.5,
+                                height: 1.45,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 24),
+                            const SizedBox(height: 24),
+                          ],
                           child,
                           // Below the form rather than above it: shown above, a
                           // failed submit pushed the button ~80px down, right
