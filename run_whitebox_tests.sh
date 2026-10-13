@@ -51,10 +51,19 @@ run_flutter() {
   cd "$ROOT/flutter_app" || return 1
   flutter test --coverage 2>&1 | tee "$REPORTS/flutter-tests.log"
   local rc=${PIPESTATUS[0]}
-  awk -F: '/^SF:/{f=$2} /^LF:/{lf=$2} /^LH:/{lh=$2; th+=lh; tf+=lf;
-             printf "%6.1f%%  %5d/%-5d %s\n", (lf?100*lh/lf:0), lh, lf, f}
-           END{printf "%6.1f%%  %5d/%-5d TOTAL\n", (tf?100*th/tf:0), th, tf}' \
-      coverage/lcov.info | sort -n > "$REPORTS/flutter-coverage.txt"
+  # Same layout as backend-coverage.txt: header, per-file rows (least
+  # covered first), then the total under a rule.
+  {
+    printf "%7s  %-11s %s\n" "Cover" "Hit/Lines" "File"
+    printf -- "%s\n" "---------------------------------------------------------------"
+    awk -F: '/^SF:/{f=$2} /^LF:/{lf=$2} /^LH:/{lh=$2;
+               printf "%6.1f%%  %5d/%-5d %s\n", (lf?100*lh/lf:0), lh, lf, f}' \
+        coverage/lcov.info | sort -n
+    printf -- "%s\n" "---------------------------------------------------------------"
+    awk -F: '/^LF:/{tf+=$2} /^LH:/{th+=$2}
+             END{printf "%6.1f%%  %5d/%-5d TOTAL\n", (tf?100*th/tf:0), th, tf}' \
+        coverage/lcov.info
+  } > "$REPORTS/flutter-coverage.txt"
   log "$(grep -E 'All tests passed|Some tests failed' "$REPORTS/flutter-tests.log" | tail -1 | sed 's/.*: //')"
   log "Flutter line coverage: $(grep TOTAL "$REPORTS/flutter-coverage.txt" | awk '{print $1}')"
   return "$rc"

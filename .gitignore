@@ -40,3 +40,4 @@ backend/ml/models/bert_emotion_model/
 *.pt
 *.bin
 test-reports/
+backend/ml/models/bert_emotion_model_*/
