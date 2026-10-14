@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
+import '../../providers/player_provider.dart';
 import '../../theme/app_theme.dart';
 
 class TrackCard extends StatelessWidget {
@@ -21,133 +23,180 @@ class TrackCard extends StatelessWidget {
     final emotionColor = AppColors.emotionColors[emotion] ?? AppColors.accent;
     final subtitle = _subtitleText();
     final staticPickLabel = _staticPickLabel();
+    final itemType = track['item_type']?.toString().trim().toLowerCase() ?? 'track';
+    // A music.md song Spotify could not resolve: it keeps its slot so the
+    // list matches the therapist's, but it can only be searched for.
+    final playable = PlayerProvider.isPlayable(track);
+    final note = !playable ? 'Open in Spotify' : null;
+    // Its id is a placeholder, so a heart would favorite nothing.
+    final canFavorite = itemType == 'track' && playable;
+    final player = canFavorite ? context.watch<PlayerProvider>() : null;
+    final isFavorite = player?.isFavoriteTrack(track) ?? false;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: emotionColor.withValues(alpha: 0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+    return Semantics(
+      hint: !playable ? 'Not found on Spotify. Opens a Spotify search.' : null,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkCard : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark ? AppColors.darkBorder : Colors.grey.shade200,
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Album art
-              Expanded(
-                child: Stack(
-                  children: [
-                    SizedBox(
-                      width: double.infinity,
-                      child: image != null && image.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: image,
-                              fit: BoxFit.cover,
-                              placeholder: (_, __) => Container(
-                                color: emotionColor.withValues(alpha: 0.2),
-                                child: Icon(Icons.music_note,
-                                    color: emotionColor, size: 40),
-                              ),
-                              errorWidget: (_, __, ___) => Container(
-                                color: emotionColor.withValues(alpha: 0.2),
-                                child: Icon(Icons.music_note,
-                                    color: emotionColor, size: 40),
-                              ),
-                            )
-                          : Container(
-                              color: emotionColor.withValues(alpha: 0.2),
-                              child: Center(
-                                child: Icon(Icons.music_note,
-                                    color: emotionColor, size: 40),
-                              ),
-                            ),
-                    ),
-                    // Play button overlay
-                    Positioned(
-                      bottom: 8,
-                      right: 8,
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: const BoxDecoration(
-                          color: AppColors.accent,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.play_arrow,
-                            color: Colors.black, size: 20),
-                      ),
-                    ),
-                    if (staticPickLabel != null ||
-                        track['is_preferred'] == true)
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (staticPickLabel != null)
-                              _CardBadge(
-                                label: staticPickLabel,
-                                background: AppColors.gradientEnd,
-                                foreground: Colors.white,
-                              ),
-                            if (track['is_preferred'] == true) ...[
-                              if (staticPickLabel != null)
-                                const SizedBox(height: 4),
-                              const _CardBadge(
-                                label: '★ Fav',
-                                background: Colors.amber,
-                                foreground: Colors.black,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-
-              // Track info
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      track['name'] ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: isDark ? Colors.white54 : Colors.black54,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
+            boxShadow: [
+              BoxShadow(
+                color: emotionColor.withValues(alpha: 0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Album art
+                Expanded(
+                  child: Stack(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: image != null && image.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: image,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => Container(
+                                  color: emotionColor.withValues(alpha: 0.2),
+                                  child: Icon(Icons.music_note,
+                                      color: emotionColor, size: 40),
+                                ),
+                                errorWidget: (_, __, ___) => Container(
+                                  color: emotionColor.withValues(alpha: 0.2),
+                                  child: Icon(Icons.music_note,
+                                      color: emotionColor, size: 40),
+                                ),
+                              )
+                            : Container(
+                                color: emotionColor.withValues(alpha: 0.2),
+                                child: Center(
+                                  child: Icon(Icons.music_note,
+                                      color: emotionColor, size: 40),
+                                ),
+                              ),
+                      ),
+                      // Play button overlay
+                      Positioned(
+                        bottom: 8,
+                        right: 8,
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: const BoxDecoration(
+                            color: AppColors.accent,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                              playable ? Icons.play_arrow : Icons.open_in_new,
+                              color: Colors.black,
+                              size: playable ? 20 : 17),
+                        ),
+                      ),
+                      if (staticPickLabel != null)
+                        Positioned(
+                          top: 8,
+                          left: 8,
+                          child: _CardBadge(
+                            label: staticPickLabel,
+                            background: AppColors.gradientEnd,
+                            // White on the lime badge was about 1.2:1 and
+                            // hard to read; black is about 16:1.
+                            foreground: Colors.black,
+                          ),
+                        ),
+                      if (canFavorite)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Semantics(
+                            button: true,
+                            label: isFavorite
+                                ? 'Remove from favorites'
+                                : 'Add to favorites',
+                            child: GestureDetector(
+                              onTap: () => player!
+                                  .toggleFavoriteForTrack(track, emotion: emotion),
+                              child: Container(
+                                width: 26,
+                                height: 26,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.32),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  isFavorite
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  size: 14,
+                                  color: isFavorite
+                                      ? const Color(0xFFE2645B)
+                                      : Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                // Track info
+                Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        track['name'] ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isDark ? Colors.white54 : Colors.black54,
+                          fontSize: 11,
+                        ),
+                      ),
+                      if (note != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          note,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: !playable
+                                ? context.emoColors.accentText
+                                : context.emoColors.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

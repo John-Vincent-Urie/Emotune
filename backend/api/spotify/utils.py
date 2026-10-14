@@ -51,12 +51,6 @@ def _required_playback_scopes():
 def _requested_scopes():
     return _normalize_scopes(getattr(settings, 'SPOTIFY_SCOPE', ''))
 
-def _personalization_scope_map():
-    return {
-        'top_tracks': 'user-top-read',
-        'saved_tracks': 'user-library-read',
-        'recently_played': 'user-read-recently-played',
-    }
 
 def _token_payload_summary(payload):
     payload = payload if isinstance(payload, dict) else {}
@@ -96,7 +90,10 @@ def _extract_error_details(payload, response_text=''):
         error_message = str(response_text or '').strip()
 
     return {
-        'error_code': str(error_code).strip() or None,
+        # str(None) would be the text 'None', so a missing code stays None.
+        'error_code': (
+            str(error_code).strip() or None if error_code is not None else None
+        ),
         'error_message': error_message[:1000] or None,
     }
 
@@ -106,6 +103,7 @@ def _classify_upstream_failure(
     response_text='',
     *,
     endpoint='',
+    source='',
 ):
     combined_text = ' '.join(
         [str(error_message or '').strip(), str(response_text or '').strip()]
@@ -125,6 +123,23 @@ def _classify_upstream_failure(
         'invalid_client' in combined_text
         or 'invalid client' in combined_text
     ):
+        # Spotify answers invalid_client for two different faults, and sending
+        # someone to edit .env when the credentials are fine wastes real time.
+        # A refresh token is bound to the app that issued it, so on a refresh
+        # the far likelier cause is a link made under an older Spotify app.
+        if source == 'refresh_token':
+            return {
+                'reason': 'refresh_token_rejected',
+                'retryable': False,
+                'recommended_action': (
+                    'Spotify rejected this account\'s refresh token. It was most '
+                    'likely issued by a different Spotify app than the current '
+                    'SPOTIFY_CLIENT_ID, so reconnect Spotify in EmoTune to get a '
+                    'fresh token. If reconnecting also fails, then check that '
+                    'SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET belong to the '
+                    'same Spotify app.'
+                ),
+            }
         return {
             'reason': 'client_credentials_invalid',
             'retryable': False,
@@ -244,12 +259,14 @@ def _build_failure_response(
     error_code=None,
     endpoint='',
     source='spotify',
+    retry_after=None,
 ):
     classification = _classify_upstream_failure(
         status_code,
         error_message=error_message,
         response_text=response_text,
         endpoint=endpoint,
+        source=source,
     )
     return {
         'ok': False,
@@ -264,7 +281,28 @@ def _build_failure_response(
         'source': source,
         'retryable': classification['retryable'],
         'recommended_action': classification['recommended_action'],
+        # Seconds Spotify asked us to wait, from the Retry-After header on a
+        # 429. Only a rate-limited response carries one; everything else leaves
+        # this None. Callers that retry (the pool refresh command) must honour
+        # it -- Spotify's block can be far longer than any fixed backoff guess.
+        'retry_after': retry_after,
     }
+
+
+def _parse_retry_after(value):
+    """Return the Retry-After header as whole seconds, or None.
+
+    Spotify sends a plain seconds count. The HTTP spec also allows a date, but
+    Spotify does not use it, so an unparseable value is simply ignored rather
+    than guessed at.
+    """
+    if value is None:
+        return None
+    try:
+        seconds = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return seconds if seconds >= 0 else None
 
 def _build_request_exception_failure_response(
     error,
@@ -317,6 +355,7 @@ def _compact_failure(result, *, source=None, extra=None):
         'error': result.get('error'),
         'error_code': result.get('error_code'),
         'recommended_action': result.get('recommended_action'),
+        'retry_after': result.get('retry_after'),
     }
     if extra:
         compact.update(extra)
@@ -360,14 +399,23 @@ def _canonical_track_title(value):
     if not title:
         return ''
     title = re.sub(r'\s*\([^)]*\)', '', title)
+    title = re.sub(r'\s*\[[^\]]*\]', '', title)
+    # Everything after " - " that names a version of the same recording. The
+    # later words (mix, unplugged, recorded at, spotify singles, stripped, a
+    # cappella, soundtrack, studio, tour) let pools stop holding "Black",
+    # "Black - Brendan O'Brien Mix" and "Black - ... MTV Unplugged" side by side.
     title = re.sub(
-        r'\s*-\s*.*(?:live|acoustic|remix|edit|version|remaster(?:ed)?|anniversary|sped up|slowed(?: down)?|instrumental|karaoke|from ).*',
+        r'\s*-\s*.*(?:live|acoustic|remix|edit|version|remaster(?:ed)?|anniversary|sped up|slowed(?: down)?|'
+        r'instrumental|karaoke|from |mix|unplugged|recorded at|spotify singles|spotify sessions|session|'
+        r'stripped|a cappella|acapella|soundtrack|studio|tour|demo).*',
         '',
         title,
     )
     title = re.sub(r'\s+part\s+\d+\b', '', title)
+    title = re.sub(r'\s*-\s*$', '', title)  # "Ikaw - (2024 Remastered Version)" left "ikaw -"
     title = re.sub(r'\s+', ' ', title).strip()
     return title
+
 
 def _unique_text_values(values):
     unique_values = []
@@ -390,7 +438,9 @@ def _normalize_playable_item(item, default_source='spotify'):
         return None
 
     item_id = str(normalized.get('id') or '').strip()
-    item_type = str(normalized.get('item_type') or '').strip() or 'track'
+    # Left blank until the URI and URL have had their say: defaulting to
+    # 'track' here made an album or playlist URL build a spotify:track: URI.
+    item_type = str(normalized.get('item_type') or '').strip()
     uri = str(normalized.get('uri') or '').strip()
     spotify_url = str(normalized.get('spotify_url') or '').strip()
 
@@ -432,7 +482,7 @@ def _normalize_playable_item(item, default_source='spotify'):
         return None
 
     normalized['id'] = item_id or uri or spotify_url or normalized.get('name') or 'spotify-item'
-    normalized['item_type'] = item_type
+    normalized['item_type'] = item_type or 'track'
     normalized['name'] = str(normalized.get('name') or 'Spotify recommendation')
     normalized['artist'] = artist_name or 'Spotify'
     normalized['album'] = str(normalized.get('album') or '')
@@ -508,123 +558,3 @@ def _format_nested_track_items(
             normalized['spotify_added_at'] = item.get(added_at_key)
         formatted.append(normalized)
     return formatted
-
-def _history_allows_learning(history):
-    if history is None:
-        return True
-    music_picker_data = (
-        history.music_picker_data
-        if isinstance(history.music_picker_data, dict)
-        else {}
-    )
-    personalization = music_picker_data.get('personalization')
-    return not (
-        isinstance(personalization, dict)
-        and personalization.get('train_session') is False
-    )
-
-def _normalize_taste_profile(taste_profile):
-    working = taste_profile if isinstance(taste_profile, dict) else {}
-    familiarity = str(working.get('familiarity') or 'balanced').strip().lower()
-    if familiarity not in {'balanced', 'familiar', 'discovery'}:
-        familiarity = 'balanced'
-    return {
-        'familiarity': familiarity,
-        'prefer_instrumental': bool(working.get('prefer_instrumental', False)),
-    }
-
-def _taste_discovery_bonus(track, taste_profile):
-    familiarity = taste_profile.get('familiarity')
-    source = str(track.get('recommendation_source') or '').strip().lower()
-    if familiarity == 'discovery':
-        if source in {'spotify_catalog', 'curated_fallback'}:
-            return 0.14, 'taste:discovery'
-        if source in {'spotify_top_tracks', 'spotify_saved_tracks', 'user_preference', 'favorite_track'}:
-            return -0.08, 'taste:discovery'
-    if familiarity == 'familiar':
-        if source in {'spotify_top_tracks', 'spotify_saved_tracks', 'user_preference', 'favorite_track'}:
-            return 0.12, 'taste:familiar'
-        if source in {'spotify_catalog', 'curated_fallback'}:
-            return -0.06, 'taste:familiar'
-    return 0.0, None
-
-INSTRUMENTAL_TERMS = (
-    'instrumental',
-    'instrumentals',
-    'ambient',
-    'piano',
-    'study',
-    'focus',
-    'meditation',
-    'meditative',
-    'sleep',
-    'classical',
-    'orchestral',
-    'soundtrack',
-    'score',
-    'lofi',
-    'lo-fi',
-    'lo fi',
-)
-
-# Words that mark a recording as vocal-led or vocal-heavy. "ft." is here
-# because that is how the app's own playlist document writes a feature credit.
-VOCAL_TERMS = (
-    'feat.',
-    'feat',
-    'ft.',
-    'featuring',
-    'vocal',
-    'vocals',
-    'karaoke',
-    'live',
-    'remix',
-)
-
-
-def _term_pattern(terms):
-    """Match whole words only.
-
-    Substring matching used to read "Alive" as a live recording and
-    "Sleepless" as sleep music, so every term is anchored to word boundaries
-    that tolerate the punctuation in "feat." and "lo-fi".
-    """
-    return re.compile(
-        r'(?<![a-z0-9])(?:%s)(?![a-z0-9])'
-        % '|'.join(re.escape(term) for term in sorted(terms, key=len, reverse=True))
-    )
-
-
-_INSTRUMENTAL_PATTERN = _term_pattern(INSTRUMENTAL_TERMS)
-_VOCAL_PATTERN = _term_pattern(VOCAL_TERMS)
-
-
-def _taste_instrumental_signal(text_blob, taste_profile):
-    """How instrumental a track reads: ``1``, ``-1``, or ``0`` when unknown.
-
-    Returns ``(signal, reason)``. The signal is unscaled on purpose -- callers
-    score on different ranges and need the same reading of the track, not the
-    same number.
-    """
-    if not taste_profile.get('prefer_instrumental'):
-        return 0, None
-
-    normalized_blob = str(text_blob or '').strip().lower()
-    instrumental_hit = bool(_INSTRUMENTAL_PATTERN.search(normalized_blob))
-    vocal_hit = bool(_VOCAL_PATTERN.search(normalized_blob))
-
-    if instrumental_hit and not vocal_hit:
-        return 1, 'taste:instrumental'
-    if vocal_hit and not instrumental_hit:
-        return -1, 'taste:less_instrumental_fit'
-    return 0, None
-
-
-def _taste_instrumental_bonus(text_blob, taste_profile, *, weight=0.8):
-    """The instrumental signal scaled for the candidate ranker's score range.
-
-    Candidate scores there run from roughly 1 to 5, where source weight alone
-    spans 0.8 to 3.4, so the old +/-0.18 nudge could only break exact ties.
-    """
-    signal, reason = _taste_instrumental_signal(text_blob, taste_profile)
-    return signal * weight, reason

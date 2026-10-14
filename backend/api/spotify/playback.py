@@ -374,6 +374,17 @@ class SpotifyPlaybackClient:
             diagnostics['recommended_action'] = (
                 'Reconnect Spotify in EmoTune because playback-state permission was rejected by Spotify.'
             )
+        elif (
+            diagnostics['account']['ok']
+            and diagnostics['devices']['ok']
+            and diagnostics['devices']['has_active_device']
+        ):
+            # Nothing above matched and the account, scopes and device all check
+            # out, so there is genuinely nothing to act on. Empty rather than a
+            # cheerful sentence: both callers treat any non-empty value as a
+            # problem to show the user, and the catch-all below used to fire
+            # here and tell people to go fix a connection that already worked.
+            diagnostics['recommended_action'] = ''
         else:
             diagnostics['recommended_action'] = (
                 'Open the Spotify app on this phone and approve EmoTune playback access when prompted. '

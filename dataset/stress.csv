@@ -1,0 +1,1001 @@
+﻿id,text,emotion
+1,I'm worried because deployment is difficult and I have very little time left.,stress
+2,I'm having a hard time because software project is difficult and I have other subjects to work on too.,stress
+3,I can't relax because system project is difficult and I still have several requirements left.,stress
+4,I'm having a hard time because coding is difficult and I keep getting stuck.,stress
+5,I'm having a hard time because group project is difficult and I have not finished the documentation.,stress
+6,I'm getting stressed because server setup is difficult and I have been working on it for hours.,stress
+7,I feel stressed because laboratory activity is difficult and I need to submit it soon.,stress
+8,I'm struggling because coding is difficult and I am not sure how to finish it.,stress
+9,I'm getting stressed because programming is difficult and I have too many things to finish.,stress
+10,I can't relax because database is difficult and I don't have enough time.,stress
+11,I feel pressured because database is difficult and I need to do everything at once.,stress
+12,I'm stressed because database is difficult and I need to submit it soon.,stress
+13,I can't relax because system project is difficult and I don't have enough time.,stress
+14,I can't relax because system project is difficult and the deadline is getting closer.,stress
+15,I'm really stressed because server setup is difficult and I still have several requirements left.,stress
+16,I feel pressured because UI design is difficult and the deadline is getting closer.,stress
+17,I'm really stressed because thesis is difficult and I am not sure how to finish it.,stress
+18,I feel pressured because deployment is difficult and I am not sure how to finish it.,stress
+19,I'm struggling because mobile development is difficult and I keep finding errors.,stress
+20,I can't relax because UI design is difficult and my group is not finished yet.,stress
+21,I'm struggling because programming is difficult and I still need to fix several problems.,stress
+22,I feel stressed because final project is difficult and everything is piling up.,stress
+23,I'm starting to panic because API integration is difficult and I am not sure how to finish it.,stress
+24,I'm worried because final project is difficult and I have too many things to finish.,stress
+25,I'm really stressed because networking activity is difficult and my group is not finished yet.,stress
+26,I can't relax because mobile development is difficult and I keep finding errors.,stress
+27,I'm mentally tired because software project is difficult and my group is not finished yet.,stress
+28,I feel stressed because API integration is difficult and I have been working on it for hours.,stress
+29,I'm worried about my deadline.,stress
+30,I'm stressed because school requirements is difficult and I don't have enough time.,stress
+31,I'm worried because deployment is difficult and I don't know where to start.,stress
+32,I'm having a hard time because UI design is difficult and I don't have enough time.,stress
+33,I'm getting stressed because assignments is difficult and my group is not finished yet.,stress
+34,I'm getting stressed because programming is difficult and I need to submit it soon.,stress
+35,I'm getting overwhelmed because capstone is difficult and I need to do everything at once.,stress
+36,I'm stressed because assignments is difficult and I keep finding errors.,stress
+37,I can't relax because web development is difficult and I am behind schedule.,stress
+38,I feel stressed because research paper is difficult and my group is not finished yet.,stress
+39,I can't relax because exams is difficult and the deadline is getting closer.,stress
+40,I'm struggling because database is difficult and I need to do everything at once.,stress
+41,I'm getting stressed because school requirements is difficult and I need to do everything at once.,stress
+42,I'm starting to panic because API integration is difficult and I have been working on it for hours.,stress
+43,I'm mentally tired because exams is difficult and I still need to fix several problems.,stress
+44,I'm exhausted because mobile development is difficult and I am behind schedule.,stress
+45,I still need to deploy our system before the deadline.,stress
+46,I can't relax because documentation is difficult and I don't know where to start.,stress
+47,I feel pressured because API integration is difficult and I still have several requirements left.,stress
+48,I'm under a lot of pressure because coding is difficult and I am behind schedule.,stress
+49,I can't relax because deployment is difficult and I have not finished the documentation.,stress
+50,I'm worried because assignments is difficult and everything is piling up.,stress
+51,I'm stressed because final project is difficult and I still need to fix several problems.,stress
+52,I feel stressed because server setup is difficult and I am not sure how to finish it.,stress
+53,I'm having a hard time because debugging is difficult and the deadline is getting closer.,stress
+54,I feel stressed because thesis is difficult and the deadline is getting closer.,stress
+55,I'm really stressed because final project is difficult and I need to do everything at once.,stress
+56,Stress na stress ako sa debugging.,stress
+57,I'm stressed because exams is difficult and I still need to fix several problems.,stress
+58,I'm having a hard time because networking activity is difficult and I need to submit it soon.,stress
+59,I feel stressed because system project is difficult and everything is piling up.,stress
+60,I can't relax because exams is difficult and our requirements keep changing.,stress
+61,I feel stressed because system project is difficult and I have other subjects to work on too.,stress
+62,I'm getting stressed because software project is difficult and I am worried about the result.,stress
+63,I feel pressured because mobile development is difficult and I have not finished the documentation.,stress
+64,Pagod na ako sa kakagawa ng system project.,stress
+65,I feel stressed because research paper is difficult and I am not sure how to finish it.,stress
+66,Pagod na ako sa kakagawa ng mobile development.,stress
+67,I'm worried because UI design is difficult and our requirements keep changing.,stress
+68,I'm having a hard time because capstone is difficult and I keep getting stuck.,stress
+69,I'm struggling because deployment is difficult and I don't have enough time.,stress
+70,I feel stressed because server setup is difficult and I have been working on it for hours.,stress
+71,Hindi ko na alam uunahin ko sa documentation.,stress
+72,I feel overwhelmed because system project is difficult and I am worried about the result.,stress
+73,I'm having a hard time because capstone is difficult and I still have several requirements left.,stress
+74,I'm mentally tired because UI design is difficult and I still need to fix several problems.,stress
+75,I'm really stressed because capstone is difficult and I am worried about the result.,stress
+76,I'm mentally tired because exams is difficult and I still have several requirements left.,stress
+77,I feel pressured because web development is difficult and I have too many things to finish.,stress
+78,I'm starting to panic because assignments is difficult and I still need to fix several problems.,stress
+79,I'm stressed because debugging is difficult and our requirements keep changing.,stress
+80,I can't relax because software project is difficult and I have other subjects to work on too.,stress
+81,I'm worried because web development is difficult and my group is not finished yet.,stress
+82,I can't relax because exams is difficult and everything is piling up.,stress
+83,I'm struggling because programming is difficult and everything is piling up.,stress
+84,I'm stressed because coding is difficult and I don't have enough time.,stress
+85,I'm really stressed because mobile development is difficult and I have other subjects to work on too.,stress
+86,I'm really stressed because coding is difficult and I am worried about the result.,stress
+87,I feel pressured because documentation is difficult and I am worried about the result.,stress
+88,I feel pressured because API integration is difficult and I don't know where to start.,stress
+89,I'm really stressed because coding is difficult and I keep getting stuck.,stress
+90,I'm getting stressed because mobile development is difficult and I have too many things to finish.,stress
+91,I'm getting stressed because final project is difficult and I am not sure how to finish it.,stress
+92,I'm exhausted because API integration is difficult and I have very little time left.,stress
+93,I'm under a lot of pressure because documentation is difficult and I don't know where to start.,stress
+94,I'm worried because capstone is difficult and I am behind schedule.,stress
+95,I feel pressured because programming is difficult and I have been working on it for hours.,stress
+96,I feel pressured because final project is difficult and I still need to fix several problems.,stress
+97,I feel overwhelmed because networking activity is difficult and I don't know where to start.,stress
+98,I'm getting overwhelmed because debugging is difficult and I am worried about the result.,stress
+99,I feel pressured because presentation is difficult and I have very little time left.,stress
+100,I'm getting overwhelmed because system project is difficult and I need to do everything at once.,stress
+101,I'm getting overwhelmed because UI design is difficult and the deadline is getting closer.,stress
+102,I feel stressed because laboratory activity is difficult and I am behind schedule.,stress
+103,I'm having a hard time because deployment is difficult and I still need to fix several problems.,stress
+104,I'm getting overwhelmed because web development is difficult and I need to submit it soon.,stress
+105,I'm really stressed because debugging is difficult and I am behind schedule.,stress
+106,I feel overwhelmed because presentation is difficult and I have other subjects to work on too.,stress
+107,I'm struggling because deployment is difficult and I have too many things to finish.,stress
+108,I'm having a hard time because UI design is difficult and I need to do everything at once.,stress
+109,I can't relax because thesis is difficult and I still need to fix several problems.,stress
+110,I'm worried because software project is difficult and I have other subjects to work on too.,stress
+111,I can't relax because mobile development is difficult and I don't know where to start.,stress
+112,I'm having a hard time because UI design is difficult and the deadline is getting closer.,stress
+113,I feel overwhelmed because UI design is difficult and I have not finished the documentation.,stress
+114,I'm stressed because networking activity is difficult and I am worried about the result.,stress
+115,I'm starting to panic because programming is difficult and I have too many things to finish.,stress
+116,I'm struggling because laboratory activity is difficult and I have very little time left.,stress
+117,I'm starting to panic because system project is difficult and I have very little time left.,stress
+118,I'm getting stressed because web development is difficult and everything is piling up.,stress
+119,I'm exhausted because coding is difficult and I don't have enough time.,stress
+120,I feel overwhelmed because UI design is difficult and I have too many things to finish.,stress
+121,I'm getting stressed because group project is difficult and I need to submit it soon.,stress
+122,I feel pressured because exams is difficult and I have been working on it for hours.,stress
+123,I'm worried because deployment is difficult and I have too many things to finish.,stress
+124,I feel pressured because capstone is difficult and I don't have enough time.,stress
+125,I feel overwhelmed because final project is difficult and I don't have enough time.,stress
+126,I'm struggling because documentation is difficult and our requirements keep changing.,stress
+127,I feel stressed because database is difficult and our requirements keep changing.,stress
+128,I'm under a lot of pressure because system project is difficult and I have not finished the documentation.,stress
+129,I'm struggling because laboratory activity is difficult and the deadline is getting closer.,stress
+130,I'm struggling because server setup is difficult and my group is not finished yet.,stress
+131,I feel pressured because API integration is difficult and I have been working on it for hours.,stress
+132,I feel stressed because thesis is difficult and I have other subjects to work on too.,stress
+133,I'm stressed because system project is difficult and I keep getting stuck.,stress
+134,I feel overwhelmed because coding is difficult and I don't have enough time.,stress
+135,I'm exhausted because API integration is difficult and I am behind schedule.,stress
+136,I'm stressed because laboratory activity is difficult and our requirements keep changing.,stress
+137,I'm stressed because coding is difficult and I have other subjects to work on too.,stress
+138,I'm struggling because debugging is difficult and I have other subjects to work on too.,stress
+139,I'm worried because documentation is difficult and I still need to fix several problems.,stress
+140,I'm stressed because research paper is difficult and I need to submit it soon.,stress
+141,I'm really stressed because group project is difficult and the deadline is getting closer.,stress
+142,I can't relax because laboratory activity is difficult and I need to do everything at once.,stress
+143,I feel pressured because assignments is difficult and I keep getting stuck.,stress
+144,I feel stressed because exams is difficult and I keep getting stuck.,stress
+145,I'm exhausted because exams is difficult and I am worried about the result.,stress
+146,I'm under a lot of pressure because networking activity is difficult and I have too many things to finish.,stress
+147,I feel pressured because programming is difficult and I have too many things to finish.,stress
+148,I feel overwhelmed because mobile development is difficult and everything is piling up.,stress
+149,I'm worried because group project is difficult and I am worried about the result.,stress
+150,I'm stressed because API integration is difficult and I have not finished the documentation.,stress
+151,I'm stressed because system project is difficult and I need to submit it soon.,stress
+152,I'm mentally tired because programming is difficult and the deadline is getting closer.,stress
+153,I'm worried because research paper is difficult and I keep finding errors.,stress
+154,I'm really stressed because exams is difficult and I am not sure how to finish it.,stress
+155,I'm getting stressed because networking activity is difficult and I don't have enough time.,stress
+156,I'm stressed because debugging is difficult and everything is piling up.,stress
+157,I'm starting to panic because deployment is difficult and I have not finished the documentation.,stress
+158,I feel stressed because web development is difficult and I am worried about the result.,stress
+159,I'm worried because final project is difficult and I am not sure how to finish it.,stress
+160,Sabay-sabay lahat ng requirements ko sa group project.,stress
+161,I'm getting stressed because presentation is difficult and I have other subjects to work on too.,stress
+162,I feel stressed because system project is difficult and I am worried about the result.,stress
+163,I feel pressured because thesis is difficult and I need to submit it soon.,stress
+164,I'm worried because API integration is difficult and I have been working on it for hours.,stress
+165,I'm mentally tired because API integration is difficult and my group is not finished yet.,stress
+166,I'm struggling because laboratory activity is difficult and I have not finished the documentation.,stress
+167,I feel overwhelmed because thesis is difficult and I don't know where to start.,stress
+168,I'm struggling because laboratory activity is difficult and I have other subjects to work on too.,stress
+169,I feel stressed because laboratory activity is difficult and our requirements keep changing.,stress
+170,I feel pressured because documentation is difficult and I don't have enough time.,stress
+171,I feel stressed because assignments is difficult and I have too many things to finish.,stress
+172,I feel stressed because school requirements is difficult and our requirements keep changing.,stress
+173,I'm starting to panic because coding is difficult and I have very little time left.,stress
+174,I'm getting overwhelmed because assignments is difficult and I need to do everything at once.,stress
+175,I feel pressured because presentation is difficult and I have too many things to finish.,stress
+176,I feel overwhelmed because capstone is difficult and I am worried about the result.,stress
+177,I'm mentally tired because server setup is difficult and I have not finished the documentation.,stress
+178,I can't relax because web development is difficult and I am not sure how to finish it.,stress
+179,I'm having a hard time because school requirements is difficult and I don't have enough time.,stress
+180,I'm mentally tired because debugging is difficult and my group is not finished yet.,stress
+181,I feel overwhelmed because UI design is difficult and I am worried about the result.,stress
+182,I'm struggling because UI design is difficult and I have other subjects to work on too.,stress
+183,I'm having a hard time because server setup is difficult and our requirements keep changing.,stress
+184,I'm having a hard time because documentation is difficult and I need to do everything at once.,stress
+185,I'm getting stressed because documentation is difficult and I don't know where to start.,stress
+186,I'm getting overwhelmed because assignments is difficult and I need to submit it soon.,stress
+187,I'm really stressed because API integration is difficult and I have very little time left.,stress
+188,I'm getting overwhelmed because database is difficult and I am not sure how to finish it.,stress
+189,I can't relax because debugging is difficult and I don't have enough time.,stress
+190,I'm struggling because system project is difficult and the deadline is getting closer.,stress
+191,I'm getting stressed because presentation is difficult and I have very little time left.,stress
+192,I feel overwhelmed because coding is difficult and my group is not finished yet.,stress
+193,I'm under a lot of pressure because web development is difficult and I have very little time left.,stress
+194,I'm mentally tired because coding is difficult and I have very little time left.,stress
+195,I'm stressed because system project is difficult and I am not sure how to finish it.,stress
+196,I'm having a hard time because school requirements is difficult and our requirements keep changing.,stress
+197,I'm really stressed because deployment is difficult and I keep getting stuck.,stress
+198,I'm under a lot of pressure because thesis is difficult and I have been working on it for hours.,stress
+199,I'm getting overwhelmed because laboratory activity is difficult and I need to submit it soon.,stress
+200,I'm getting overwhelmed because software project is difficult and I am worried about the result.,stress
+201,I feel stressed because documentation is difficult and our requirements keep changing.,stress
+202,I'm getting stressed because system project is difficult and I don't know where to start.,stress
+203,I'm mentally tired because assignments is difficult and I have been working on it for hours.,stress
+204,I'm getting stressed because laboratory activity is difficult and I have not finished the documentation.,stress
+205,I'm worried because documentation is difficult and I need to do everything at once.,stress
+206,I'm having a hard time because programming is difficult and I am worried about the result.,stress
+207,I'm struggling because exams is difficult and I am not sure how to finish it.,stress
+208,I'm getting stressed because mobile development is difficult and I am worried about the result.,stress
+209,Sobrang overwhelming ng presentation.,stress
+210,I feel pressured because research paper is difficult and I am worried about the result.,stress
+211,I'm mentally tired because API integration is difficult and the deadline is getting closer.,stress
+212,I can't relax because deployment is difficult and I need to do everything at once.,stress
+213,Nakaka-overwhelm yung deadline ng capstone.,stress
+214,I'm under a lot of pressure because system project is difficult and our requirements keep changing.,stress
+215,I'm exhausted because laboratory activity is difficult and the deadline is getting closer.,stress
+216,I feel pressured because database is difficult and our requirements keep changing.,stress
+217,I feel overwhelmed because presentation is difficult and I still need to fix several problems.,stress
+218,I'm really stressed because mobile development is difficult and I still need to fix several problems.,stress
+219,I'm having a hard time because debugging is difficult and I need to submit it soon.,stress
+220,I'm worried because thesis is difficult and I have not finished the documentation.,stress
+221,Wala na akong time para sa web development.,stress
+222,I'm under a lot of pressure because database is difficult and I still need to fix several problems.,stress
+223,I feel stressed because assignments is difficult and I am worried about the result.,stress
+224,I'm getting stressed because server setup is difficult and our requirements keep changing.,stress
+225,I'm exhausted because thesis is difficult and our requirements keep changing.,stress
+226,I'm exhausted because networking activity is difficult and I have too many things to finish.,stress
+227,I'm worried because presentation is difficult and I have other subjects to work on too.,stress
+228,I'm starting to panic because UI design is difficult and everything is piling up.,stress
+229,I'm mentally tired because presentation is difficult and I am worried about the result.,stress
+230,I'm under a lot of pressure because laboratory activity is difficult and I need to submit it soon.,stress
+231,I'm having a hard time because mobile development is difficult and I have been working on it for hours.,stress
+232,I'm getting stressed because school requirements is difficult and I have too many things to finish.,stress
+233,I'm under a lot of pressure because networking activity is difficult and my group is not finished yet.,stress
+234,I feel pressured because presentation is difficult and my group is not finished yet.,stress
+235,I'm mentally tired because programming is difficult and I don't know where to start.,stress
+236,I can't relax because group project is difficult and I have very little time left.,stress
+237,I'm worried because presentation is difficult and I have too many things to finish.,stress
+238,I feel stressed because presentation is difficult and I am not sure how to finish it.,stress
+239,I'm stressed because school requirements is difficult and I am worried about the result.,stress
+240,I'm starting to panic because coding is difficult and I am behind schedule.,stress
+241,I'm having a hard time because coding is difficult and I have too many things to finish.,stress
+242,I'm stressed because database is difficult and I have very little time left.,stress
+243,I'm stressed because networking activity is difficult and I have too many things to finish.,stress
+244,Wala na akong time para sa final project.,stress
+245,I'm worried because laboratory activity is difficult and I keep finding errors.,stress
+246,I'm under a lot of pressure because database is difficult and I keep getting stuck.,stress
+247,I'm struggling because group project is difficult and I have other subjects to work on too.,stress
+248,I'm worried because group project is difficult and I have not finished the documentation.,stress
+249,I'm worried because software project is difficult and everything is piling up.,stress
+250,I'm getting stressed because server setup is difficult and I am behind schedule.,stress
+251,I'm having a hard time because final project is difficult and I am worried about the result.,stress
+252,I'm starting to panic because UI design is difficult and I keep finding errors.,stress
+253,I'm struggling because thesis is difficult and I am behind schedule.,stress
+254,I feel pressured because thesis is difficult and I don't know where to start.,stress
+255,I'm starting to panic because research paper is difficult and I have very little time left.,stress
+256,I'm starting to panic because networking activity is difficult and I am behind schedule.,stress
+257,I'm exhausted because mobile development is difficult and the deadline is getting closer.,stress
+258,I'm struggling because exams is difficult and I still need to fix several problems.,stress
+259,I'm under a lot of pressure because debugging is difficult and I need to submit it soon.,stress
+260,I feel overwhelmed because mobile development is difficult and I have other subjects to work on too.,stress
+261,I'm getting overwhelmed because final project is difficult and I am not sure how to finish it.,stress
+262,I'm under a lot of pressure because programming is difficult and I have too many things to finish.,stress
+263,I feel overwhelmed because UI design is difficult and I keep finding errors.,stress
+264,I feel stressed because capstone is difficult and my group is not finished yet.,stress
+265,I'm getting overwhelmed because deployment is difficult and I have very little time left.,stress
+266,I feel overwhelmed because assignments is difficult and I am not sure how to finish it.,stress
+267,I'm getting stressed because exams is difficult and our requirements keep changing.,stress
+268,I'm mentally tired because networking activity is difficult and I still need to fix several problems.,stress
+269,I'm under a lot of pressure because laboratory activity is difficult and I need to do everything at once.,stress
+270,I'm worried because API integration is difficult and our requirements keep changing.,stress
+271,I'm really stressed because capstone is difficult and I don't know where to start.,stress
+272,I'm getting stressed because final project is difficult and I have not finished the documentation.,stress
+273,I'm starting to panic because deployment is difficult and I keep getting stuck.,stress
+274,I can't relax because programming is difficult and the deadline is getting closer.,stress
+275,I'm getting stressed because system project is difficult and the deadline is getting closer.,stress
+276,I'm exhausted because debugging is difficult and I have not finished the documentation.,stress
+277,I'm having a hard time because assignments is difficult and I still have several requirements left.,stress
+278,I'm starting to panic because thesis is difficult and I have been working on it for hours.,stress
+279,Stress na stress ako sa software project.,stress
+280,I feel overwhelmed because mobile development is difficult and I have too many things to finish.,stress
+281,I'm struggling because school requirements is difficult and I am behind schedule.,stress
+282,I feel overwhelmed because networking activity is difficult and I am behind schedule.,stress
+283,I can't relax because documentation is difficult and I still need to fix several problems.,stress
+284,I feel pressured because UI design is difficult and I don't know where to start.,stress
+285,I feel stressed because database is difficult and I still need to fix several problems.,stress
+286,I'm starting to panic because thesis is difficult and I keep getting stuck.,stress
+287,I'm getting overwhelmed because presentation is difficult and I have other subjects to work on too.,stress
+288,I'm under a lot of pressure because documentation is difficult and I am worried about the result.,stress
+289,I'm stressed because presentation is difficult and I don't have enough time.,stress
+290,I'm struggling because deployment is difficult and I keep finding errors.,stress
+291,I can't relax because UI design is difficult and I keep getting stuck.,stress
+292,I'm getting stressed because final project is difficult and my group is not finished yet.,stress
+293,I feel pressured because server setup is difficult and I keep getting stuck.,stress
+294,I'm under a lot of pressure because capstone is difficult and I need to submit it soon.,stress
+295,Hindi ko na alam uunahin ko sa assignments.,stress
+296,I feel overwhelmed because school requirements is difficult and I still have several requirements left.,stress
+297,I'm having a hard time because assignments is difficult and I still need to fix several problems.,stress
+298,I'm struggling because server setup is difficult and I keep finding errors.,stress
+299,I feel overwhelmed because exams is difficult and the deadline is getting closer.,stress
+300,I'm mentally tired because UI design is difficult and I still have several requirements left.,stress
+301,I feel overwhelmed because UI design is difficult and I have other subjects to work on too.,stress
+302,I'm getting stressed because group project is difficult and I don't know where to start.,stress
+303,I feel pressured because presentation is difficult and I don't know where to start.,stress
+304,I feel stressed because capstone is difficult and I keep getting stuck.,stress
+305,I'm worried because debugging is difficult and I don't have enough time.,stress
+306,I'm starting to panic because mobile development is difficult and our requirements keep changing.,stress
+307,I'm exhausted because programming is difficult and everything is piling up.,stress
+308,I'm stressed because mobile development is difficult and I don't know where to start.,stress
+309,I'm worried because web development is difficult and I have too many things to finish.,stress
+310,I'm worried because exams is difficult and my group is not finished yet.,stress
+311,I'm worried because research paper is difficult and I have been working on it for hours.,stress
+312,I'm under a lot of pressure because API integration is difficult and our requirements keep changing.,stress
+313,I'm stressed because exams is difficult and I have too many things to finish.,stress
+314,I feel pressured because deployment is difficult and I need to do everything at once.,stress
+315,I can't relax because debugging is difficult and I have been working on it for hours.,stress
+316,I'm having a hard time because final project is difficult and I am not sure how to finish it.,stress
+317,I'm stressed because software project is difficult and I have too many things to finish.,stress
+318,I'm exhausted because API integration is difficult and the deadline is getting closer.,stress
+319,Hindi ko na alam uunahin ko sa coding.,stress
+320,I'm exhausted because UI design is difficult and my group is not finished yet.,stress
+321,I'm stressed because UI design is difficult and our requirements keep changing.,stress
+322,Pressure na pressure ako sa API integration.,stress
+323,I'm stressed because presentation is difficult and I need to do everything at once.,stress
+324,I'm exhausted because programming is difficult and I keep finding errors.,stress
+325,I'm under a lot of pressure because web development is difficult and I keep getting stuck.,stress
+326,I feel stressed because database is difficult and the deadline is getting closer.,stress
+327,I feel overwhelmed because group project is difficult and my group is not finished yet.,stress
+328,I feel stressed because system project is difficult and I keep getting stuck.,stress
+329,I'm under a lot of pressure because web development is difficult and I still have several requirements left.,stress
+330,I'm starting to panic because laboratory activity is difficult and my group is not finished yet.,stress
+331,I'm really stressed because web development is difficult and I am worried about the result.,stress
+332,I'm exhausted because server setup is difficult and I keep getting stuck.,stress
+333,I'm struggling because debugging is difficult and I don't know where to start.,stress
+334,I'm stressed because final project is difficult and everything is piling up.,stress
+335,I'm struggling because group project is difficult and my group is not finished yet.,stress
+336,I'm struggling because database is difficult and I need to submit it soon.,stress
+337,I'm having a hard time because debugging is difficult and I keep getting stuck.,stress
+338,I'm worried because capstone is difficult and I have been working on it for hours.,stress
+339,I feel pressured because networking activity is difficult and I keep finding errors.,stress
+340,I'm getting overwhelmed because assignments is difficult and I am worried about the result.,stress
+341,I'm getting overwhelmed because networking activity is difficult and I have very little time left.,stress
+342,I feel stressed because research paper is difficult and I need to submit it soon.,stress
+343,I'm having a hard time because capstone is difficult and the deadline is getting closer.,stress
+344,I'm stressed because thesis is difficult and I have other subjects to work on too.,stress
+345,I'm exhausted because assignments is difficult and I keep finding errors.,stress
+346,I'm getting stressed because API integration is difficult and I have too many things to finish.,stress
+347,I'm struggling because coding is difficult and I have very little time left.,stress
+348,I'm having a hard time because UI design is difficult and I am worried about the result.,stress
+349,I'm under a lot of pressure because server setup is difficult and I have other subjects to work on too.,stress
+350,I feel pressured because system project is difficult and I am not sure how to finish it.,stress
+351,I'm really stressed because web development is difficult and I keep getting stuck.,stress
+352,I feel stressed because assignments is difficult and I have been working on it for hours.,stress
+353,I'm under a lot of pressure because web development is difficult and I keep finding errors.,stress
+354,I feel pressured because thesis is difficult and I have very little time left.,stress
+355,I'm mentally tired because system project is difficult and I still need to fix several problems.,stress
+356,I feel stressed because final project is difficult and I am not sure how to finish it.,stress
+357,I'm getting stressed because school requirements is difficult and I have not finished the documentation.,stress
+358,I'm having a hard time because API integration is difficult and the deadline is getting closer.,stress
+359,I'm mentally tired because software project is difficult and I have too many things to finish.,stress
+360,I'm getting overwhelmed because group project is difficult and I have very little time left.,stress
+361,I'm getting stressed because thesis is difficult and I keep finding errors.,stress
+362,I can't relax because laboratory activity is difficult and I am worried about the result.,stress
+363,I'm getting stressed because networking activity is difficult and I still need to fix several problems.,stress
+364,I'm really stressed because exams is difficult and I am worried about the result.,stress
+365,I'm having a hard time because web development is difficult and I keep finding errors.,stress
+366,I'm exhausted because laboratory activity is difficult and I have very little time left.,stress
+367,I'm starting to panic because presentation is difficult and I need to do everything at once.,stress
+368,I'm getting overwhelmed because documentation is difficult and our requirements keep changing.,stress
+369,I'm starting to panic because system project is difficult and I have been working on it for hours.,stress
+370,Nakaka-stress talaga itong API integration.,stress
+371,I can't relax because debugging is difficult and I have other subjects to work on too.,stress
+372,I'm under a lot of pressure because group project is difficult and I still have several requirements left.,stress
+373,I feel pressured because group project is difficult and I don't have enough time.,stress
+374,I'm exhausted because group project is difficult and I have not finished the documentation.,stress
+375,I feel pressured because programming is difficult and I need to do everything at once.,stress
+376,I'm worried because networking activity is difficult and my group is not finished yet.,stress
+377,I'm stressed because documentation is difficult and everything is piling up.,stress
+378,I'm struggling because software project is difficult and my group is not finished yet.,stress
+379,I feel overwhelmed because system project is difficult and I still need to fix several problems.,stress
+380,I'm stressed because capstone is difficult and I have been working on it for hours.,stress
+381,I'm mentally tired because school requirements is difficult and I am worried about the result.,stress
+382,I'm worried because programming is difficult and I am not sure how to finish it.,stress
+383,I'm mentally tired because UI design is difficult and I keep getting stuck.,stress
+384,I'm stressed because assignments is difficult and everything is piling up.,stress
+385,I'm starting to panic because documentation is difficult and the deadline is getting closer.,stress
+386,I'm under a lot of pressure because research paper is difficult and I keep finding errors.,stress
+387,I'm having a hard time because API integration is difficult and I am behind schedule.,stress
+388,I feel overwhelmed because research paper is difficult and I have very little time left.,stress
+389,I feel pressured because deployment is difficult and our requirements keep changing.,stress
+390,I'm worried because group project is difficult and my group is not finished yet.,stress
+391,I feel pressured because school requirements is difficult and our requirements keep changing.,stress
+392,I'm struggling because presentation is difficult and my group is not finished yet.,stress
+393,I'm getting overwhelmed because research paper is difficult and I have been working on it for hours.,stress
+394,I'm mentally tired because mobile development is difficult and I keep finding errors.,stress
+395,I'm exhausted because database is difficult and I am behind schedule.,stress
+396,Wala na akong time para sa programming.,stress
+397,I'm worried because assignments is difficult and I am not sure how to finish it.,stress
+398,I feel pressured because capstone is difficult and I still have several requirements left.,stress
+399,I feel stressed because coding is difficult and everything is piling up.,stress
+400,I feel stressed because assignments is difficult and I have other subjects to work on too.,stress
+401,I'm exhausted because documentation is difficult and I have other subjects to work on too.,stress
+402,Malapit na deadline ng research paper kaya stressed ako.,stress
+403,I'm having a hard time because research paper is difficult and everything is piling up.,stress
+404,I'm struggling because system project is difficult and our requirements keep changing.,stress
+405,Pressure na pressure ako sa deployment.,stress
+406,I'm stressed because server setup is difficult and I don't know where to start.,stress
+407,I'm getting stressed because mobile development is difficult and I am behind schedule.,stress
+408,I'm struggling because capstone is difficult and I still have several requirements left.,stress
+409,I'm starting to panic because group project is difficult and I am behind schedule.,stress
+410,I feel pressured because capstone is difficult and I have been working on it for hours.,stress
+411,I'm having a hard time because debugging is difficult and I have very little time left.,stress
+412,I'm stressed because server setup is difficult and I keep finding errors.,stress
+413,I'm worried because school requirements is difficult and I have been working on it for hours.,stress
+414,I can't relax because exams is difficult and I still have several requirements left.,stress
+415,I'm exhausted because laboratory activity is difficult and I keep finding errors.,stress
+416,I'm really stressed because school requirements is difficult and I have too many things to finish.,stress
+417,I'm exhausted because mobile development is difficult and I have been working on it for hours.,stress
+418,I'm exhausted because UI design is difficult and I am worried about the result.,stress
+419,I feel pressured because database is difficult and I still have several requirements left.,stress
+420,I feel pressured because software project is difficult and I keep finding errors.,stress
+421,I feel overwhelmed because debugging is difficult and I still have several requirements left.,stress
+422,I'm starting to panic because API integration is difficult and I still have several requirements left.,stress
+423,I feel stressed because exams is difficult and the deadline is getting closer.,stress
+424,I'm stressed because debugging is difficult and I need to submit it soon.,stress
+425,I'm getting stressed because server setup is difficult and I keep finding errors.,stress
+426,Hindi ko na alam paano matatapos itong software project.,stress
+427,I'm stressed because system project is difficult and I have very little time left.,stress
+428,I'm starting to panic because networking activity is difficult and the deadline is getting closer.,stress
+429,I'm struggling because API integration is difficult and I have other subjects to work on too.,stress
+430,I'm exhausted because networking activity is difficult and I have other subjects to work on too.,stress
+431,I feel stressed because final project is difficult and I don't know where to start.,stress
+432,I feel pressured because final project is difficult and I have other subjects to work on too.,stress
+433,I'm stressed because exams is difficult and I have other subjects to work on too.,stress
+434,I'm struggling because web development is difficult and I have too many things to finish.,stress
+435,Stress na stress ako sa documentation.,stress
+436,I'm stressed because database is difficult and I don't have enough time.,stress
+437,I feel pressured because mobile development is difficult and I need to submit it soon.,stress
+438,I feel pressured because laboratory activity is difficult and I am behind schedule.,stress
+439,I'm having a hard time because presentation is difficult and I need to submit it soon.,stress
+440,Kailangan ko pang ayusin ang database pero ang dami ko pang ibang gagawin.,stress
+441,I'm struggling because laboratory activity is difficult and I still have several requirements left.,stress
+442,I'm exhausted because API integration is difficult and I have other subjects to work on too.,stress
+443,I'm stressed because group project is difficult and I need to do everything at once.,stress
+444,I'm under a lot of pressure because presentation is difficult and I am not sure how to finish it.,stress
+445,I feel overwhelmed because deployment is difficult and I have other subjects to work on too.,stress
+446,I'm mentally tired because research paper is difficult and I need to do everything at once.,stress
+447,I feel stressed because database is difficult and my group is not finished yet.,stress
+448,I'm exhausted because system project is difficult and I have very little time left.,stress
+449,I feel overwhelmed because final project is difficult and I need to do everything at once.,stress
+450,I'm struggling because system project is difficult and I keep getting stuck.,stress
+451,I'm under a lot of pressure because presentation is difficult and I have other subjects to work on too.,stress
+452,I'm stressed because capstone is difficult and I keep finding errors.,stress
+453,I'm struggling because coding is difficult and I don't have enough time.,stress
+454,I'm exhausted because networking activity is difficult and I am not sure how to finish it.,stress
+455,I'm having a hard time because system project is difficult and I still need to fix several problems.,stress
+456,I'm really stressed because coding is difficult and I don't have enough time.,stress
+457,I can't relax because coding is difficult and I don't know where to start.,stress
+458,I feel overwhelmed because school requirements is difficult and my group is not finished yet.,stress
+459,I can't relax because assignments is difficult and I don't have enough time.,stress
+460,I feel pressured because school requirements is difficult and everything is piling up.,stress
+461,I can't relax because presentation is difficult and I have not finished the documentation.,stress
+462,I can't relax because laboratory activity is difficult and I need to submit it soon.,stress
+463,I'm starting to panic because debugging is difficult and I need to do everything at once.,stress
+464,I'm under a lot of pressure because capstone is difficult and our requirements keep changing.,stress
+465,I feel stressed because final project is difficult and I don't have enough time.,stress
+466,I feel pressured because mobile development is difficult and I am worried about the result.,stress
+467,I can't relax because API integration is difficult and I keep finding errors.,stress
+468,I feel pressured because coding is difficult and I keep finding errors.,stress
+469,I'm getting stressed because research paper is difficult and I keep finding errors.,stress
+470,I'm getting overwhelmed because deployment is difficult and I don't have enough time.,stress
+471,I'm getting stressed because laboratory activity is difficult and I need to do everything at once.,stress
+472,I'm worried because coding is difficult and I still need to fix several problems.,stress
+473,I'm mentally tired because laboratory activity is difficult and I still need to fix several problems.,stress
+474,I'm struggling because web development is difficult and my group is not finished yet.,stress
+475,I'm stressed because coding is difficult and everything is piling up.,stress
+476,I'm getting stressed because exams is difficult and I have too many things to finish.,stress
+477,I'm getting overwhelmed because documentation is difficult and I have not finished the documentation.,stress
+478,I can't relax because networking activity is difficult and I am not sure how to finish it.,stress
+479,I'm starting to panic because web development is difficult and I still need to fix several problems.,stress
+480,I'm mentally tired because mobile development is difficult and I still need to fix several problems.,stress
+481,I can't relax because networking activity is difficult and I still have several requirements left.,stress
+482,I feel stressed because school requirements is difficult and I need to submit it soon.,stress
+483,I feel overwhelmed because server setup is difficult and the deadline is getting closer.,stress
+484,I'm getting overwhelmed because debugging is difficult and I still have several requirements left.,stress
+485,I'm having a hard time because group project is difficult and I keep getting stuck.,stress
+486,I'm under a lot of pressure because thesis is difficult and I need to do everything at once.,stress
+487,I'm stressed because mobile development is difficult and I need to submit it soon.,stress
+488,I'm worried because thesis is difficult and I am behind schedule.,stress
+489,I'm starting to panic because software project is difficult and I have very little time left.,stress
+490,I'm getting stressed because mobile development is difficult and I keep finding errors.,stress
+491,I'm mentally tired because deployment is difficult and I keep getting stuck.,stress
+492,I'm getting overwhelmed because documentation is difficult and I am behind schedule.,stress
+493,I'm worried because software project is difficult and I have been working on it for hours.,stress
+494,I'm struggling because software project is difficult and I have not finished the documentation.,stress
+495,I feel stressed because assignments is difficult and I still have several requirements left.,stress
+496,I can't relax because exams is difficult and I need to do everything at once.,stress
+497,I'm under a lot of pressure because final project is difficult and I have very little time left.,stress
+498,I'm stressed because networking activity is difficult and I still need to fix several problems.,stress
+499,Hindi ko na alam paano matatapos itong programming.,stress
+500,I feel pressured because laboratory activity is difficult and I need to do everything at once.,stress
+501,I'm mentally tired because capstone is difficult and our requirements keep changing.,stress
+502,I'm struggling because API integration is difficult and I keep getting stuck.,stress
+503,I feel stressed because school requirements is difficult and I am behind schedule.,stress
+504,I can't relax because software project is difficult and I am worried about the result.,stress
+505,I'm stressed because assignments is difficult and our requirements keep changing.,stress
+506,I'm having a hard time because UI design is difficult and I have been working on it for hours.,stress
+507,I'm mentally tired because assignments is difficult and I need to do everything at once.,stress
+508,I'm mentally tired because API integration is difficult and I don't have enough time.,stress
+509,"Grabe, sobrang stress ko na sa mobile development.",stress
+510,I feel overwhelmed because web development is difficult and I still have several requirements left.,stress
+511,I'm getting overwhelmed because school requirements is difficult and the deadline is getting closer.,stress
+512,I'm starting to panic because capstone is difficult and I keep finding errors.,stress
+513,I'm getting overwhelmed because server setup is difficult and I am not sure how to finish it.,stress
+514,I'm really stressed because laboratory activity is difficult and I need to do everything at once.,stress
+515,I'm starting to panic because documentation is difficult and I keep getting stuck.,stress
+516,I'm under a lot of pressure because group project is difficult and I don't know where to start.,stress
+517,I'm getting overwhelmed because mobile development is difficult and I have too many things to finish.,stress
+518,I can't relax because web development is difficult and I have very little time left.,stress
+519,I feel stressed because exams is difficult and I don't have enough time.,stress
+520,I'm exhausted because assignments is difficult and I have been working on it for hours.,stress
+521,I feel stressed because thesis is difficult and I still have several requirements left.,stress
+522,I'm really stressed because API integration is difficult and I still have several requirements left.,stress
+523,I feel overwhelmed because API integration is difficult and I have too many things to finish.,stress
+524,I'm under a lot of pressure because laboratory activity is difficult and I still need to fix several problems.,stress
+525,I'm exhausted because laboratory activity is difficult and I still have several requirements left.,stress
+526,I'm mentally tired because thesis is difficult and I am worried about the result.,stress
+527,I'm starting to panic because system project is difficult and the deadline is getting closer.,stress
+528,I'm stressed because laboratory activity is difficult and I need to submit it soon.,stress
+529,I'm having a hard time because thesis is difficult and I have been working on it for hours.,stress
+530,I feel pressured because debugging is difficult and everything is piling up.,stress
+531,I feel overwhelmed because assignments is difficult and the deadline is getting closer.,stress
+532,I feel overwhelmed because API integration is difficult and the deadline is getting closer.,stress
+533,I'm mentally tired because thesis is difficult and everything is piling up.,stress
+534,I'm having a hard time because mobile development is difficult and I have very little time left.,stress
+535,I'm getting overwhelmed because research paper is difficult and I am not sure how to finish it.,stress
+536,I'm getting stressed because assignments is difficult and I am worried about the result.,stress
+537,I'm struggling because final project is difficult and I don't know where to start.,stress
+538,I'm starting to panic because assignments is difficult and I need to submit it soon.,stress
+539,I'm mentally tired because laboratory activity is difficult and our requirements keep changing.,stress
+540,I'm having a hard time because assignments is difficult and I need to do everything at once.,stress
+541,I'm under a lot of pressure because mobile development is difficult and I have been working on it for hours.,stress
+542,Sobrang overwhelming ng mobile development.,stress
+543,I'm worried because debugging is difficult and I still need to fix several problems.,stress
+544,I feel pressured because software project is difficult and the deadline is getting closer.,stress
+545,I feel stressed because API integration is difficult and I keep getting stuck.,stress
+546,I'm starting to panic because research paper is difficult and I have been working on it for hours.,stress
+547,I feel pressured because API integration is difficult and I still need to fix several problems.,stress
+548,I'm starting to panic because exams is difficult and I am worried about the result.,stress
+549,I'm mentally tired because capstone is difficult and my group is not finished yet.,stress
+550,I'm starting to panic because exams is difficult and my group is not finished yet.,stress
+551,I'm stressed because mobile development is difficult and I still need to fix several problems.,stress
+552,I'm getting stressed because final project is difficult and I need to do everything at once.,stress
+553,I'm getting overwhelmed because thesis is difficult and I still need to fix several problems.,stress
+554,I'm stressed because networking activity is difficult and I need to submit it soon.,stress
+555,I feel stressed because server setup is difficult and I don't know where to start.,stress
+556,I'm struggling because assignments is difficult and I have been working on it for hours.,stress
+557,I'm under a lot of pressure because deployment is difficult and I keep getting stuck.,stress
+558,I'm under a lot of pressure because group project is difficult and I have not finished the documentation.,stress
+559,I'm starting to panic because mobile development is difficult and I need to submit it soon.,stress
+560,I feel pressured because deployment is difficult and I have been working on it for hours.,stress
+561,I feel stressed because coding is difficult and I have very little time left.,stress
+562,I'm stressed because database is difficult and I still need to fix several problems.,stress
+563,I feel overwhelmed because system project is difficult and I have not finished the documentation.,stress
+564,I'm having a hard time because system project is difficult and I am not sure how to finish it.,stress
+565,I can't relax because documentation is difficult and my group is not finished yet.,stress
+566,I'm starting to panic because database is difficult and my group is not finished yet.,stress
+567,I'm getting overwhelmed because UI design is difficult and I keep finding errors.,stress
+568,I'm starting to panic because database is difficult and I don't know where to start.,stress
+569,I'm stressed because laboratory activity is difficult and I still need to fix several problems.,stress
+570,I'm struggling because final project is difficult and I keep getting stuck.,stress
+571,I feel stressed because group project is difficult and I need to submit it soon.,stress
+572,I'm getting stressed because exams is difficult and I have other subjects to work on too.,stress
+573,I'm mentally tired because presentation is difficult and I don't know where to start.,stress
+574,I'm starting to panic because assignments is difficult and I am not sure how to finish it.,stress
+575,I'm mentally tired because server setup is difficult and everything is piling up.,stress
+576,I'm exhausted because database is difficult and I still have several requirements left.,stress
+577,I'm having a hard time because web development is difficult and I don't know where to start.,stress
+578,I'm starting to panic because presentation is difficult and I am worried about the result.,stress
+579,I'm stressed because system project is difficult and I still have several requirements left.,stress
+580,I'm struggling because web development is difficult and I still need to fix several problems.,stress
+581,I'm exhausted because software project is difficult and I have not finished the documentation.,stress
+582,I'm mentally tired because exams is difficult and our requirements keep changing.,stress
+583,I'm worried because group project is difficult and I keep getting stuck.,stress
+584,I'm mentally tired because database is difficult and I am not sure how to finish it.,stress
+585,I'm worried because UI design is difficult and I don't have enough time.,stress
+586,I'm worried because API integration is difficult and I am worried about the result.,stress
+587,I'm stressed because debugging is difficult and I don't have enough time.,stress
+588,Wala na akong time para sa database.,stress
+589,I'm mentally tired because group project is difficult and I have very little time left.,stress
+590,I'm exhausted because final project is difficult and I keep finding errors.,stress
+591,I feel stressed because school requirements is difficult and I don't have enough time.,stress
+592,I can't relax because school requirements is difficult and I don't have enough time.,stress
+593,I'm exhausted because coding is difficult and I have very little time left.,stress
+594,I'm getting stressed because assignments is difficult and I have very little time left.,stress
+595,I'm getting overwhelmed because web development is difficult and I still have several requirements left.,stress
+596,I feel stressed because software project is difficult and I have been working on it for hours.,stress
+597,I'm exhausted because final project is difficult and I don't know where to start.,stress
+598,I'm worried because research paper is difficult and the deadline is getting closer.,stress
+599,Pressure na pressure ako sa server setup.,stress
+600,I feel stressed because debugging is difficult and I have been working on it for hours.,stress
+601,I'm under a lot of pressure because programming is difficult and I am worried about the result.,stress
+602,I'm starting to panic because final project is difficult and I still have several requirements left.,stress
+603,Stress na stress ako sa API integration.,stress
+604,I feel pressured because server setup is difficult and I keep finding errors.,stress
+605,I'm stressed because deployment is difficult and I have been working on it for hours.,stress
+606,I'm worried because database is difficult and I don't know where to start.,stress
+607,I'm worried because school requirements is difficult and everything is piling up.,stress
+608,I'm exhausted because debugging is difficult and I am worried about the result.,stress
+609,I feel pressured because database is difficult and I have too many things to finish.,stress
+610,I'm mentally tired because thesis is difficult and I keep getting stuck.,stress
+611,I'm starting to panic because exams is difficult and I don't know where to start.,stress
+612,I'm really stressed because debugging is difficult and the deadline is getting closer.,stress
+613,I'm getting stressed because server setup is difficult and I have other subjects to work on too.,stress
+614,I feel stressed because capstone is difficult and I have been working on it for hours.,stress
+615,I'm getting overwhelmed because system project is difficult and I am behind schedule.,stress
+616,I feel pressured because laboratory activity is difficult and I still have several requirements left.,stress
+617,I can't relax because capstone is difficult and I am behind schedule.,stress
+618,I feel overwhelmed because networking activity is difficult and I still need to fix several problems.,stress
+619,I'm stressed because debugging is difficult and my group is not finished yet.,stress
+620,I'm really stressed because capstone is difficult and I still have several requirements left.,stress
+621,I'm mentally tired because software project is difficult and I keep getting stuck.,stress
+622,I'm struggling because networking activity is difficult and I am behind schedule.,stress
+623,I'm getting stressed because coding is difficult and I am worried about the result.,stress
+624,I'm worried because deployment is difficult and our requirements keep changing.,stress
+625,I'm getting stressed because web development is difficult and I have very little time left.,stress
+626,I feel pressured because school requirements is difficult and I keep getting stuck.,stress
+627,I feel overwhelmed because laboratory activity is difficult and everything is piling up.,stress
+628,I'm stressed because presentation is difficult and I keep finding errors.,stress
+629,I'm getting overwhelmed because UI design is difficult and I am worried about the result.,stress
+630,I'm starting to panic because software project is difficult and I have been working on it for hours.,stress
+631,I'm starting to panic because database is difficult and I have not finished the documentation.,stress
+632,I'm struggling because exams is difficult and I have very little time left.,stress
+633,I feel overwhelmed because server setup is difficult and I need to submit it soon.,stress
+634,I'm mentally tired because debugging is difficult and I keep getting stuck.,stress
+635,I'm under a lot of pressure because presentation is difficult and everything is piling up.,stress
+636,I'm under a lot of pressure because system project is difficult and everything is piling up.,stress
+637,I feel stressed because exams is difficult and I don't know where to start.,stress
+638,I'm getting overwhelmed because web development is difficult and my group is not finished yet.,stress
+639,"Grabe, sobrang stress ko na sa programming.",stress
+640,I'm under a lot of pressure because presentation is difficult and our requirements keep changing.,stress
+641,I'm really stressed because software project is difficult and I have too many things to finish.,stress
+642,I'm under a lot of pressure because research paper is difficult and I have been working on it for hours.,stress
+643,I'm mentally tired because exams is difficult and I have very little time left.,stress
+644,I'm getting stressed because UI design is difficult and our requirements keep changing.,stress
+645,I'm under a lot of pressure because laboratory activity is difficult and I keep finding errors.,stress
+646,I feel pressured because documentation is difficult and my group is not finished yet.,stress
+647,I can't relax because capstone is difficult and I don't have enough time.,stress
+648,I'm really stressed because thesis is difficult and I keep finding errors.,stress
+649,Nakaka-stress talaga itong web development.,stress
+650,I feel overwhelmed because software project is difficult and I have other subjects to work on too.,stress
+651,I'm mentally tired because web development is difficult and I don't have enough time.,stress
+652,Sabay-sabay lahat ng requirements ko sa web development.,stress
+653,I'm stressed because debugging is difficult and I have not finished the documentation.,stress
+654,I'm struggling because capstone is difficult and I am not sure how to finish it.,stress
+655,I'm under a lot of pressure because networking activity is difficult and I have very little time left.,stress
+656,I'm really stressed because system project is difficult and I am behind schedule.,stress
+657,I'm really stressed because networking activity is difficult and I have very little time left.,stress
+658,I feel pressured because exams is difficult and I need to do everything at once.,stress
+659,I feel pressured because exams is difficult and I still have several requirements left.,stress
+660,I feel stressed because thesis is difficult and I need to do everything at once.,stress
+661,I'm stressed because group project is difficult and I need to submit it soon.,stress
+662,I feel overwhelmed because group project is difficult and I am worried about the result.,stress
+663,I feel stressed because system project is difficult and I don't know where to start.,stress
+664,I'm struggling because thesis is difficult and I have other subjects to work on too.,stress
+665,I'm mentally tired because coding is difficult and I need to do everything at once.,stress
+666,I'm exhausted because capstone is difficult and I have other subjects to work on too.,stress
+667,I feel pressured because assignments is difficult and I have other subjects to work on too.,stress
+668,I'm getting stressed because coding is difficult and I still need to fix several problems.,stress
+669,I feel stressed because presentation is difficult and I don't know where to start.,stress
+670,I feel pressured because programming is difficult and our requirements keep changing.,stress
+671,I feel pressured because documentation is difficult and I need to submit it soon.,stress
+672,I'm really stressed because final project is difficult and the deadline is getting closer.,stress
+673,I'm exhausted because coding is difficult and I am behind schedule.,stress
+674,I'm mentally tired because system project is difficult and I have very little time left.,stress
+675,Sobrang overwhelming ng deployment.,stress
+676,I'm really stressed because system project is difficult and I am not sure how to finish it.,stress
+677,I'm getting overwhelmed because laboratory activity is difficult and I keep finding errors.,stress
+678,I'm getting overwhelmed because school requirements is difficult and I am worried about the result.,stress
+679,"Grabe, sobrang stress ko na sa API integration.",stress
+680,I'm having a hard time because capstone is difficult and I still need to fix several problems.,stress
+681,I'm under a lot of pressure because web development is difficult and my group is not finished yet.,stress
+682,I'm getting stressed because deployment is difficult and I have very little time left.,stress
+683,I'm really stressed because capstone is difficult and the deadline is getting closer.,stress
+684,I feel pressured because database is difficult and I am behind schedule.,stress
+685,I'm starting to panic because documentation is difficult and I still have several requirements left.,stress
+686,I'm under a lot of pressure because presentation is difficult and I don't have enough time.,stress
+687,I'm stressed because programming is difficult and I have very little time left.,stress
+688,I'm worried because coding is difficult and the deadline is getting closer.,stress
+689,I'm stressed because school requirements is difficult and I need to do everything at once.,stress
+690,I'm stressed because capstone is difficult and I need to do everything at once.,stress
+691,I'm starting to panic because research paper is difficult and our requirements keep changing.,stress
+692,I can't relax because web development is difficult and I need to do everything at once.,stress
+693,I'm under a lot of pressure because documentation is difficult and our requirements keep changing.,stress
+694,I need to prepare for a presentation while finishing our system.,stress
+695,Pressure na pressure ako sa mobile development.,stress
+696,I feel pressured because presentation is difficult and I am not sure how to finish it.,stress
+697,I'm under a lot of pressure because debugging is difficult and I have very little time left.,stress
+698,I feel stressed because documentation is difficult and I am worried about the result.,stress
+699,I feel stressed because research paper is difficult and I keep getting stuck.,stress
+700,I'm getting stressed because thesis is difficult and I am not sure how to finish it.,stress
+701,I can't relax because debugging is difficult and I have not finished the documentation.,stress
+702,I'm getting overwhelmed because UI design is difficult and everything is piling up.,stress
+703,I'm exhausted because thesis is difficult and I still need to fix several problems.,stress
+704,I'm exhausted because presentation is difficult and I am worried about the result.,stress
+705,I'm worried because debugging is difficult and I am behind schedule.,stress
+706,I can't relax because thesis is difficult and I keep finding errors.,stress
+707,I feel stressed because assignments is difficult and I need to submit it soon.,stress
+708,I'm exhausted because API integration is difficult and I need to do everything at once.,stress
+709,I'm under a lot of pressure because database is difficult and our requirements keep changing.,stress
+710,I feel stressed because mobile development is difficult and I still have several requirements left.,stress
+711,I can't relax because software project is difficult and I still have several requirements left.,stress
+712,I'm worried because research paper is difficult and I am worried about the result.,stress
+713,I'm having a hard time because API integration is difficult and I don't have enough time.,stress
+714,I'm exhausted because mobile development is difficult and I don't know where to start.,stress
+715,I'm struggling because presentation is difficult and I need to do everything at once.,stress
+716,I can't relax because final project is difficult and I still have several requirements left.,stress
+717,I'm getting overwhelmed because mobile development is difficult and I don't have enough time.,stress
+718,I'm stressed because documentation is difficult and my group is not finished yet.,stress
+719,I'm mentally tired because school requirements is difficult and our requirements keep changing.,stress
+720,I can't relax because system project is difficult and everything is piling up.,stress
+721,I'm exhausted because assignments is difficult and I have too many things to finish.,stress
+722,I'm struggling because research paper is difficult and I need to submit it soon.,stress
+723,I'm struggling because API integration is difficult and I have not finished the documentation.,stress
+724,I'm getting overwhelmed because server setup is difficult and I don't have enough time.,stress
+725,I can't relax because exams is difficult and I keep getting stuck.,stress
+726,I feel overwhelmed because laboratory activity is difficult and I have too many things to finish.,stress
+727,I'm under a lot of pressure because server setup is difficult and everything is piling up.,stress
+728,Wala na akong time para sa software project.,stress
+729,Our capstone deadline is near and we still have many features to finish.,stress
+730,I can't relax because web development is difficult and I have other subjects to work on too.,stress
+731,I'm worried because mobile development is difficult and I have been working on it for hours.,stress
+732,I'm under a lot of pressure because API integration is difficult and I have other subjects to work on too.,stress
+733,I'm having a hard time because exams is difficult and I keep finding errors.,stress
+734,I'm mentally tired because exams is difficult and I keep finding errors.,stress
+735,I'm worried because final project is difficult and our requirements keep changing.,stress
+736,I'm getting overwhelmed because mobile development is difficult and our requirements keep changing.,stress
+737,I'm struggling because software project is difficult and I have other subjects to work on too.,stress
+738,I'm getting overwhelmed because final project is difficult and I don't have enough time.,stress
+739,I'm struggling because API integration is difficult and I am worried about the result.,stress
+740,I'm getting overwhelmed because group project is difficult and my group is not finished yet.,stress
+741,I'm stressed because programming is difficult and I need to do everything at once.,stress
+742,I feel overwhelmed because programming is difficult and I need to do everything at once.,stress
+743,I'm having a hard time because software project is difficult and I don't have enough time.,stress
+744,I'm worried because software project is difficult and I need to do everything at once.,stress
+745,Sabay-sabay lahat ng requirements ko sa programming.,stress
+746,I feel overwhelmed because deployment is difficult and the deadline is getting closer.,stress
+747,I'm under a lot of pressure because research paper is difficult and I need to submit it soon.,stress
+748,I feel overwhelmed because web development is difficult and I need to do everything at once.,stress
+749,I'm really stressed because debugging is difficult and I don't know where to start.,stress
+750,I feel pressured because coding is difficult and I need to submit it soon.,stress
+751,I'm worried because mobile development is difficult and I keep getting stuck.,stress
+752,I'm worried because database is difficult and I still have several requirements left.,stress
+753,I'm worried because debugging is difficult and I am not sure how to finish it.,stress
+754,I'm mentally tired because coding is difficult and our requirements keep changing.,stress
+755,I'm under a lot of pressure because web development is difficult and I have too many things to finish.,stress
+756,I feel overwhelmed because group project is difficult and everything is piling up.,stress
+757,I'm mentally tired because group project is difficult and I am worried about the result.,stress
+758,I'm exhausted because thesis is difficult and I have been working on it for hours.,stress
+759,I'm getting overwhelmed because presentation is difficult and everything is piling up.,stress
+760,I'm having a hard time because server setup is difficult and my group is not finished yet.,stress
+761,I'm exhausted because system project is difficult and I keep getting stuck.,stress
+762,I feel pressured because research paper is difficult and I don't know where to start.,stress
+763,I'm struggling because research paper is difficult and I still have several requirements left.,stress
+764,I'm mentally tired because research paper is difficult and our requirements keep changing.,stress
+765,I'm under a lot of pressure because coding is difficult and I am not sure how to finish it.,stress
+766,I'm mentally tired because documentation is difficult and I keep finding errors.,stress
+767,I'm under a lot of pressure because final project is difficult and I have been working on it for hours.,stress
+768,I can't relax because API integration is difficult and I have other subjects to work on too.,stress
+769,I'm having a hard time because software project is difficult and the deadline is getting closer.,stress
+770,I'm stressed because debugging is difficult and I am worried about the result.,stress
+771,I'm starting to panic because presentation is difficult and I have other subjects to work on too.,stress
+772,I'm worried because presentation is difficult and I don't know where to start.,stress
+773,I'm mentally tired because exams is difficult and I have other subjects to work on too.,stress
+774,I'm under a lot of pressure because software project is difficult and I am worried about the result.,stress
+775,I'm having a hard time because programming is difficult and I keep finding errors.,stress
+776,I can't relax because mobile development is difficult and I don't have enough time.,stress
+777,I feel overwhelmed because system project is difficult and everything is piling up.,stress
+778,I'm starting to panic because school requirements is difficult and I have very little time left.,stress
+779,I feel pressured because final project is difficult and I am behind schedule.,stress
+780,I'm getting overwhelmed because coding is difficult and our requirements keep changing.,stress
+781,I'm struggling because assignments is difficult and I am behind schedule.,stress
+782,I'm struggling because debugging is difficult and I keep finding errors.,stress
+783,I'm worried because final project is difficult and I have very little time left.,stress
+784,I'm having a hard time because database is difficult and I keep getting stuck.,stress
+785,I feel overwhelmed because presentation is difficult and I keep finding errors.,stress
+786,I'm exhausted because final project is difficult and I have too many things to finish.,stress
+787,I'm getting overwhelmed because API integration is difficult and I am worried about the result.,stress
+788,I'm having a hard time because networking activity is difficult and I have very little time left.,stress
+789,I feel overwhelmed because group project is difficult and I have very little time left.,stress
+790,I'm getting stressed because software project is difficult and I am behind schedule.,stress
+791,I feel overwhelmed because coding is difficult and I am worried about the result.,stress
+792,I feel pressured because group project is difficult and I have too many things to finish.,stress
+793,I'm stressed because networking activity is difficult and the deadline is getting closer.,stress
+794,I'm starting to panic because database is difficult and I have been working on it for hours.,stress
+795,Kailangan ko pang ayusin ang coding pero ang dami ko pang ibang gagawin.,stress
+796,Stress na stress ako sa research paper.,stress
+797,I'm having a hard time because web development is difficult and my group is not finished yet.,stress
+798,I'm having a hard time because programming is difficult and our requirements keep changing.,stress
+799,I'm exhausted because documentation is difficult and I keep finding errors.,stress
+800,I'm starting to panic because final project is difficult and I have been working on it for hours.,stress
+801,I'm exhausted because server setup is difficult and I keep finding errors.,stress
+802,I feel stressed because programming is difficult and I keep finding errors.,stress
+803,I'm stressed because database is difficult and I keep finding errors.,stress
+804,I'm starting to panic because school requirements is difficult and I am behind schedule.,stress
+805,I'm mentally tired because API integration is difficult and everything is piling up.,stress
+806,I'm starting to panic because deployment is difficult and my group is not finished yet.,stress
+807,I'm getting overwhelmed because mobile development is difficult and I don't know where to start.,stress
+808,I'm worried because UI design is difficult and I keep finding errors.,stress
+809,I'm getting stressed because deployment is difficult and I don't know where to start.,stress
+810,I'm stressed because UI design is difficult and the deadline is getting closer.,stress
+811,Sabay-sabay lahat ng requirements ko sa thesis.,stress
+812,I'm mentally tired because UI design is difficult and I am not sure how to finish it.,stress
+813,I feel pressured because debugging is difficult and I keep getting stuck.,stress
+814,I'm struggling because debugging is difficult and I need to submit it soon.,stress
+815,I'm having a hard time because debugging is difficult and I am worried about the result.,stress
+816,I can't relax because capstone is difficult and I have very little time left.,stress
+817,I feel stressed because deployment is difficult and I keep getting stuck.,stress
+818,I'm worried because assignments is difficult and the deadline is getting closer.,stress
+819,I'm having a hard time because system project is difficult and I have too many things to finish.,stress
+820,I'm struggling because documentation is difficult and I have very little time left.,stress
+821,I can't relax because documentation is difficult and I keep finding errors.,stress
+822,I'm really stressed because final project is difficult and I am behind schedule.,stress
+823,I'm under a lot of pressure because assignments is difficult and I have not finished the documentation.,stress
+824,I feel overwhelmed because final project is difficult and I have very little time left.,stress
+825,I feel pressured because system project is difficult and I keep getting stuck.,stress
+826,I'm starting to panic because mobile development is difficult and I have too many things to finish.,stress
+827,I'm mentally tired because research paper is difficult and I have other subjects to work on too.,stress
+828,I'm mentally tired because web development is difficult and I am worried about the result.,stress
+829,I'm under a lot of pressure because UI design is difficult and my group is not finished yet.,stress
+830,I feel stressed because programming is difficult and I have been working on it for hours.,stress
+831,I feel pressured because assignments is difficult and I have not finished the documentation.,stress
+832,I'm under a lot of pressure because UI design is difficult and I need to submit it soon.,stress
+833,I'm getting stressed because system project is difficult and I am worried about the result.,stress
+834,I'm really stressed because coding is difficult and I don't know where to start.,stress
+835,I'm stressed because exams is difficult and I need to do everything at once.,stress
+836,Kailangan ko pang ayusin ang school requirements pero ang dami ko pang ibang gagawin.,stress
+837,I'm under a lot of pressure because UI design is difficult and I keep finding errors.,stress
+838,I'm having a hard time because UI design is difficult and I have not finished the documentation.,stress
+839,I'm worried because exams is difficult and I keep getting stuck.,stress
+840,I'm exhausted because documentation is difficult and I still have several requirements left.,stress
+841,I feel overwhelmed because web development is difficult and I still need to fix several problems.,stress
+842,I'm exhausted because UI design is difficult and I have not finished the documentation.,stress
+843,I feel overwhelmed because deployment is difficult and I have not finished the documentation.,stress
+844,I'm really stressed because thesis is difficult and I have been working on it for hours.,stress
+845,I'm stressed because software project is difficult and the deadline is getting closer.,stress
+846,I'm under a lot of pressure because group project is difficult and I still need to fix several problems.,stress
+847,I'm getting stressed because thesis is difficult and I am behind schedule.,stress
+848,I'm worried because software project is difficult and our requirements keep changing.,stress
+849,I'm having a hard time because capstone is difficult and our requirements keep changing.,stress
+850,I'm exhausted because laboratory activity is difficult and our requirements keep changing.,stress
+851,I'm mentally tired because web development is difficult and I don't know where to start.,stress
+852,I'm having a hard time because group project is difficult and I still need to fix several problems.,stress
+853,I'm mentally tired because assignments is difficult and I am behind schedule.,stress
+854,Sabay-sabay lahat ng requirements ko sa system project.,stress
+855,I can't relax because server setup is difficult and I have other subjects to work on too.,stress
+856,I'm starting to panic because coding is difficult and I don't have enough time.,stress
+857,Sobrang overwhelming ng documentation.,stress
+858,I feel stressed because deployment is difficult and I am behind schedule.,stress
+859,I feel pressured because school requirements is difficult and I still have several requirements left.,stress
+860,I'm getting overwhelmed because assignments is difficult and I don't have enough time.,stress
+861,I can't relax because programming is difficult and I need to submit it soon.,stress
+862,I'm under a lot of pressure because assignments is difficult and my group is not finished yet.,stress
+863,I'm struggling because coding is difficult and I am behind schedule.,stress
+864,I feel overwhelmed because capstone is difficult and I don't know where to start.,stress
+865,I feel stressed because API integration is difficult and I need to submit it soon.,stress
+866,I'm struggling because final project is difficult and our requirements keep changing.,stress
+867,I'm stressed because networking activity is difficult and I don't have enough time.,stress
+868,I feel pressured because assignments is difficult and I am not sure how to finish it.,stress
+869,I'm really stressed because capstone is difficult and I have not finished the documentation.,stress
+870,I'm stressed because group project is difficult and I keep finding errors.,stress
+871,I'm mentally tired because coding is difficult and I have other subjects to work on too.,stress
+872,I'm mentally tired because system project is difficult and our requirements keep changing.,stress
+873,I'm exhausted because networking activity is difficult and my group is not finished yet.,stress
+874,I'm starting to panic because server setup is difficult and our requirements keep changing.,stress
+875,I'm really stressed because server setup is difficult and I don't know where to start.,stress
+876,I'm starting to panic because capstone is difficult and I still have several requirements left.,stress
+877,I'm getting overwhelmed because database is difficult and everything is piling up.,stress
+878,I'm mentally tired because database is difficult and I keep finding errors.,stress
+879,I'm stressed because web development is difficult and I have not finished the documentation.,stress
+880,Hindi ko na alam uunahin ko sa UI design.,stress
+881,I feel stressed because server setup is difficult and I need to do everything at once.,stress
+882,I feel stressed because school requirements is difficult and I keep finding errors.,stress
+883,I'm under a lot of pressure because group project is difficult and I have too many things to finish.,stress
+884,I'm getting overwhelmed because database is difficult and I have very little time left.,stress
+885,I can't relax because server setup is difficult and I am not sure how to finish it.,stress
+886,I'm mentally tired because final project is difficult and I have too many things to finish.,stress
+887,I feel stressed because school requirements is difficult and I have very little time left.,stress
+888,I'm getting stressed because group project is difficult and I am behind schedule.,stress
+889,I'm mentally tired because networking activity is difficult and I have other subjects to work on too.,stress
+890,I'm under a lot of pressure because debugging is difficult and I am not sure how to finish it.,stress
+891,I'm under a lot of pressure because coding is difficult and I have very little time left.,stress
+892,I'm really stressed because deployment is difficult and I still have several requirements left.,stress
+893,I'm worried because research paper is difficult and I need to submit it soon.,stress
+894,I'm starting to panic because coding is difficult and I have too many things to finish.,stress
+895,I'm under a lot of pressure because UI design is difficult and I need to do everything at once.,stress
+896,I'm under a lot of pressure because programming is difficult and our requirements keep changing.,stress
+897,I'm mentally tired because system project is difficult and I keep finding errors.,stress
+898,I can't relax because group project is difficult and our requirements keep changing.,stress
+899,I'm stressed because mobile development is difficult and I keep finding errors.,stress
+900,I'm mentally tired because exams is difficult and the deadline is getting closer.,stress
+901,I'm getting overwhelmed because API integration is difficult and I keep getting stuck.,stress
+902,I feel overwhelmed because documentation is difficult and I keep getting stuck.,stress
+903,I'm starting to panic because software project is difficult and I have not finished the documentation.,stress
+904,I'm really stressed because software project is difficult and I need to submit it soon.,stress
+905,I'm exhausted because final project is difficult and I am behind schedule.,stress
+906,I'm getting stressed because networking activity is difficult and I am behind schedule.,stress
+907,I'm worried because database is difficult and I don't have enough time.,stress
+908,I'm under a lot of pressure because web development is difficult and I am not sure how to finish it.,stress
+909,I'm getting stressed because programming is difficult and I keep getting stuck.,stress
+910,I'm getting stressed because thesis is difficult and I have been working on it for hours.,stress
+911,I'm really stressed because API integration is difficult and I keep getting stuck.,stress
+912,I'm struggling because deployment is difficult and I need to do everything at once.,stress
+913,I'm really stressed because debugging is difficult and I have not finished the documentation.,stress
+914,I'm starting to panic because software project is difficult and I keep finding errors.,stress
+915,I can't relax because database is difficult and my group is not finished yet.,stress
+916,I'm really stressed because documentation is difficult and I don't know where to start.,stress
+917,I'm getting overwhelmed because coding is difficult and I have very little time left.,stress
+918,I'm exhausted because debugging is difficult and I still have several requirements left.,stress
+919,I'm getting overwhelmed because research paper is difficult and my group is not finished yet.,stress
+920,I'm getting stressed because UI design is difficult and my group is not finished yet.,stress
+921,I feel overwhelmed because research paper is difficult and I have other subjects to work on too.,stress
+922,I'm mentally tired because presentation is difficult and I don't have enough time.,stress
+923,I'm exhausted because thesis is difficult and I am not sure how to finish it.,stress
+924,I feel stressed because UI design is difficult and the deadline is getting closer.,stress
+925,"Grabe, sobrang stress ko na sa software project.",stress
+926,I feel pressured because final project is difficult and I need to submit it soon.,stress
+927,I'm stressed because final project is difficult and I have very little time left.,stress
+928,I'm starting to panic because research paper is difficult and I still need to fix several problems.,stress
+929,I'm really stressed because debugging is difficult and I need to submit it soon.,stress
+930,I'm really stressed because debugging is difficult and our requirements keep changing.,stress
+931,I'm stressed because networking activity is difficult and I have not finished the documentation.,stress
+932,I'm starting to panic because mobile development is difficult and I keep getting stuck.,stress
+933,I'm exhausted because programming is difficult and I have very little time left.,stress
+934,I'm really stressed because coding is difficult and I still have several requirements left.,stress
+935,I'm exhausted because school requirements is difficult and I have not finished the documentation.,stress
+936,I'm getting overwhelmed because server setup is difficult and I need to do everything at once.,stress
+937,I can't relax because software project is difficult and the deadline is getting closer.,stress
+938,I'm stressed because API integration is difficult and I have been working on it for hours.,stress
+939,I'm struggling because system project is difficult and I am worried about the result.,stress
+940,I'm really stressed because API integration is difficult and I am worried about the result.,stress
+941,I'm having a hard time because programming is difficult and I am behind schedule.,stress
+942,I'm mentally tired because laboratory activity is difficult and I don't know where to start.,stress
+943,I'm getting stressed because exams is difficult and I still have several requirements left.,stress
+944,I feel overwhelmed because deployment is difficult and I don't have enough time.,stress
+945,I'm getting stressed because laboratory activity is difficult and I have very little time left.,stress
+946,I'm worried because debugging is difficult and I am worried about the result.,stress
+947,I'm getting stressed because laboratory activity is difficult and our requirements keep changing.,stress
+948,I'm having a hard time because debugging is difficult and I am not sure how to finish it.,stress
+949,I can't relax because programming is difficult and I have not finished the documentation.,stress
+950,I'm exhausted because web development is difficult and I need to submit it soon.,stress
+951,I'm stressed because web development is difficult and I still have several requirements left.,stress
+952,I feel overwhelmed because programming is difficult and I don't have enough time.,stress
+953,I feel pressured because exams is difficult and I am behind schedule.,stress
+954,I'm getting stressed because API integration is difficult and I am behind schedule.,stress
+955,I'm exhausted because laboratory activity is difficult and my group is not finished yet.,stress
+956,I feel pressured because deployment is difficult and I keep getting stuck.,stress
+957,I'm getting stressed because web development is difficult and the deadline is getting closer.,stress
+958,I feel overwhelmed because system project is difficult and I still have several requirements left.,stress
+959,I'm stressed because final project is difficult and our requirements keep changing.,stress
+960,I'm worried because research paper is difficult and I don't know where to start.,stress
+961,I'm struggling because server setup is difficult and I have very little time left.,stress
+962,I'm mentally tired because documentation is difficult and I need to do everything at once.,stress
+963,I feel stressed because API integration is difficult and I am not sure how to finish it.,stress
+964,I'm really stressed because mobile development is difficult and I need to do everything at once.,stress
+965,I'm stressed because laboratory activity is difficult and I keep finding errors.,stress
+966,I'm getting overwhelmed because research paper is difficult and I still need to fix several problems.,stress
+967,I feel pressured because research paper is difficult and I have too many things to finish.,stress
+968,I'm stressed because software project is difficult and I have other subjects to work on too.,stress
+969,I'm worried because documentation is difficult and my group is not finished yet.,stress
+970,I'm getting stressed because deployment is difficult and I have other subjects to work on too.,stress
+971,I can't relax because coding is difficult and I have very little time left.,stress
+972,I'm starting to panic because software project is difficult and I am worried about the result.,stress
+973,I feel overwhelmed because assignments is difficult and I still have several requirements left.,stress
+974,I'm worried because school requirements is difficult and I don't know where to start.,stress
+975,I feel overwhelmed because assignments is difficult and I need to submit it soon.,stress
+976,I feel pressured because web development is difficult and everything is piling up.,stress
+977,I feel overwhelmed because networking activity is difficult and the deadline is getting closer.,stress
+978,I'm under a lot of pressure because software project is difficult and I am not sure how to finish it.,stress
+979,I'm struggling because API integration is difficult and I keep finding errors.,stress
+980,I'm exhausted because thesis is difficult and I need to submit it soon.,stress
+981,I'm stressed because networking activity is difficult and I have been working on it for hours.,stress
+982,I'm under a lot of pressure because thesis is difficult and I am not sure how to finish it.,stress
+983,I'm having a hard time because programming is difficult and I have been working on it for hours.,stress
+984,I'm getting stressed because thesis is difficult and my group is not finished yet.,stress
+985,I'm stressed because deployment is difficult and I have very little time left.,stress
+986,I'm getting stressed because laboratory activity is difficult and I don't know where to start.,stress
+987,I'm worried because laboratory activity is difficult and everything is piling up.,stress
+988,I'm exhausted because database is difficult and everything is piling up.,stress
+989,I feel overwhelmed because research paper is difficult and I don't have enough time.,stress
+990,I feel stressed because assignments is difficult and I keep finding errors.,stress
+991,I'm getting stressed because laboratory activity is difficult and I have too many things to finish.,stress
+992,I'm stressed because mobile development is difficult and I need to do everything at once.,stress
+993,I feel overwhelmed because presentation is difficult and I have not finished the documentation.,stress
+994,I'm mentally tired because presentation is difficult and I am not sure how to finish it.,stress
+995,Stress na stress ako sa deployment.,stress
+996,I'm getting stressed because API integration is difficult and I have other subjects to work on too.,stress
+997,I'm stressed because exams is difficult and I am behind schedule.,stress
+998,I'm under a lot of pressure because software project is difficult and I don't know where to start.,stress
+999,I feel stressed because database is difficult and I am worried about the result.,stress
+1000,I'm getting stressed because final project is difficult and I keep getting stuck.,stress

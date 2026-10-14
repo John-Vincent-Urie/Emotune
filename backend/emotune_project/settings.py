@@ -94,6 +94,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Serves STATIC_ROOT (the admin and admin-panel CSS/JS) from the app itself,
+    # since gunicorn -- unlike runserver -- serves no static files.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -124,12 +127,41 @@ TEMPLATES = [
 WSGI_APPLICATION = 'emotune_project.wsgi.application'
 ASGI_APPLICATION = 'emotune_project.asgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# SQLite unless DJANGO_DB_ENGINE=mysql. Docker runs MySQL (docker-compose.yml);
+# the local venv and the test suite keep SQLite unless told otherwise.
+if os.getenv('DJANGO_DB_ENGINE', 'sqlite').strip().lower() == 'mysql':
+    # PyMySQL stands in for mysqlclient, so the image needs no C toolchain.
+    import pymysql
+
+    pymysql.install_as_MySQLdb()
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': os.getenv('MYSQL_DATABASE', 'emotune'),
+            'USER': os.getenv('MYSQL_USER', 'emotune'),
+            'PASSWORD': os.getenv('MYSQL_PASSWORD', ''),
+            'HOST': os.getenv('MYSQL_HOST', 'db'),
+            'PORT': os.getenv('MYSQL_PORT', '3306'),
+            'CONN_MAX_AGE': env_int('MYSQL_CONN_MAX_AGE', 60),
+            'OPTIONS': {
+                'charset': 'utf8mb4',
+                'sql_mode': 'STRICT_TRANS_TABLES',
+            },
+            'TEST': {
+                'CHARSET': 'utf8mb4',
+                'COLLATION': 'utf8mb4_unicode_ci',
+            },
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            # Overridable so a container can keep the database on a volume instead
+            # of inside the image's code directory.
+            'NAME': os.getenv('DJANGO_SQLITE_PATH') or BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 AUTH_USER_MODEL = 'users.User'
 
@@ -148,9 +180,55 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = os.getenv('DJANGO_MEDIA_ROOT') or BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Email -- used by the forgotten-password code in users/emails.py.
+#
+# For Gmail, EMAIL_HOST_USER is the full address and EMAIL_HOST_PASSWORD must be
+# a 16-character App Password (Google Account > Security > 2-Step Verification >
+# App passwords). Gmail's SMTP refuses a normal account password outright.
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = env_int('EMAIL_PORT', 587)
+EMAIL_USE_TLS = env_bool('EMAIL_USE_TLS', True)
+EMAIL_USE_SSL = env_bool('EMAIL_USE_SSL', False)
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+# A hung SMTP connection would otherwise hold a request worker open.
+EMAIL_TIMEOUT = env_int('EMAIL_TIMEOUT', 10)
+DEFAULT_FROM_EMAIL = (
+    os.getenv('DEFAULT_FROM_EMAIL')
+    or (f'EmoTune <{EMAIL_HOST_USER}>' if EMAIL_HOST_USER else 'EmoTune <no-reply@emotune.local>')
+)
+
+# With no credentials there is nothing to authenticate with, so print the mail
+# to the console instead. The reset flow then still works end to end offline --
+# the code shows up in the runserver log.
+EMAIL_BACKEND = os.getenv('DJANGO_EMAIL_BACKEND') or (
+    'django.core.mail.backends.smtp.EmailBackend'
+    if EMAIL_HOST_USER
+    else 'django.core.mail.backends.console.EmailBackend'
+)
+
+
+# Credential-endpoint rate limits, as (production, development) defaults. Every
+# development client -- browser, emulator, a phone over `adb reverse` -- runs on
+# this one machine, so they all share one address (127.0.0.1, or the Docker
+# bridge gateway behind `docker compose`). At production rates one person's
+# testing locks everyone out (QA hit a 26-minute register lockout), so with
+# DJANGO_DEBUG on the defaults are loose but still finite. A THROTTLE_* variable
+# overrides either.
+_THROTTLE_DEFAULTS = {
+    'login_ip': ('THROTTLE_LOGIN_IP', '20/min', '300/min'),
+    'login_email': ('THROTTLE_LOGIN_EMAIL', '10/min', '60/min'),
+    'register': ('THROTTLE_REGISTER', '10/hour', '300/hour'),
+    'password_change': ('THROTTLE_PASSWORD_CHANGE', '10/hour', '120/hour'),
+    'password_reset_ip': ('THROTTLE_PASSWORD_RESET_IP', '20/hour', '300/hour'),
+    'password_reset_email': ('THROTTLE_PASSWORD_RESET_EMAIL', '6/hour', '60/hour'),
+    'password_reset_verify_ip': ('THROTTLE_PASSWORD_RESET_VERIFY_IP', '60/hour', '600/hour'),
+    'password_reset_verify_email': ('THROTTLE_PASSWORD_RESET_VERIFY_EMAIL', '20/hour', '200/hour'),
+}
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -165,11 +243,15 @@ REST_FRAMEWORK = {
     # client can guess passwords against /api/users/login/ as fast as the
     # network allows. Scopes are applied by the throttles in users/throttles.py.
     'DEFAULT_THROTTLE_RATES': {
-        'login_ip': os.getenv('THROTTLE_LOGIN_IP', '20/min'),
-        'login_email': os.getenv('THROTTLE_LOGIN_EMAIL', '10/min'),
-        'register': os.getenv('THROTTLE_REGISTER', '10/hour'),
-        'password_change': os.getenv('THROTTLE_PASSWORD_CHANGE', '10/hour'),
+        scope: os.getenv(env_name) or (debug_rate if DEBUG else production_rate)
+        for scope, (env_name, production_rate, debug_rate) in _THROTTLE_DEFAULTS.items()
     },
+    # How many reverse proxies in front of Django append to X-Forwarded-For.
+    # Left unset, DRF trusts that header from anyone, so a client could send a
+    # fresh fake address with every request and never be throttled. 0 (the
+    # default) uses the socket address only; set 1 behind exactly one trusted
+    # proxy (nginx, a load balancer) that sets the header itself.
+    'NUM_PROXIES': env_int('DRF_NUM_PROXIES', 0),
 }
 
 def _access_token_lifetime():
@@ -305,135 +387,12 @@ SPOTIFY_REQUIRED_PLAYBACK_SCOPES = (
 SPOTIFY_HTTP_TIMEOUT_SECONDS = float(
     os.getenv('SPOTIFY_HTTP_TIMEOUT_SECONDS', '3'),
 )
-SPOTIFY_RECOMMENDATION_BUDGET_SECONDS = float(
-    os.getenv('SPOTIFY_RECOMMENDATION_BUDGET_SECONDS', '6'),
-)
-SPOTIFY_PROGRESSIVE_INITIAL_BUDGET_SECONDS = env_float(
-    'SPOTIFY_PROGRESSIVE_INITIAL_BUDGET_SECONDS',
-    2.5,
-)
-SPOTIFY_PROGRESSIVE_INITIAL_CANDIDATE_LIMIT = env_int(
-    'SPOTIFY_PROGRESSIVE_INITIAL_CANDIDATE_LIMIT',
-    6,
-)
-SPOTIFY_PROGRESSIVE_INITIAL_TRACK_LIMIT = env_int(
-    'SPOTIFY_PROGRESSIVE_INITIAL_TRACK_LIMIT',
-    1,
-)
-SPOTIFY_PROGRESSIVE_CONTINUATION_BUDGET_SECONDS = env_float(
-    'SPOTIFY_PROGRESSIVE_CONTINUATION_BUDGET_SECONDS',
-    8.0,
-)
-SPOTIFY_PROGRESSIVE_CONTINUATION_CANDIDATE_LIMIT = env_int(
-    'SPOTIFY_PROGRESSIVE_CONTINUATION_CANDIDATE_LIMIT',
-    20,
-)
-# Shared per-emotion candidate pool ("waiting room"). Pre-fetched Spotify
-# candidates are served straight from the database so a recommendation no
-# longer waits on a chain of live catalog searches. Keep the ages short: this
-# is a cache, not a local copy of the Spotify catalog.
-SPOTIFY_TRACK_POOL_ENABLED = env_bool('SPOTIFY_TRACK_POOL_ENABLED', True)
-SPOTIFY_TRACK_POOL_TARGET_SIZE = env_int('SPOTIFY_TRACK_POOL_TARGET_SIZE', 100)
-SPOTIFY_TRACK_POOL_FRESH_SECONDS = env_int(
-    'SPOTIFY_TRACK_POOL_FRESH_SECONDS',
-    6 * 60 * 60,
-)
-SPOTIFY_TRACK_POOL_MAX_AGE_SECONDS = env_int(
-    'SPOTIFY_TRACK_POOL_MAX_AGE_SECONDS',
-    24 * 60 * 60,
-)
-# What a pool hit may still spend on the queries that are specific to this
-# request (preferred artists, LLM picks, playlist category).
-SPOTIFY_TRACK_POOL_LIVE_QUERY_BUDGET_SECONDS = env_float(
-    'SPOTIFY_TRACK_POOL_LIVE_QUERY_BUDGET_SECONDS',
-    1.5,
-)
-SPOTIFY_TRACK_POOL_LIVE_QUERY_SHARE = env_float(
-    'SPOTIFY_TRACK_POOL_LIVE_QUERY_SHARE',
-    0.4,
-)
-SPOTIFY_TRACK_POOL_REFRESH_BUDGET_SECONDS = env_float(
-    'SPOTIFY_TRACK_POOL_REFRESH_BUDGET_SECONDS',
-    25.0,
-)
-MUSIC_PICKER_PLAYLIST_DOC = os.getenv(
-    'MUSIC_PICKER_PLAYLIST_DOC',
-    str(PROJECT_ROOT / 'docs' / 'music.md'),
-)
-MUSIC_PICKER_EMOTION_SEED_TRACK_LIMIT = env_int(
-    'MUSIC_PICKER_EMOTION_SEED_TRACK_LIMIT',
-    10,
-)
-RECOMMENDATION_CONTINUATION_MAX_AGE_SECONDS = env_int(
-    'RECOMMENDATION_CONTINUATION_MAX_AGE_SECONDS',
-    900,
-)
-# The music picker's model: a linear ranker whose weights are fitted offline by
-# ml_model/train_picker_ranker.py. Serving it costs one dot product per
-# candidate -- no native build, no per-request model fitting, so it runs
-# anywhere the backend runs. With no artifact on disk the built-in defaults
-# reproduce the hand-tuned blend the picker shipped with.
-PICKER_RANKER_ENABLED = env_bool(
-    'PICKER_RANKER_ENABLED',
-    True,
-)
-PICKER_RANKER_WEIGHTS_PATH = os.getenv(
-    'PICKER_RANKER_WEIGHTS_PATH',
-    str(BASE_DIR.parent / 'ml_model' / 'artifacts' / 'picker_weights.json'),
-)
+# Appended to the crisis-safety fallback message (api/safety.py) when free-text
+# input matches self-harm/suicide language. Left empty by default -- a wrong or
+# outdated hotline is worse than none, so this must be set to a verified, current
+# resource for your deployment's region before relying on it in front of real users.
+CRISIS_HOTLINE_TEXT = os.getenv('CRISIS_HOTLINE_TEXT', '')
 
-LLM_MUSIC_PICKER_ENABLED = env_bool(
-    'LLM_MUSIC_PICKER_ENABLED',
-    False,
-)
-LLM_MUSIC_PICKER_PROVIDER = os.getenv(
-    'LLM_MUSIC_PICKER_PROVIDER',
-    '',
-)
-LLM_MUSIC_PICKER_API_URL = os.getenv(
-    'LLM_MUSIC_PICKER_API_URL',
-    '',
-)
-LLM_MUSIC_PICKER_API_KEY = os.getenv(
-    'LLM_MUSIC_PICKER_API_KEY',
-    '',
-)
-LLM_MUSIC_PICKER_MODEL = os.getenv(
-    'LLM_MUSIC_PICKER_MODEL',
-    '',
-)
-LLM_MUSIC_PICKER_GEMINI_API_VERSION = os.getenv(
-    'LLM_MUSIC_PICKER_GEMINI_API_VERSION',
-    'v1beta',
-)
-LLM_MUSIC_PICKER_TIMEOUT_SECONDS = env_float(
-    'LLM_MUSIC_PICKER_TIMEOUT_SECONDS',
-    8.0,
-)
-LLM_MUSIC_PICKER_MAX_CANDIDATES = env_int(
-    'LLM_MUSIC_PICKER_MAX_CANDIDATES',
-    18,
-)
-LLM_MUSIC_PICKER_PLAYLIST_SIZE = env_int(
-    'LLM_MUSIC_PICKER_PLAYLIST_SIZE',
-    12,
-)
-LLM_MUSIC_PICKER_SEARCH_QUERY_COUNT = env_int(
-    'LLM_MUSIC_PICKER_SEARCH_QUERY_COUNT',
-    6,
-)
-LLM_MUSIC_PICKER_EXACT_SONG_SEED_ENABLED = env_bool(
-    'LLM_MUSIC_PICKER_EXACT_SONG_SEED_ENABLED',
-    True,
-)
-LLM_MUSIC_PICKER_EXACT_SONG_SEED_QUERY_LIMIT = env_int(
-    'LLM_MUSIC_PICKER_EXACT_SONG_SEED_QUERY_LIMIT',
-    3,
-)
-LLM_MUSIC_PICKER_TEMPERATURE = env_float(
-    'LLM_MUSIC_PICKER_TEMPERATURE',
-    0.2,
-)
 EMOTION_HIGH_CONFIDENCE_THRESHOLD = env_float(
     'EMOTION_HIGH_CONFIDENCE_THRESHOLD',
     0.68,

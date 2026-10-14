@@ -1,0 +1,118 @@
+# EmoTune backend in Docker.
+#
+#   docker compose up --build -d     # build and start on http://127.0.0.1:8000
+#   docker compose logs -f backend
+#   docker compose exec backend python manage.py createsuperuser
+#   docker compose down              # stop (the database volumes are kept)
+#
+# Configuration comes from the same .env the local runserver uses. The MySQL
+# credentials (MYSQL_DATABASE, MYSQL_USER, MYSQL_PASSWORD) must be set there
+# first -- see docs/SETUP.md. phpMyAdmin: http://127.0.0.1:8081
+
+x-backend-env: &backend-env
+  env_file:
+    - path: .env
+      required: false
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: emotune-backend
+    <<: *backend-env
+    environment:
+      # Load the emotion models when gunicorn starts rather than on the first
+      # request, which would otherwise wait on them.
+      EMOTUNE_WARM_MODELS_ON_STARTUP: always
+      DJANGO_DB_ENGINE: mysql
+      MYSQL_HOST: db
+      MYSQL_PORT: "3306"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      # Bound on all interfaces like `runserver 0.0.0.0:8000`, so a phone on the
+      # LAN can reach it. Set EMOTUNE_PORT if a local runserver holds 8000.
+      - "${EMOTUNE_PORT:-8000}:8000"
+    volumes:
+      - emotune-data:/data
+      # Mounted rather than baked in: the models are 11GB+ with checkpoints,
+      # and a promoted or candidate model (ML_MODEL_PATH) needs no rebuild.
+      - ./backend/ml/models:/app/backend/ml/models:ro
+      # The GoEmotions fallback model loads from the Hugging Face cache with
+      # downloads disabled (EMOTION_GOEMOTIONS_LOCAL_ONLY), so share the host's.
+      - ${HF_CACHE_DIR:-${HOME}/.cache/huggingface}:/home/app/.cache/huggingface:ro
+    healthcheck:
+      # Any answer below 500 means Django is up. Not followed: with DEBUG off
+      # the SSL redirect alone would otherwise fail the check.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import http.client,sys; c=http.client.HTTPConnection('127.0.0.1',8000,timeout=4); c.request('GET','/django-admin/login/',headers={'Host':'localhost'}); sys.exit(c.getresponse().status>=500)"
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.4
+    # Sized for a laptop that is already short on memory: a small buffer pool,
+    # no performance_schema, few connections (one gunicorn worker, 4 threads).
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-buffer-pool-size=128M
+      - --performance-schema=OFF
+      - --max-connections=40
+    mem_limit: 512m
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-emotune}
+      MYSQL_USER: ${MYSQL_USER:-emotune}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env (see docs/SETUP.md)}
+      # No root password to manage: MySQL generates a random one at first init
+      # (printed once in `docker logs` as GENERATED ROOT PASSWORD). The app,
+      # phpMyAdmin and the tests all use MYSQL_USER instead.
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      TZ: Asia/Manila
+    ports:
+      # Localhost only: for phpMyAdmin-free tools and the test suite run from
+      # the host venv, never the LAN.
+      - "127.0.0.1:${MYSQL_HOST_PORT:-3307}:3306"
+    volumes:
+      - emotune-mysql:/var/lib/mysql
+      # Runs once, on an empty data volume: lets MYSQL_USER create the
+      # test_<database> that Django's test runner needs.
+      - ./docker/mysql-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Over TCP on purpose: the entrypoint's temporary init server listens on
+      # the socket only, so this stays unhealthy until MySQL is really ready.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u\"$$MYSQL_USER\" -p\"$$MYSQL_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 10
+    restart: unless-stopped
+
+  phpmyadmin:
+    image: phpmyadmin:5
+    mem_limit: 192m
+    environment:
+      PMA_HOST: db
+      PMA_PORT: "3306"
+      UPLOAD_LIMIT: 64M
+    ports:
+      # Localhost only: a database console must not be reachable from the LAN.
+      - "127.0.0.1:${PHPMYADMIN_PORT:-8081}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  # Uploaded profile pictures, plus the pre-MySQL SQLite database kept as a backup.
+  emotune-data:
+  # The MySQL data directory.
+  emotune-mysql:

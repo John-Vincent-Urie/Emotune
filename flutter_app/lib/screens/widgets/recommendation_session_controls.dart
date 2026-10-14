@@ -7,25 +7,13 @@ class RecommendationSessionControls extends StatelessWidget {
     super.key,
     required this.sessionLengthMinutes,
     required this.onSessionLengthChanged,
-    required this.familiarity,
-    required this.onFamiliarityChanged,
-    required this.preferInstrumental,
-    required this.onPreferInstrumentalChanged,
-    required this.trainOnThisSession,
-    required this.onTrainOnThisSessionChanged,
     this.title = 'Session Studio',
     this.subtitle =
-        'Shape how long you want support, the taste of the playlist, and whether this session should teach personalization.',
+        'Shape how long you want support.',
   });
 
   final int? sessionLengthMinutes;
   final ValueChanged<int?> onSessionLengthChanged;
-  final String familiarity;
-  final ValueChanged<String> onFamiliarityChanged;
-  final bool preferInstrumental;
-  final ValueChanged<bool> onPreferInstrumentalChanged;
-  final bool trainOnThisSession;
-  final ValueChanged<bool> onTrainOnThisSessionChanged;
   final String title;
   final String subtitle;
 
@@ -36,163 +24,82 @@ class RecommendationSessionControls extends StatelessWidget {
     _NullableIntOption(value: 45, label: '45 min'),
   ];
 
-  static const List<_StringOption> _familiarityOptions = [
-    _StringOption(value: 'balanced', label: 'Balanced'),
-    _StringOption(value: 'familiar', label: 'More familiar'),
-    _StringOption(value: 'discovery', label: 'More discovery'),
-  ];
-
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = context.emoColors;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141414) : Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2A2A2A) : Colors.black12,
-        ),
-        boxShadow: isDark
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 18,
-                  offset: const Offset(0, 10),
-                ),
-              ],
+        color: colors.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  gradient: AppColors.buttonGradient,
-                  borderRadius: BorderRadius.circular(14),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.buttonGradient,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.tune_rounded,
+                    color: Color(0xFF08130D),
+                    size: 16,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.tune_rounded,
-                  color: Colors.black,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: colors.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: isDark ? Colors.white70 : Colors.black54,
-                        fontSize: 12,
-                        height: 1.45,
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: colors.textSecondary,
+                          fontSize: 11.5,
+                          height: 1.4,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
-          const _SectionLabel(
-            label: 'Session Length',
+          const _FieldLabel(
+            label: 'Session length',
             helper: 'Auto leaves the session untimed until you pick a length.',
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: _sessionOptions.map((option) {
-              final isSelected = option.value == sessionLengthMinutes;
-              return ChoiceChip(
-                label: Text(option.label),
-                selected: isSelected,
-                onSelected: (_) => onSessionLengthChanged(option.value),
-                selectedColor: AppColors.gradientStart.withValues(alpha: 0.18),
-                labelStyle: TextStyle(
-                  color: isSelected
-                      ? (isDark ? Colors.white : Colors.black87)
-                      : (isDark ? Colors.white70 : Colors.black54),
-                ),
-                side: BorderSide(
-                  color: isSelected
-                      ? AppColors.gradientStart
-                      : (isDark ? Colors.white12 : Colors.black12),
-                ),
-                backgroundColor: isDark
-                    ? const Color(0xFF1B1B1B)
-                    : Colors.grey.shade50,
+              return _SegButton(
+                label: option.label,
+                selected: option.value == sessionLengthMinutes,
+                onTap: () => onSessionLengthChanged(option.value),
               );
             }).toList(),
-          ),
-          const SizedBox(height: 16),
-          const _SectionLabel(
-            label: 'Taste Control',
-            helper:
-                'Balanced opens with the EmoTune list for that emotion, More '
-                'familiar opens with the songs you hearted for it, and More '
-                'discovery pulls fresh Spotify tracks instead of the built-in '
-                'list.',
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _familiarityOptions.map((option) {
-              final isSelected = option.value == familiarity;
-              return ChoiceChip(
-                label: Text(option.label),
-                selected: isSelected,
-                onSelected: (_) => onFamiliarityChanged(option.value),
-                selectedColor: AppColors.gradientEnd.withValues(alpha: 0.18),
-                labelStyle: TextStyle(
-                  color: isSelected
-                      ? (isDark ? Colors.white : Colors.black87)
-                      : (isDark ? Colors.white70 : Colors.black54),
-                ),
-                side: BorderSide(
-                  color: isSelected
-                      ? AppColors.gradientEnd
-                      : (isDark ? Colors.white12 : Colors.black12),
-                ),
-                backgroundColor: isDark
-                    ? const Color(0xFF1B1B1B)
-                    : Colors.grey.shade50,
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 16),
-          _ToggleRow(
-            title: 'Prefer instrumental',
-            subtitle: 'Search for instrumental music first, then rank it above '
-                'vocal-led tracks.',
-            value: preferInstrumental,
-            onChanged: onPreferInstrumentalChanged,
-          ),
-          const SizedBox(height: 10),
-          _ToggleRow(
-            title: 'Train on this session',
-            subtitle: 'Turn this off when you want a private or experimental session.',
-            value: trainOnThisSession,
-            onChanged: onTrainOnThisSessionChanged,
           ),
         ],
       ),
@@ -200,26 +107,23 @@ class RecommendationSessionControls extends StatelessWidget {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({
-    required this.label,
-    required this.helper,
-  });
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel({required this.label, required this.helper});
 
   final String label;
   final String helper;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = context.emoColors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
           style: TextStyle(
-            color: isDark ? Colors.white : Colors.black87,
-            fontSize: 13,
+            color: colors.textPrimary,
+            fontSize: 12.5,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -227,7 +131,7 @@ class _SectionLabel extends StatelessWidget {
         Text(
           helper,
           style: TextStyle(
-            color: isDark ? Colors.white60 : Colors.black45,
+            color: colors.textSecondary,
             fontSize: 11,
             height: 1.4,
           ),
@@ -237,64 +141,57 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _ToggleRow extends StatelessWidget {
-  const _ToggleRow({
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.onChanged,
+/// The pill button used for session length / taste control -- a checkmark
+/// prefixes the label when selected, matching the HTML mockup's `.seg-btn`.
+class _SegButton extends StatelessWidget {
+  const _SegButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
   });
 
-  final String title;
-  final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1A1A) : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? Colors.white10 : Colors.black12,
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black87,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: isDark ? Colors.white60 : Colors.black45,
-                    fontSize: 11,
-                    height: 1.4,
-                  ),
-                ),
-              ],
+    final colors = context.emoColors;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+          decoration: BoxDecoration(
+            color: colors.cardAlt,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected ? colors.accentText : colors.divider,
+              width: 1.4,
             ),
           ),
-          const SizedBox(width: 12),
-          Switch.adaptive(
-            value: value,
-            activeThumbColor: AppColors.accent,
-            onChanged: onChanged,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected) ...[
+                Icon(Icons.check_rounded, size: 12, color: colors.accentText),
+                const SizedBox(width: 5),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? colors.textPrimary : colors.textSecondary,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -307,15 +204,5 @@ class _NullableIntOption {
   });
 
   final int? value;
-  final String label;
-}
-
-class _StringOption {
-  const _StringOption({
-    required this.value,
-    required this.label,
-  });
-
-  final String value;
   final String label;
 }

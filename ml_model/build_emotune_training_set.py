@@ -56,6 +56,9 @@ SOURCES = (
     ("emotune_dataset_1200.csv", True),
     ("emotune_custom_dataset.csv", True),
     ("surveyed_datasets.csv", False),
+    # Hand-labelled by the team (2026-10-12); its "unclear" rows have no
+    # emotion and are dropped by canonical_label.
+    ("emotune_labeled_dataset.csv", True),
 )
 
 # surveyed_datasets.csv predates the canonical label names.

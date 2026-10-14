@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/recommendation_studio_provider.dart';
@@ -24,7 +25,18 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => PlayerProvider()),
+        // The player refuses Spotify playback, and stops it on disconnect,
+        // whenever the signed-in account has no Spotify link.
+        ChangeNotifierProxyProvider<AuthProvider, PlayerProvider>(
+          create: (_) => PlayerProvider(),
+          update: (_, auth, player) {
+            final user = auth.user;
+            return player!
+              ..setSpotifyAccountLinked(
+                user == null ? null : user['is_spotify_connected'] == true,
+              );
+          },
+        ),
         ChangeNotifierProvider<RecommendationStudioProvider>.value(
           value: recommendationStudioProvider,
         ),
@@ -42,9 +54,27 @@ class EmoTuneApp extends StatefulWidget {
 }
 
 class _EmoTuneAppState extends State<EmoTuneApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+
   @override
   void initState() {
     super.initState();
+    // ApiService has already cleared the tokens by the time this runs; reset
+    // the signed-in state and, if the user was inside the app, send them to
+    // login instead of leaving every screen failing with 401s.
+    ApiService.onSessionExpired = () async {
+      if (!mounted || !context.read<AuthProvider>().handleSessionExpired()) {
+        return;
+      }
+      _navigatorKey.currentState
+          ?.pushNamedAndRemoveUntil('/login', (route) => false);
+      _messengerKey.currentState?.showSnackBar(
+        const SnackBar(
+          content: Text('Your session expired. Please sign in again.'),
+        ),
+      );
+    };
     // Load saved user session
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AuthProvider>().loadUser();
@@ -55,12 +85,22 @@ class _EmoTuneAppState extends State<EmoTuneApp> {
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
 
+    // A theme swap repaints every token at once; crossfading it reads as the
+    // app changing its mind rather than blinking. MediaQuery is available here
+    // because View installs it above MaterialApp.
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+
     return MaterialApp(
+      navigatorKey: _navigatorKey,
+      scaffoldMessengerKey: _messengerKey,
       title: 'EmoTune',
       debugShowCheckedModeBanner: false,
       theme: buildLightTheme(),
       darkTheme: buildDarkTheme(),
       themeMode: themeProvider.themeMode,
+      themeAnimationDuration:
+          reduceMotion ? Duration.zero : const Duration(milliseconds: 400),
+      themeAnimationCurve: Curves.easeInOut,
       initialRoute: '/',
       routes: {
         '/': (_) => const SplashScreen(),
@@ -70,7 +110,29 @@ class _EmoTuneAppState extends State<EmoTuneApp> {
         '/home': (_) => const MainShell(),
       },
       builder: (context, child) {
-        return child!;
+        // Android's navigation bar does not follow the app theme on its own.
+        // Only the navigation-bar fields: the status bar stays with each
+        // screen, since the auth screens are dark whatever the theme.
+        //
+        // The theme comes from ThemeProvider, not Theme.of(context): this
+        // builder's context sits above MaterialApp's theme, so it always read
+        // light, and dark mode got dark icons. On Android 15+ the bar is drawn
+        // over the app and its colour is ignored; with dark icons Android then
+        // added a light contrast scrim -- the light strip under the dark app.
+        // Disabling the enforced scrim lets the app's own background show.
+        final isDark = themeProvider.isDark;
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: SystemUiOverlayStyle(
+            systemNavigationBarColor: isDark
+                ? EmoTuneColors.dark.background
+                : EmoTuneColors.light.background,
+            systemNavigationBarIconBrightness:
+                isDark ? Brightness.light : Brightness.dark,
+            systemNavigationBarDividerColor: Colors.transparent,
+            systemNavigationBarContrastEnforced: false,
+          ),
+          child: child!,
+        );
       },
     );
   }

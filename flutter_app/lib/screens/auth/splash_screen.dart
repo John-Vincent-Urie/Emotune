@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
-import '../../widgets/emotune_logo.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+
+import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/emotune_backdrop.dart';
+import '../../widgets/emotune_buttons.dart';
+import '../../widgets/emotune_logo.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -30,11 +37,24 @@ class _SplashScreenState extends State<SplashScreen>
     );
     _controller.forward();
 
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/welcome');
-      }
-    });
+    // Hold the splash for its usual three seconds, but route on the restored
+    // session: going straight to Welcome logged every returning user out on
+    // each launch or page reload even though their tokens were still valid.
+    Future.delayed(const Duration(seconds: 3), _continue);
+  }
+
+  bool _routed = false;
+
+  Future<void> _continue() async {
+    if (_routed) return;
+    _routed = true;
+    final auth = context.read<AuthProvider>();
+    await auth.loadUser();
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(
+      context,
+      auth.isLoggedIn || auth.hasSavedSession ? '/home' : '/welcome',
+    );
   }
 
   @override
@@ -45,54 +65,45 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: FadeTransition(
-          opacity: _fadeAnim,
-          child: ScaleTransition(
-            scale: _scaleAnim,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const EmoTuneLogo(size: 130),
-                const SizedBox(height: 24),
-                const Text(
-                  'Welcome to EmoTune !',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Georgia',
-                    fontStyle: FontStyle.italic,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: kAlwaysDarkSystemUi,
+      child: Scaffold(
+        backgroundColor: AppColors.darkBg,
+        body: Stack(
+          children: [
+            const Positioned.fill(child: EmoTuneBackdrop(showParticles: false)),
+            Center(
+              child: FadeTransition(
+                opacity: _fadeAnim,
+                child: ScaleTransition(
+                  scale: _scaleAnim,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const EmoTuneLogo(size: 130),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Let your mood decide your music',
+                        style: GoogleFonts.manrope(
+                          color: AppColors.textSecondary,
+                          fontSize: 14,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                      const SizedBox(height: 48),
+                      SizedBox(
+                        width: 200,
+                        child: EmoTuneSecondaryButton(
+                          label: 'Continue',
+                          onPressed: _continue,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Let your mood decide your music',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                const SizedBox(height: 60),
-                SizedBox(
-                  width: 200,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pushReplacementNamed(context, '/welcome'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    child: const Text('Continue', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

@@ -1,20 +1,34 @@
+import logging
+
 from rest_framework import status, permissions
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model, authenticate
 from django.db.models import Count
+from django.utils import timezone
+from api.models import emotion_display_names
+from .emails import send_password_reset_code
 from .models import (
-    EMOTION_CHOICES, FavoriteTrack, ListeningSession, PromptHistory, UserPreference,
+    EMOTION_CHOICES, FavoriteTrack, ListeningSession, PasswordResetCode,
+    PromptHistory,
 )
 from .throttles import (
-    LoginEmailThrottle, LoginIPThrottle, PasswordChangeThrottle, RegisterThrottle,
+    LoginEmailThrottle, LoginIPThrottle, PasswordChangeThrottle,
+    PasswordResetEmailThrottle, PasswordResetIPThrottle,
+    PasswordResetVerifyEmailThrottle, PasswordResetVerifyIPThrottle,
+    RegisterThrottle,
 )
 from .serializers import (
     UserSerializer, RegisterSerializer, ChangePasswordSerializer,
-    FavoriteTrackSerializer, PromptHistorySerializer, UserPreferenceSerializer
+    FavoriteTrackSerializer, PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer, PasswordResetVerifySerializer,
+    PromptHistorySerializer
 )
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -41,9 +55,14 @@ def register(request):
 @permission_classes([permissions.AllowAny])
 @throttle_classes([LoginIPThrottle, LoginEmailThrottle])
 def login(request):
-    email = request.data.get('email')
+    # Register stores addresses trimmed and lowercased, but phone keyboards
+    # capitalize the first letter and admin-made accounts can be mixed case, so
+    # match the stored address case-insensitively (as password reset does).
+    email = str(request.data.get('email') or '').strip()
     password = request.data.get('password')
-    user = authenticate(request, username=email, password=password)
+    matches = list(User.objects.filter(email__iexact=email).values_list('email', flat=True))
+    stored_email = email.lower() if email.lower() in matches else (matches[0] if matches else email)
+    user = authenticate(request, username=stored_email, password=password)
     if user:
         refresh = RefreshToken.for_user(user)
         return Response({
@@ -100,7 +119,7 @@ def profile(request):
 @api_view(['POST'])
 @throttle_classes([PasswordChangeThrottle])
 def change_password(request):
-    serializer = ChangePasswordSerializer(data=request.data)
+    serializer = ChangePasswordSerializer(data=request.data, context={'user': request.user})
     if serializer.is_valid():
         user = request.user
         if not user.check_password(serializer.validated_data['old_password']):
@@ -111,13 +130,147 @@ def change_password(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['PUT'])
-def update_artists(request):
-    """Update preferred artists"""
-    artists = request.data.get('preferred_artists', [])
-    request.user.preferred_artists = artists
-    request.user.save()
-    return Response({'preferred_artists': artists})
+# Forgotten-password reset, by one-time code emailed to the account address.
+
+# Returned whether or not the address has an account: answering differently
+# would turn this endpoint into a way to test which emails are registered.
+_RESET_SENT_MESSAGE = (
+    'If that email has an EmoTune account, a reset code is on its way.'
+)
+_RESET_CODE_INVALID = 'That code is invalid or has expired. Request a new one.'
+
+
+def _resolve_reset_code(email, code):
+    """Look up the live code for an address and check it.
+
+    Returns ``(user, record, error_response)`` with exactly one of the first
+    pair or the error populated. A wrong guess is counted here, so both the
+    verify and confirm endpoints burn attempts at the same rate.
+    """
+    user = User.objects.filter(email__iexact=email).first()
+    record = None
+    if user is not None:
+        record = (
+            PasswordResetCode.objects
+            .filter(user=user, used_at__isnull=True)
+            .order_by('-created_at')
+            .first()
+        )
+
+    # No account, no code, expired, already spent, or out of attempts all
+    # collapse to one answer -- each distinction would leak something.
+    if user is None or record is None or not record.is_usable:
+        return None, None, Response(
+            {'error': _RESET_CODE_INVALID},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not record.matches(code):
+        record.attempts += 1
+        record.save(update_fields=['attempts'])
+        if record.attempts_remaining == 0:
+            return None, None, Response(
+                {'error': 'Too many wrong codes. Request a new one.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        # The count goes in the message as well as the field: the app surfaces
+        # `error` verbatim, and "4 tries left" is the part that changes what
+        # the user does next.
+        tries = record.attempts_remaining
+        noun = 'try' if tries == 1 else 'tries'
+        return None, None, Response(
+            {
+                'error': f'That code is not right. {tries} {noun} left.',
+                'attempts_remaining': tries,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return user, record, None
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+@throttle_classes([PasswordResetIPThrottle, PasswordResetEmailThrottle])
+def password_reset_request(request):
+    """Email a one-time code to the address, if an account owns it."""
+    serializer = PasswordResetRequestSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    email = serializer.validated_data['email']
+    user = User.objects.filter(email__iexact=email).first()
+
+    if user is not None:
+        record, code = PasswordResetCode.issue(user)
+        try:
+            send_password_reset_code(user, code)
+        except Exception:
+            # The code is useless to a user who never received it, and leaving
+            # it live would only eat into their attempt budget later.
+            record.delete()
+            logger.exception('Password reset mail failed for %s', email)
+            # This does reveal that the address exists, but only while mail is
+            # broken -- and a silent success would strand the user instead.
+            return Response(
+                {'error': 'Could not send the code right now. Try again shortly.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+    return Response({
+        'message': _RESET_SENT_MESSAGE,
+        'expires_in_minutes': int(PasswordResetCode.LIFETIME.total_seconds() // 60),
+        'code_length': PasswordResetCode.CODE_LENGTH,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+@throttle_classes([PasswordResetVerifyIPThrottle, PasswordResetVerifyEmailThrottle])
+def password_reset_verify(request):
+    """Check a code without spending it, so the app can gate its next step."""
+    serializer = PasswordResetVerifySerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    _user, record, error = _resolve_reset_code(
+        serializer.validated_data['email'],
+        serializer.validated_data['code'],
+    )
+    if error is not None:
+        return error
+    return Response({'valid': True, 'expires_at': record.expires_at})
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+@throttle_classes([PasswordResetVerifyIPThrottle, PasswordResetVerifyEmailThrottle])
+def password_reset_confirm(request):
+    """Spend the code and set the new password."""
+    serializer = PasswordResetConfirmSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    user, record, error = _resolve_reset_code(
+        serializer.validated_data['email'],
+        serializer.validated_data['code'],
+    )
+    if error is not None:
+        return error
+
+    user.set_password(serializer.validated_data['new_password'])
+    user.save(update_fields=['password'])
+
+    record.used_at = timezone.now()
+    record.save(update_fields=['used_at'])
+    PasswordResetCode.objects.filter(user=user, used_at__isnull=True).delete()
+
+    # Whoever knew the old password may still hold a live session. A reset is
+    # how someone recovers a compromised account, so end those sessions too.
+    for token in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=token)
+
+    return Response({'message': 'Password updated. You can log in with it now.'})
 
 
 # Favorites
@@ -177,7 +330,10 @@ def emotion_stats(request):
         .values('detected_emotion')\
         .annotate(count=Count('id'))\
         .order_by('-count')
-    return Response(list(stats))
+    display_names = emotion_display_names()
+    return Response([
+        {**row, 'display_name': display_names.get(row['detected_emotion'])} for row in stats
+    ])
 
 
 # A listen past this share of a track is the user staying with the pick.
@@ -203,13 +359,11 @@ def _listen_was_meaningful(listen_seconds, track_length_seconds):
 def update_listen_time(request):
     """Record how a playback ended.
 
-    Every playback of a real track is written to ListeningSession, including
-    short ones. That is deliberate: a skip is the only negative example the
-    music picker's ranker ever sees, and dropping short listens here is what
-    left the training set with 12 rows that were all positives.
-
-    Preference counters are a different question and keep their own bar -- a
-    four-second skip must not teach the personalizer that you like a track.
+    Advances the listening session's progress (the session card and the
+    feel-better check-ins read it) and keeps the listening history. Nothing here
+    trains or personalizes anything any more: the songs are the therapist's
+    fixed list, so the old preference counters and "train on this session"
+    switch went with the ranking (2026-10-10).
     """
     track_id = request.data.get('track_id')
     emotion = request.data.get('emotion')
@@ -218,13 +372,26 @@ def update_listen_time(request):
     artist_name = request.data.get('artist_name', '')
     item_type = str(request.data.get('item_type', 'track') or 'track').strip().lower()
     history_id = request.data.get('history_id')
-    train_session = request.data.get('train_session', True)
     ended_reason = str(request.data.get('ended_reason', '') or '').strip().lower()
 
     try:
         track_length_seconds = max(int(request.data.get('duration_ms') or 0), 0) / 1000.0
     except (TypeError, ValueError):
         track_length_seconds = 0.0
+    try:
+        duration = max(int(duration or 0), 0)
+    except (TypeError, ValueError):
+        duration = 0
+    if history_id not in (None, ''):
+        try:
+            history_id = int(history_id)
+        except (TypeError, ValueError):
+            history_id = 0
+        if history_id <= 0:
+            return Response(
+                {'error': 'history_id must be a positive whole number.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     prompt_history = None
     if history_id:
@@ -248,10 +415,6 @@ def update_listen_time(request):
         prompt_history.music_picker_data = music_picker_data
         prompt_history.save(update_fields=['session_duration', 'music_picker_data'])
 
-        personalization = music_picker_data.get('personalization')
-        if isinstance(personalization, dict) and personalization.get('train_session') is False:
-            train_session = False
-
     if (
         not track_id
         or not emotion
@@ -260,9 +423,6 @@ def update_listen_time(request):
     ):
         return Response({'status': 'skipped'})
 
-    if str(train_session).strip().lower() in {'false', '0', 'no'}:
-        return Response({'status': 'tracking_disabled'})
-
     listen_seconds = max(int(duration or 0), 0)
     played_through = (
         ended_reason == 'completed'
@@ -270,9 +430,7 @@ def update_listen_time(request):
     )
 
     if prompt_history is not None:
-        # Written for every playback, however short. The candidates that were
-        # offered alongside this one are already on the prompt, so one row here
-        # turns a whole candidate set into a labelled training group.
+        # Listening history: every playback of a real track, however short.
         ListeningSession.objects.update_or_create(
             user=request.user,
             prompt_history=prompt_history,
@@ -284,17 +442,4 @@ def update_listen_time(request):
             },
         )
 
-    if not played_through:
-        # A skip is recorded above, but it is not evidence of a preference.
-        return Response({'status': 'recorded', 'completed': False})
-
-    pref, _created = UserPreference.objects.get_or_create(
-        user=request.user,
-        emotion=emotion,
-        spotify_track_id=track_id,
-        defaults={'track_name': track_name, 'artist_name': artist_name}
-    )
-    pref.play_count += 1
-    pref.total_listen_time += listen_seconds
-    pref.save()
-    return Response({'status': 'updated', 'completed': True})
+    return Response({'status': 'recorded', 'completed': played_through})

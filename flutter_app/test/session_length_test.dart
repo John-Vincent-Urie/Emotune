@@ -72,12 +72,6 @@ void main() {
             child: RecommendationSessionControls(
               sessionLengthMinutes: sessionLengthMinutes,
               onSessionLengthChanged: onSessionLengthChanged,
-              familiarity: 'balanced',
-              onFamiliarityChanged: (_) {},
-              preferInstrumental: false,
-              onPreferInstrumentalChanged: (_) {},
-              trainOnThisSession: true,
-              onTrainOnThisSessionChanged: (_) {},
             ),
           ),
         ),
@@ -98,7 +92,7 @@ void main() {
         onSessionLengthChanged: tapped.add,
       ));
 
-      expect(find.text('Session Length'), findsOneWidget);
+      expect(find.text('Session length'), findsOneWidget);
       for (final label in ['Auto', '15 min', '20 min', '45 min']) {
         expect(lengthChip(label), findsOneWidget);
       }
@@ -118,17 +112,24 @@ void main() {
         onSessionLengthChanged: (_) {},
       ));
 
-      ChoiceChip chipFor(String label) => tester.widget<ChoiceChip>(
-            find.ancestor(
-              of: lengthChip(label),
-              matching: find.byType(ChoiceChip),
-            ),
-          );
+      // The chips are the design system's segmented pills now, not
+      // ChoiceChips; the selected state they announce is what to check.
+      bool? isSelected(String label) => tester
+          .widget<Semantics>(
+            find
+                .ancestor(
+                  of: lengthChip(label),
+                  matching: find.byType(Semantics),
+                )
+                .first,
+          )
+          .properties
+          .selected;
 
-      expect(chipFor('20 min').selected, isTrue);
-      expect(chipFor('Auto').selected, isFalse);
-      expect(chipFor('15 min').selected, isFalse);
-      expect(chipFor('45 min').selected, isFalse);
+      expect(isSelected('20 min'), isTrue);
+      expect(isSelected('Auto'), isFalse);
+      expect(isSelected('15 min'), isFalse);
+      expect(isSelected('45 min'), isFalse);
     });
 
     testWidgets('outcome mode and check-in rhythm are gone', (tester) async {
@@ -145,8 +146,11 @@ void main() {
       expect(find.text('Calm Me Down'), findsNothing);
       expect(find.text('Check-In Rhythm'), findsNothing);
       expect(find.text('Every 3'), findsNothing);
-      expect(find.text('Session Length'), findsOneWidget);
-      expect(find.text('Taste Control'), findsOneWidget);
+      expect(find.text('Session length'), findsOneWidget);
+      // Removed 2026-10-10: the therapist's list plays in its own order.
+      expect(find.text('Taste control'), findsNothing);
+      expect(find.text('More familiar'), findsNothing);
+      expect(find.text('Prefer instrumental'), findsNothing);
     });
   });
 }

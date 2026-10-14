@@ -12,6 +12,8 @@ import requests
 from django.conf import settings
 from django.utils import timezone
 
+from .. import http_client
+from . import rate_limit
 from .utils import (
     _build_failure_response,
     _build_request_exception_failure_response,
@@ -20,6 +22,7 @@ from .utils import (
     _extract_error_details,
     _normalize_scopes,
     _parse_response_json,
+    _parse_retry_after,
     _token_payload_summary,
 )
 from .constants import SPOTIFY_AUTH_URL, SPOTIFY_TOKEN_URL, SPOTIFY_API_BASE
@@ -65,7 +68,7 @@ class SpotifyAuthClient:
         resolved_redirect_uri = redirect_uri or self.redirect_uri
         auth = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
         try:
-            response = requests.post(
+            response = http_client.post(
                 SPOTIFY_TOKEN_URL,
                 headers={
                     'Authorization': f'Basic {auth}',
@@ -124,7 +127,7 @@ class SpotifyAuthClient:
         """Refresh an access token"""
         auth = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
         try:
-            response = requests.post(
+            response = http_client.post(
                 SPOTIFY_TOKEN_URL,
                 headers={
                     'Authorization': f'Basic {auth}',
@@ -209,7 +212,7 @@ class SpotifyAuthClient:
 
         auth = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
         try:
-            response = requests.post(
+            response = http_client.post(
                 SPOTIFY_TOKEN_URL,
                 headers={
                     'Authorization': f'Basic {auth}',
@@ -392,8 +395,20 @@ class SpotifyAuthClient:
         timeout_seconds=None,
     ):
         """Call a Spotify Web API endpoint and return a debug-friendly payload."""
+        # While Spotify has us rate-limited, every call would just add another
+        # 429 (and can lengthen the block), so answer locally instead.
+        if rate_limit.remaining_seconds() > 0:
+            skipped = _build_failure_response(
+                status_code=429,
+                error_message='Skipped: Spotify is rate-limiting EmoTune; waiting out its Retry-After.',
+                endpoint=path,
+                retry_after=rate_limit.retry_after_seconds(),
+            )
+            skipped['skipped_during_cooldown'] = True
+            return skipped
+
         try:
-            response = requests.request(
+            response = http_client.request(
                 method,
                 f"{SPOTIFY_API_BASE}{path}",
                 headers={'Authorization': f'Bearer {token}'},
@@ -448,6 +463,9 @@ class SpotifyAuthClient:
 
         error_details = _extract_error_details(payload, response_text)
         error_message = error_details['error_message'] or response_text[:300]
+        retry_after = _parse_retry_after(response.headers.get('Retry-After'))
+        if response.status_code == 429:
+            rate_limit.start_cooldown(retry_after)
 
         logger.warning(
             "Spotify %s %s failed with status %s: %s",
@@ -463,6 +481,7 @@ class SpotifyAuthClient:
             response_json=payload,
             error_code=error_details['error_code'],
             endpoint=path,
+            retry_after=retry_after,
         )
 
     def _spotify_get(self, token, path, params=None, timeout_seconds=None):
