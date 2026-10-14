@@ -1,0 +1,9 @@
+== Backend (Django + coverage.py) ==
+Ran 259 tests in 84.281s
+OK
+Backend coverage (stmt+branch): 83%
+== Flutter (flutter test --coverage) ==
+All tests passed!
+Flutter line coverage: 46.1%
+
+Reports written to /home/uriediska/Documents/Capstone/EmoTune-Capstone_project/test-reports
