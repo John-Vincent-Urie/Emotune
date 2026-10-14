@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% if success %}Spotify connected{% else %}Spotify connection failed{% endif %} · EmoTune</title>
+    <style>
+        :root { color-scheme: dark; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #050505;
+            color: #f5f5f5;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            padding: 24px;
+        }
+        .card { max-width: 420px; text-align: center; }
+        .status { font-size: 40px; line-height: 1; margin-bottom: 16px; }
+        h1 { font-size: 22px; margin: 0 0 12px; }
+        p { color: #b5b5b5; line-height: 1.5; margin: 0 0 24px; font-size: 15px; }
+        a.button {
+            display: inline-block;
+            background: #a6f75b;
+            color: #05170a;
+            font-weight: 600;
+            text-decoration: none;
+            padding: 14px 28px;
+            border-radius: 999px;
+        }
+        .hint { margin-top: 20px; font-size: 13px; color: #7a7a7a; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="status">{% if success %}&#127925;{% else %}&#9888;&#65039;{% endif %}</div>
+        <h1>{% if success %}Spotify connected{% else %}Spotify connection failed{% endif %}</h1>
+        <p>{{ message }}</p>
+        <a class="button" href="{{ return_uri }}">Return to EmoTune</a>
+        <div class="hint">If EmoTune does not reopen on its own, tap the button above.</div>
+    </div>
+    <script>
+        // Hand control straight back to the app. Browsers block a scheme
+        // redirect that is not tied to a user gesture in some contexts, so the
+        // button above stays as the fallback.
+        window.setTimeout(function () {
+            window.location.href = {{ return_uri_json }};
+        }, 400);
+    </script>
+</body>
+</html>

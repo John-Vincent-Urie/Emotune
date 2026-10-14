@@ -1,0 +1,534 @@
+{
+  "seed": 42,
+  "model_name": "bert-base-uncased",
+  "stage_sequence": [
+    "text_emotion_150k",
+    "emotune_custom"
+  ],
+  "stage_summaries": [
+    {
+      "stage": "text_emotion_150k",
+      "description": "Text Emotion Classification 150k pre-training",
+      "num_epochs": 1.0,
+      "train_examples": 9836,
+      "validation_examples": 1004,
+      "train_metrics": {
+        "train_runtime": 2716.2981,
+        "train_samples_per_second": 3.621,
+        "train_steps_per_second": 0.226,
+        "total_flos": 323526992411136.0,
+        "train_loss": 0.5821326554306154,
+        "epoch": 1.0
+      },
+      "validation_metrics": {
+        "eval_loss": 0.18841058015823364,
+        "eval_accuracy": 0.9392430278884463,
+        "eval_precision": 0.9395158274036818,
+        "eval_recall": 0.9392430278884463,
+        "eval_f1": 0.9391187107046798,
+        "eval_macro_f1": 0.9442958982929227,
+        "eval_runtime": 73.5683,
+        "eval_samples_per_second": 13.647,
+        "eval_steps_per_second": 1.713,
+        "epoch": 1.0
+      },
+      "class_weights": {
+        "happy": 614.75,
+        "sad": 1.0,
+        "angry": 0.61475,
+        "motivational": 0.61475,
+        "fear": 0.61475,
+        "depressing": 1.348136,
+        "surprising": 1.0,
+        "stressed": 1.337867,
+        "calm": 409.833344,
+        "lonely": 1.0,
+        "romantic": 0.61475,
+        "nostalgic": 1.0,
+        "mixed": 1.0
+      },
+      "metadata": {
+        "source_dataset": "text_emotion_classification.cleaned.csv",
+        "rows_before_capping": 21901,
+        "max_samples_per_class": 2000,
+        "train_label_distribution": {
+          "happy": 2,
+          "angry": 2000,
+          "motivational": 2000,
+          "fear": 2000,
+          "depressing": 912,
+          "stressed": 919,
+          "calm": 3,
+          "romantic": 2000
+        },
+        "eval_label_distribution": {
+          "angry": 200,
+          "motivational": 200,
+          "fear": 200,
+          "depressing": 102,
+          "stressed": 102,
+          "romantic": 200
+        }
+      }
+    },
+    {
+      "stage": "emotune_custom",
+      "description": "EmoTune final fine-tune",
+      "num_epochs": 4.0,
+      "train_examples": 3369,
+      "validation_examples": 99,
+      "train_metrics": {
+        "train_runtime": 3689.4029,
+        "train_samples_per_second": 3.653,
+        "train_steps_per_second": 0.229,
+        "total_flos": 443254346251776.0,
+        "train_loss": 0.4324193120850206,
+        "epoch": 4.0
+      },
+      "validation_metrics": {
+        "eval_loss": 0.5570843815803528,
+        "eval_accuracy": 0.8686868686868687,
+        "eval_precision": 0.8751402918069584,
+        "eval_recall": 0.8686868686868687,
+        "eval_f1": 0.8678889737713268,
+        "eval_macro_f1": 0.8766824678589384,
+        "eval_runtime": 7.2,
+        "eval_samples_per_second": 13.75,
+        "eval_steps_per_second": 1.806,
+        "epoch": 4.0
+      },
+      "class_weights": {
+        "happy": 0.909312,
+        "sad": 0.909312,
+        "angry": 0.938963,
+        "motivational": 0.938963,
+        "fear": 0.949282,
+        "depressing": 0.938963,
+        "surprising": 0.938963,
+        "stressed": 0.938963,
+        "calm": 0.938963,
+        "lonely": 0.938963,
+        "romantic": 0.928867,
+        "nostalgic": 0.938963,
+        "mixed": 6.64497
+      },
+      "metadata": {
+        "source_dataset": "emotune_combined.csv",
+        "custom_repeat_factor": 3,
+        "train_label_distribution": {
+          "happy": 285,
+          "sad": 285,
+          "angry": 276,
+          "motivational": 276,
+          "fear": 273,
+          "depressing": 276,
+          "surprising": 276,
+          "stressed": 276,
+          "calm": 276,
+          "lonely": 276,
+          "romantic": 279,
+          "nostalgic": 276,
+          "mixed": 39
+        },
+        "eval_label_distribution": {
+          "happy": 9,
+          "sad": 8,
+          "angry": 8,
+          "motivational": 8,
+          "fear": 8,
+          "depressing": 8,
+          "surprising": 8,
+          "stressed": 9,
+          "calm": 8,
+          "lonely": 8,
+          "romantic": 8,
+          "nostalgic": 8,
+          "mixed": 1
+        },
+        "data_report": {
+          "rows_original": 1322,
+          "rows_after_cleaning": 1322,
+          "rows_removed": 0,
+          "empty_text_rows_removed": 0,
+          "empty_label_rows_removed": 0,
+          "invalid_label_rows_removed": 0,
+          "duplicate_rows_removed": 0,
+          "label_distribution": {
+            "angry": 109,
+            "calm": 108,
+            "depressing": 108,
+            "fear": 107,
+            "happy": 112,
+            "lonely": 108,
+            "mixed": 15,
+            "motivational": 108,
+            "nostalgic": 108,
+            "romantic": 109,
+            "sad": 112,
+            "stressed": 109,
+            "surprising": 109
+          },
+          "recommended_reduced_distribution": {
+            "angry": 109,
+            "calm": 108,
+            "fear_or_anxious": 107,
+            "happy": 112,
+            "motivational": 108,
+            "neutral_or_mixed": 340,
+            "romantic": 109,
+            "sad": 220,
+            "stressed": 109
+          },
+          "text_length_summary": {
+            "chars_mean": 52.29,
+            "chars_median": 53.0,
+            "words_mean": 10.39,
+            "words_median": 11.0
+          },
+          "dataset_path": "/home/uriediska/Documents/Capstone/EmoTune-Capstone_project/dataset/emotune_combined.csv"
+        }
+      }
+    }
+  ],
+  "final_results": {
+    "test_accuracy": 0.88,
+    "weighted_f1": 0.8811033182503771,
+    "macro_f1": 0.8896072630235525,
+    "test_label_distribution": {
+      "happy": 8,
+      "sad": 9,
+      "angry": 9,
+      "motivational": 8,
+      "fear": 8,
+      "depressing": 8,
+      "surprising": 9,
+      "stressed": 8,
+      "calm": 8,
+      "lonely": 8,
+      "romantic": 8,
+      "nostalgic": 8,
+      "mixed": 1
+    },
+    "confusion_matrix": [
+      [
+        7,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        9,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        9,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        7,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        8,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        4,
+        0,
+        0,
+        0,
+        4,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        8,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        6,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        7,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        7,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        7,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        8,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "confusion_matrix_labels": [
+      "happy",
+      "sad",
+      "angry",
+      "motivational",
+      "fear",
+      "depressing",
+      "surprising",
+      "stressed",
+      "calm",
+      "lonely",
+      "romantic",
+      "nostalgic",
+      "mixed"
+    ],
+    "classification_report": {
+      "happy": {
+        "precision": 1.0,
+        "recall": 0.875,
+        "f1-score": 0.9333333333333333,
+        "support": 8.0
+      },
+      "sad": {
+        "precision": 0.6,
+        "recall": 1.0,
+        "f1-score": 0.75,
+        "support": 9.0
+      },
+      "angry": {
+        "precision": 0.8181818181818182,
+        "recall": 1.0,
+        "f1-score": 0.9,
+        "support": 9.0
+      },
+      "motivational": {
+        "precision": 0.875,
+        "recall": 0.875,
+        "f1-score": 0.875,
+        "support": 8.0
+      },
+      "fear": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 8.0
+      },
+      "depressing": {
+        "precision": 0.8,
+        "recall": 0.5,
+        "f1-score": 0.6153846153846154,
+        "support": 8.0
+      },
+      "surprising": {
+        "precision": 1.0,
+        "recall": 0.8888888888888888,
+        "f1-score": 0.9411764705882353,
+        "support": 9.0
+      },
+      "stressed": {
+        "precision": 0.75,
+        "recall": 0.75,
+        "f1-score": 0.75,
+        "support": 8.0
+      },
+      "calm": {
+        "precision": 1.0,
+        "recall": 0.875,
+        "f1-score": 0.9333333333333333,
+        "support": 8.0
+      },
+      "lonely": {
+        "precision": 1.0,
+        "recall": 0.875,
+        "f1-score": 0.9333333333333333,
+        "support": 8.0
+      },
+      "romantic": {
+        "precision": 1.0,
+        "recall": 0.875,
+        "f1-score": 0.9333333333333333,
+        "support": 8.0
+      },
+      "nostalgic": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 8.0
+      },
+      "mixed": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 1.0
+      },
+      "accuracy": 0.88,
+      "macro avg": {
+        "precision": 0.9110139860139861,
+        "recall": 0.8856837606837608,
+        "f1-score": 0.8896072630235525,
+        "support": 100.0
+      },
+      "weighted avg": {
+        "precision": 0.9016363636363636,
+        "recall": 0.88,
+        "f1-score": 0.8811033182503771,
+        "support": 100.0
+      }
+    }
+  },
+  "config": {
+    "batch_size": 8,
+    "max_length": 64,
+    "learning_rate": 2e-05,
+    "warmup_ratio": 0.1,
+    "max_samples_per_class": 2000,
+    "custom_repeat_factor": 3,
+    "enable_goemotions": false,
+    "enable_dair_emotion": false,
+    "enable_text_emotion": true,
+    "enable_custom_final_stage": true,
+    "goemotions_stage_epochs": 1.0,
+    "dair_stage_epochs": 1.0,
+    "text_emotion_stage_epochs": 1.0,
+    "custom_stage_epochs": 4.0
+  }
+}

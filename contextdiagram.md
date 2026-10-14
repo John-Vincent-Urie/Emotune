@@ -10,7 +10,7 @@ A context diagram shows:
 - the **external entities** that interact with the system
 - the **data flows** that move in and out of the system
 
-At this level, the diagram must stay high-level. It should not show internal parts such as BERT, LightFM, Django apps, Flutter screens, database tables, or API endpoints.
+At this level, the diagram must stay high-level. It should not show internal parts such as BERT, the music picker, Django apps, Flutter screens, database tables, or API endpoints.
 
 ## Central Process
 
@@ -127,7 +127,7 @@ Follow these steps when creating the diagram:
 Do not place these inside the context diagram:
 
 - BERT model
-- LightFM
+- the music picker
 - Django
 - Flutter
 - database tables

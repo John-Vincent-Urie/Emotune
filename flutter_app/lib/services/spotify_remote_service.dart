@@ -110,6 +110,12 @@ class SpotifyRemoteService {
 
   Future<SpotifyAppRemoteConfig>? _configFuture;
   Stream<SpotifyRemoteEvent>? _events;
+  Future<bool>? _inFlightInteractiveAuth;
+  DateTime? _lastInteractiveAuthFailureAt;
+
+  /// How long to wait before Spotify's approval screen may be launched again
+  /// after it rejected playback.
+  static const Duration interactiveAuthCooldown = Duration(seconds: 30);
 
   bool get isSupportedPlatform =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
@@ -179,6 +185,83 @@ class SpotifyRemoteService {
     String uri, {
     bool showAuthView = false,
     bool allowForegroundLaunch = true,
+  }) async {
+    if (!showAuthView) {
+      return _invokePlayUri(
+        uri,
+        showAuthView: false,
+        allowForegroundLaunch: allowForegroundLaunch,
+      );
+    }
+    return _playUriWithInteractiveAuth(
+      uri,
+      allowForegroundLaunch: allowForegroundLaunch,
+    );
+  }
+
+  /// Interactive authorization hands control to Spotify's approval screen,
+  /// which backgrounds EmoTune and finishes asynchronously. Nothing else
+  /// stops a caller from asking again the moment an attempt fails, so a
+  /// retry-on-failure path bounces the user in and out of Spotify. Allow one
+  /// attempt at a time, and hold off for [interactiveAuthCooldown] after a
+  /// rejection instead of re-launching the approval screen immediately.
+  Future<bool> _playUriWithInteractiveAuth(
+    String uri, {
+    required bool allowForegroundLaunch,
+  }) async {
+    final inFlight = _inFlightInteractiveAuth;
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final lastFailure = _lastInteractiveAuthFailureAt;
+    if (lastFailure != null &&
+        DateTime.now().difference(lastFailure) < interactiveAuthCooldown) {
+      throw const SpotifyRemoteException(
+        'Spotify just declined playback approval on this phone. Fix the '
+        'account or approval issue, then try again.',
+        code: 'auth_cooldown',
+      );
+    }
+
+    final attempt = _runInteractiveAuth(
+      uri,
+      allowForegroundLaunch: allowForegroundLaunch,
+    );
+    _inFlightInteractiveAuth = attempt;
+    return attempt;
+  }
+
+  Future<bool> _runInteractiveAuth(
+    String uri, {
+    required bool allowForegroundLaunch,
+  }) async {
+    try {
+      final played = await _invokePlayUri(
+        uri,
+        showAuthView: true,
+        allowForegroundLaunch: allowForegroundLaunch,
+      );
+      _lastInteractiveAuthFailureAt = played ? null : DateTime.now();
+      return played;
+    } catch (_) {
+      _lastInteractiveAuthFailureAt = DateTime.now();
+      rethrow;
+    } finally {
+      _inFlightInteractiveAuth = null;
+    }
+  }
+
+  /// Clears the cooldown so an explicit user retry can reach Spotify's
+  /// approval screen again without waiting it out.
+  void resetInteractiveAuthCooldown() {
+    _lastInteractiveAuthFailureAt = null;
+  }
+
+  Future<bool> _invokePlayUri(
+    String uri, {
+    required bool showAuthView,
+    required bool allowForegroundLaunch,
   }) async {
     final config = await _loadConfig();
     final played = await _invoke<bool>('playUri', {

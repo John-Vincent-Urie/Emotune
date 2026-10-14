@@ -2,10 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/emotion_chip.dart';
 import 'package:intl/intl.dart';
+import '../../theme/emotion_names.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  const HistoryScreen({super.key, this.isActive = false});
+
+  /// MainShell keeps every tab alive inside an IndexedStack, so this screen is
+  /// only built once. Without a signal for "the tab is now on screen" the list
+  /// would keep showing whatever was on the server when the app launched.
+  final bool isActive;
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -16,26 +23,76 @@ class _HistoryScreenState extends State<HistoryScreen>
   late TabController _tabCtrl;
   List<dynamic> _history = [];
   List<dynamic> _stats = [];
-  bool _loading = true;
+  bool _loading = false;
+  bool _loadInFlight = false;
+  bool _hasLoaded = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
-    _load();
+    if (widget.isActive) {
+      _load();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant HistoryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Refetch every time the tab comes forward: a prompt submitted on Home has
+    // already written new rows by the time the user gets here.
+    if (widget.isActive && !oldWidget.isActive) {
+      _load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
-    try {
-      final hist = await ApiService.getHistory();
-      final stats = await ApiService.getEmotionStats();
+    if (_loadInFlight) return;
+    _loadInFlight = true;
+
+    // Only blank the screen out on the very first fetch. Later refreshes keep
+    // the existing rows visible so switching tabs doesn't flash a spinner.
+    if (!_hasLoaded) {
       setState(() {
-        _history = hist;
-        _stats = stats;
-        _loading = false;
+        _loading = true;
+        _error = null;
       });
-    } catch (e) {
-      setState(() => _loading = false);
+    }
+
+    try {
+      final results = await Future.wait([
+        ApiService.getHistory(),
+        ApiService.getEmotionStats(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _history = results[0];
+        _stats = results[1];
+        _loading = false;
+        _hasLoaded = true;
+        _error = null;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load your history right now.';
+      });
+    } finally {
+      _loadInFlight = false;
     }
   }
 
@@ -47,10 +104,17 @@ class _HistoryScreenState extends State<HistoryScreen>
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: const Text('History'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh),
+            onPressed: _loading ? null : _load,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabCtrl,
-          indicatorColor: AppColors.accent,
-          labelColor: AppColors.accent,
+          indicatorColor: context.emoColors.accentText,
+          labelColor: context.emoColors.accentText,
           unselectedLabelColor: isDark ? Colors.white54 : Colors.black54,
           tabs: const [
             Tab(text: 'Prompts'),
@@ -63,23 +127,67 @@ class _HistoryScreenState extends State<HistoryScreen>
           : TabBarView(
               controller: _tabCtrl,
               children: [
-                _buildHistoryList(isDark),
-                _buildPieChart(isDark),
+                RefreshIndicator(
+                  onRefresh: _load,
+                  child: _buildHistoryList(isDark),
+                ),
+                RefreshIndicator(
+                  onRefresh: _load,
+                  child: _buildPieChart(isDark),
+                ),
               ],
             ),
     );
   }
 
+  /// Placeholders have to stay scrollable or pull-to-refresh can't be started
+  /// from an empty tab.
+  Widget _buildPlaceholder(bool isDark, String message, {bool isError = false}) {
+    return LayoutBuilder(
+      builder: (ctx, constraints) => ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: isDark ? Colors.white54 : Colors.black54),
+                    ),
+                  ),
+                  if (isError) ...[
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: _load,
+                      child: const Text('Try again'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHistoryList(bool isDark) {
+    if (_error != null && _history.isEmpty) {
+      return _buildPlaceholder(isDark, _error!, isError: true);
+    }
     if (_history.isEmpty) {
-      return Center(
-        child: Text('No history yet',
-            style: TextStyle(
-                color: isDark ? Colors.white54 : Colors.black54)),
-      );
+      return _buildPlaceholder(isDark, 'No history yet');
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       itemCount: _history.length,
       itemBuilder: (ctx, i) {
@@ -92,9 +200,9 @@ class _HistoryScreenState extends State<HistoryScreen>
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+            color: isDark ? AppColors.darkCard : Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withOpacity(0.3)),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,14 +213,19 @@ class _HistoryScreenState extends State<HistoryScreen>
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.15),
+                      color: color.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: color),
                     ),
+                    // The mood color stays on the tint and border; as text
+                    // several moods fell under 3:1 in one theme or the other.
                     child: Text(
-                      emotion.toUpperCase(),
+                      emotionDisplayName(
+                        emotion,
+                        serverDisplayName: item['detected_emotion_display'],
+                      ).toUpperCase(),
                       style: TextStyle(
-                          color: color,
+                          color: context.emoColors.textPrimary,
                           fontSize: 11,
                           fontWeight: FontWeight.bold),
                     ),
@@ -122,7 +235,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                     Text(
                       DateFormat('MMM d, h:mm a').format(date.toLocal()),
                       style: TextStyle(
-                          color: isDark ? Colors.white38 : Colors.black38,
+                          color: context.emoColors.textSecondary,
                           fontSize: 11),
                     ),
                 ],
@@ -140,7 +253,7 @@ class _HistoryScreenState extends State<HistoryScreen>
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.05),
+                  color: color.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -161,15 +274,17 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Widget _buildPieChart(bool isDark) {
+    if (_error != null && _stats.isEmpty) {
+      return _buildPlaceholder(isDark, _error!, isError: true);
+    }
     if (_stats.isEmpty) {
-      return Center(
-        child: Text('No emotion data yet',
-            style: TextStyle(
-                color: isDark ? Colors.white54 : Colors.black54)),
-      );
+      return _buildPlaceholder(isDark, 'No emotion data yet');
     }
 
     final total = _stats.fold<int>(0, (sum, s) => sum + (s['count'] as int));
+    if (total == 0) {
+      return _buildPlaceholder(isDark, 'No emotion data yet');
+    }
 
     final sections = _stats.map<PieChartSectionData>((s) {
       final emotion = s['detected_emotion'] as String;
@@ -182,12 +297,16 @@ class _HistoryScreenState extends State<HistoryScreen>
         value: pct,
         title: '${pct.toStringAsFixed(0)}%',
         radius: 80,
-        titleStyle: const TextStyle(
-            color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+        // White on the yellow and tan slices was under 2:1.
+        titleStyle: TextStyle(
+            color: EmotionChip.inkFor(color),
+            fontSize: 11,
+            fontWeight: FontWeight.bold),
       );
     }).toList();
 
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
@@ -224,7 +343,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                           color: color, shape: BoxShape.circle)),
                   const SizedBox(width: 6),
                   Text(
-                    '${emotion[0].toUpperCase()}${emotion.substring(1)} ($count)',
+                    '${emotionDisplayName(emotion, serverDisplayName: s['display_name'])} ($count)',
                     style: TextStyle(
                         color: isDark ? Colors.white70 : Colors.black54,
                         fontSize: 13),

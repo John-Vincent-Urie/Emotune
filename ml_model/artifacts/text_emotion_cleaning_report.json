@@ -1,0 +1,55 @@
+{
+  "source_file": "Text Emotion Classification 150k Dataset.csv",
+  "rows_read": 152499,
+  "rows_kept": 18863,
+  "keep_sadness": false,
+  "dropped": {
+    "downsampled_motivational": 27949,
+    "duplicate": 1852,
+    "empty_category": 6435,
+    "excluded_label": 48258,
+    "low_alpha": 5,
+    "misaligned_columns": 671,
+    "synthetic_category": 45883,
+    "too_long": 2495,
+    "too_short": 88
+  },
+  "source_category_distribution": {
+    "sadness": 45898,
+    "affection": 34167,
+    "achievement": 33993,
+    "enjoy_the_moment": 11143,
+    "bonding": 10727,
+    "<empty>": 6435,
+    "fear": 2543,
+    "joy": 2346,
+    "anger": 1977,
+    "nature": 1843,
+    "exercise": 1202,
+    "love": 159,
+    "surprise": 66
+  },
+  "label_distribution": {
+    "romantic": 9410,
+    "motivational": 5000,
+    "fear": 2509,
+    "angry": 1944
+  },
+  "labels_present": [
+    "angry",
+    "fear",
+    "motivational",
+    "romantic"
+  ],
+  "labels_missing_from_schema": [
+    "calm",
+    "depressing",
+    "happy",
+    "lonely",
+    "mixed",
+    "nostalgic",
+    "sad",
+    "stressed",
+    "surprising"
+  ]
+}

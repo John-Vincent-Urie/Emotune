@@ -1,7 +1,14 @@
+#!/usr/bin/env python3
 """Inspect and clean the EmoTune custom dataset."""
 from pathlib import Path
+import sys
 
-from data_pipeline import (
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _bootstrap import ensure_local_venv  # noqa: E402
+
+ensure_local_venv('pandas')
+
+from data_pipeline import (  # noqa: E402
     DATASET_PATH,
     ensure_artifacts_dir,
     load_custom_dataset,

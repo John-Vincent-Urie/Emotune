@@ -18,9 +18,14 @@ class MiniPlayer extends StatelessWidget {
     final progress = player.duration.inSeconds > 0
         ? player.position.inSeconds / player.duration.inSeconds
         : 0.0;
-    final playbackStatus = _shouldShowPlaybackStatus(player)
-        ? player.playbackStatusShortLabel
-        : '';
+    // A failure used to leave only the artist here, so a silent player looked
+    // fine. Point at the full player, which explains the error.
+    final playbackStatus = player.errorMessage != null
+        ? "Couldn't play · tap for details"
+        : _shouldShowPlaybackStatus(player)
+            ? player.playbackStatusShortLabel
+            : '';
+    final imageUrl = track['image']?.toString().trim() ?? '';
 
     return GestureDetector(
       onTap: () {
@@ -35,14 +40,14 @@ class MiniPlayer extends StatelessWidget {
         height: 70,
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+          color: isDark ? AppColors.darkCard : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
+            color: isDark ? AppColors.darkBorder : Colors.grey.shade200,
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.accent.withOpacity(0.1),
+              color: AppColors.accent.withValues(alpha: 0.1),
               blurRadius: 10,
             ),
           ],
@@ -60,15 +65,19 @@ class MiniPlayer extends StatelessWidget {
                       child: SizedBox(
                         width: 40,
                         height: 40,
-                        child: track['image'] != null && track['image'].isNotEmpty
+                        // Without placeholder/errorWidget a reload or a failed
+                        // fetch drew nothing, which on the dark card showed
+                        // up as a black square.
+                        child: imageUrl.isNotEmpty
                             ? CachedNetworkImage(
-                                imageUrl: track['image'],
+                                imageUrl: imageUrl,
                                 fit: BoxFit.cover,
+                                useOldImageOnUrlChange: true,
+                                placeholder: (_, __) => const _ArtFallback(),
+                                errorWidget: (_, __, ___) =>
+                                    const _ArtFallback(),
                               )
-                            : Container(
-                                color: AppColors.accent.withOpacity(0.3),
-                                child: const Icon(Icons.music_note, size: 20),
-                              ),
+                            : const _ArtFallback(),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -109,28 +118,34 @@ class MiniPlayer extends StatelessWidget {
                     IconButton(
                       icon: Icon(Icons.skip_previous,
                           color: isDark ? Colors.white : Colors.black87),
+                      tooltip: 'Previous track',
                       onPressed: player.previous,
                       iconSize: 20,
                     ),
-                    GestureDetector(
-                      onTap: player.togglePlayPause,
-                      child: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: const BoxDecoration(
-                          gradient: AppColors.buttonGradient,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          player.isPlaying ? Icons.pause : Icons.play_arrow,
-                          color: Colors.black,
-                          size: 18,
+                    Semantics(
+                      button: true,
+                      label: player.isPlaying ? 'Pause' : 'Play',
+                      child: GestureDetector(
+                        onTap: player.togglePlayPause,
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: const BoxDecoration(
+                            gradient: AppColors.buttonGradient,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            player.isPlaying ? Icons.pause : Icons.play_arrow,
+                            color: Colors.black,
+                            size: 18,
+                          ),
                         ),
                       ),
                     ),
                     IconButton(
                       icon: Icon(Icons.skip_next,
                           color: isDark ? Colors.white : Colors.black87),
+                      tooltip: 'Next track',
                       onPressed: player.next,
                       iconSize: 20,
                     ),
@@ -161,5 +176,17 @@ class MiniPlayer extends StatelessWidget {
       'preview_error' => false,
       _ => true,
     };
+  }
+}
+
+class _ArtFallback extends StatelessWidget {
+  const _ArtFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.accent.withValues(alpha: 0.3),
+      child: const Icon(Icons.music_note, size: 20),
+    );
   }
 }

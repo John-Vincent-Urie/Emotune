@@ -1,17 +1,25 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../controllers/recommendation_session_controller.dart';
 import '../../providers/player_provider.dart';
 import '../../providers/recommendation_studio_provider.dart';
 import '../../services/api_service.dart';
-import '../../services/spotify_remote_service.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/emotune_logo.dart';
+import 'widgets/home_empty_state.dart';
+import 'widgets/home_header.dart';
+import 'widgets/mood_composer.dart';
+import '../widgets/song_count_line.dart';
 import '../widgets/track_card.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/feel_better_dialog.dart';
-import 'full_player_screen.dart';
+import '../support/support_contact_quick_list.dart';
+import '../support/support_screen.dart';
+import '../../services/support_contacts.dart';
+import '../../theme/emotion_names.dart';
+import 'input_status.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,20 +28,37 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  static const Duration _progressiveAppendDelay = Duration(milliseconds: 180);
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  static const _session = RecommendationSessionController();
 
   final _promptCtrl = TextEditingController();
   bool _isAnalyzing = false;
   Map<String, dynamic>? _lastResult;
   String? _aiMessage;
+  // The server declined to read an emotion from the text (gibberish,
+  // non-English, not about the user's feelings, or unsure) and asks again.
+  String? _clarifyMessage;
+  // A failed analyze. Kept apart from [_aiMessage] so an error never renders
+  // as if it were EmoTune's reply.
+  String? _analyzeError;
+  bool _analyzeErrorIsNetwork = false;
+  bool _isCrisis = false;
+  // Gentle check-in from the backend's concern tier; music still plays.
+  Map<String, dynamic>? _supportCheckIn;
   List<Map<String, dynamic>> _tracks = [];
-  bool _loadingMoreTracks = false;
   int _requestSequence = 0;
+  bool? _reduceMotion;
+  bool _entranceStarted = false;
+  late final AnimationController _entrance;
 
   @override
   void initState() {
     super.initState();
+    _entrance = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
     final player = context.read<PlayerProvider>();
     player.onFeelBetter = (result) {
       if (mounted) {
@@ -49,64 +74,151 @@ class _HomeScreenState extends State<HomeScreen> {
       player.onFeelBetter = null;
     }
     _promptCtrl.dispose();
+    _entrance.dispose();
     super.dispose();
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduce = MediaQuery.of(context).disableAnimations;
+    if (reduce == _reduceMotion) return;
+    _reduceMotion = reduce;
+    if (reduce) {
+      _entrance.value = 1;
+      _entranceStarted = true;
+    } else if (!_entranceStarted) {
+      _entranceStarted = true;
+      _entrance.forward();
+    }
+  }
+
+  bool get _isEmptyState =>
+      _tracks.isEmpty &&
+      _aiMessage == null &&
+      _analyzeError == null &&
+      _clarifyMessage == null;
+
+  @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final isCompactLayout = screenWidth < 390;
-    final composerButtonSize = isCompactLayout ? 44.0 : 48.0;
+    final colors = context.emoColors;
+    final reduceMotion = _reduceMotion ?? false;
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            // Header
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  EmoTuneLogo(size: 60, showText: true),
-                ],
-              ),
-            ),
+            // Brand header -- fixed above the body, so it stays put once the
+            // results replace the empty state.
+            // Dropped on short (landscape) screens: header, mini player and
+            // composer together left the results area with zero height.
+            if (MediaQuery.sizeOf(context).height >= 520)
+              HomeHeader(entrance: _entrance, reduceMotion: reduceMotion),
 
             // Chat/Result area
             Expanded(
-              child: SingleChildScrollView(
+              child: _isEmptyState
+                  ? LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        // Room for the orb's glow: in landscape the content
+                        // outgrows the space and the scroll view's clip edge
+                        // cut the orb off.
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: ConstrainedBox(
+                          // Centre in whatever space is left, but stay
+                          // scrollable so the chips survive a short screen
+                          // with the keyboard up.
+                          constraints: BoxConstraints(
+                            minHeight: math.max(0, constraints.maxHeight - 64),
+                          ),
+                          child: Center(
+                            child: HomeEmptyState(
+                              entrance: _entrance,
+                              reduceMotion: reduceMotion,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (_analyzeError != null) ...[
+                      _buildAnalyzeError(colors),
+                      const SizedBox(height: 16),
+                    ],
+                    if (_clarifyMessage != null) ...[
+                      _buildClarifyPrompt(colors),
+                      const SizedBox(height: 16),
+                    ],
+                    // First, above the reply and the playlist: on a 360x820
+                    // phone the last contact used to sit under the mini
+                    // player until the user thought to scroll.
+                    if (_supportCheckIn != null && !_isCrisis) ...[
+                      _buildCheckInBanner(colors),
+                      const SizedBox(height: 16),
+                    ],
                     if (_aiMessage != null) ...[
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF1A1A1A)
-                              : Colors.grey.shade100,
+                          color: _isCrisis
+                              ? const Color(0xFFFFB020).withValues(alpha: 0.12)
+                              : colors.card,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: isDark
-                                ? const Color(0xFF2A2A2A)
-                                : Colors.grey.shade300,
+                            color: _isCrisis ? colors.safety : colors.divider,
                           ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (_isCrisis) ...[
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.favorite,
+                                    color: colors.safety,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      "We'd rather check in than play a song",
+                                      style: TextStyle(
+                                        color: colors.safety,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                            ],
                             Text(
                               _aiMessage!,
                               style: TextStyle(
-                                color: isDark ? Colors.white : Colors.black87,
+                                color: colors.textPrimary,
                                 fontSize: 14,
                                 height: 1.5,
                               ),
                             ),
-                            if (_lastResult != null) ...[
+                            if (_isCrisis) ...[
+                              const SizedBox(height: 12),
+                              FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: colors.safety,
+                                  foregroundColor: colors.onSafety,
+                                ),
+                                icon: const Icon(Icons.support_agent),
+                                label: const Text('Get support now'),
+                                onPressed: _openCrisisSupport,
+                              ),
+                            ],
+                            if (!_isCrisis && _lastResult != null) ...[
                               const SizedBox(height: 8),
                               Row(
                                 children: [
@@ -116,7 +228,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     decoration: BoxDecoration(
                                       color: AppColors.emotionColors[
                                               _lastResult!['emotion']]
-                                          ?.withOpacity(0.2),
+                                          ?.withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
                                         color: AppColors.emotionColors[
@@ -124,13 +236,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                             AppColors.accent,
                                       ),
                                     ),
+                                    // The mood color stays on the tint and
+                                    // border; as text it fell to 1.3:1
+                                    // (happy, light) and 1.9:1 (fear, dark).
                                     child: Text(
-                                      '${_lastResult!['emotion'].toString().toUpperCase()} '
+                                      '${emotionDisplayName(_lastResult!['emotion']?.toString(), serverDisplayName: (_lastResult!['emotion_info'] is Map) ? (_lastResult!['emotion_info'] as Map)['display_name'] : null).toUpperCase()} '
                                       '${_lastResult!['confidence']}%',
                                       style: TextStyle(
-                                        color: AppColors.emotionColors[
-                                                _lastResult!['emotion']] ??
-                                            AppColors.accent,
+                                        color: colors.textPrimary,
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -144,32 +257,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 16),
                     ],
-                    if (_loadingMoreTracks) ...[
-                      Row(
-                        children: [
-                          const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.accent,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Loading the rest of your playlist...',
-                              style: TextStyle(
-                                color: isDark ? Colors.white54 : Colors.black54,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                    ],
                     if (_tracks.isNotEmpty) ...[
+                      SongCountLine(result: _lastResult, shown: _tracks.length),
+                      const SizedBox(height: 10),
                       GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -184,33 +274,28 @@ class _HomeScreenState extends State<HomeScreen> {
                         itemBuilder: (ctx, i) => TrackCard(
                           track: _tracks[i],
                           onTap: () => _playTrack(i),
-                          emotion: _playbackEmotionFromResult(_lastResult),
+                          emotion: _session.playbackEmotionFromResult(_lastResult),
                         ),
                       ),
                       const SizedBox(height: 80),
                     ],
                     if (_lastResult != null &&
                         _tracks.isEmpty &&
-                        !_isAnalyzing) ...[
+                        !_isAnalyzing &&
+                        !_isCrisis) ...[
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF151515)
-                              : Colors.grey.shade50,
+                          color: colors.card,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isDark
-                                ? const Color(0xFF2A2A2A)
-                                : Colors.grey.shade300,
-                          ),
+                          border: Border.all(color: colors.divider),
                         ),
                         child: Text(
                           'No music recommendations were found for that prompt yet. '
                           'Try another feeling, or reconnect Spotify and try again.',
                           style: TextStyle(
-                            color: isDark ? Colors.white70 : Colors.black54,
+                            color: colors.textSecondary,
                             fontSize: 13,
                             height: 1.5,
                           ),
@@ -218,29 +303,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 80),
                     ],
-                    if (_tracks.isEmpty && _aiMessage == null)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 60),
-                          child: Column(
-                            children: [
-                              Icon(Icons.music_note,
-                                  size: 60,
-                                  color:
-                                      isDark ? Colors.white12 : Colors.black12),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Tell me how you feel...',
-                                style: TextStyle(
-                                  color:
-                                      isDark ? Colors.white30 : Colors.black38,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -249,79 +311,13 @@ class _HomeScreenState extends State<HomeScreen> {
             // Mini player
             const MiniPlayer(),
 
-            // Prompt input
-            Container(
-              padding: EdgeInsets.fromLTRB(
-                isCompactLayout ? 12 : 16,
-                8,
-                isCompactLayout ? 12 : 16,
-                isCompactLayout ? 12 : 16,
-              ),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.black : Colors.white,
-                border: Border(
-                  top: BorderSide(
-                    color:
-                        isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
-                  ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _promptCtrl,
-                      style: TextStyle(
-                          color: isDark ? Colors.white : Colors.black87),
-                      decoration: InputDecoration(
-                        hintText: 'I feel......',
-                        hintStyle: TextStyle(
-                          color: isDark ? Colors.white38 : Colors.black38,
-                          fontStyle: FontStyle.italic,
-                        ),
-                        filled: true,
-                        fillColor: isDark
-                            ? const Color(0xFF1A1A1A)
-                            : Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(25),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: isCompactLayout ? 14 : 16,
-                          vertical: isCompactLayout ? 10 : 12,
-                        ),
-                      ),
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _analyze(),
-                    ),
-                  ),
-                  SizedBox(width: isCompactLayout ? 6 : 8),
-                  GestureDetector(
-                    onTap: _isAnalyzing ? null : _analyze,
-                    child: Container(
-                      width: composerButtonSize,
-                      height: composerButtonSize,
-                      decoration: const BoxDecoration(
-                        gradient: AppColors.buttonGradient,
-                        shape: BoxShape.circle,
-                      ),
-                      child: _isAnalyzing
-                          ? Padding(
-                              padding:
-                                  EdgeInsets.all(isCompactLayout ? 11 : 12),
-                              child: const CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.black),
-                            )
-                          : Icon(
-                              Icons.send,
-                              color: Colors.black,
-                              size: isCompactLayout ? 18 : 20,
-                            ),
-                    ),
-                  ),
-                ],
-              ),
+            // Prompt input -- present from the first frame, not part of the
+            // entrance sequence.
+            MoodComposer(
+              controller: _promptCtrl,
+              isBusy: _isAnalyzing,
+              onSubmit: _analyze,
+              reduceMotion: reduceMotion,
             ),
           ],
         ),
@@ -331,7 +327,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _analyze() async {
     final text = _promptCtrl.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty) {
+      // Sending nothing used to do nothing at all, which read as broken.
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Type a few words about how you feel first.'),
+          ),
+        );
+      return;
+    }
+    // Drop the keyboard so the reply and playlist aren't hidden under it.
+    FocusManager.instance.primaryFocus?.unfocus();
     final requestId = ++_requestSequence;
     final studio = context.read<RecommendationStudioProvider>();
 
@@ -339,44 +347,60 @@ class _HomeScreenState extends State<HomeScreen> {
       _isAnalyzing = true;
       _tracks = [];
       _aiMessage = null;
-      _loadingMoreTracks = false;
+      _clarifyMessage = null;
+      _analyzeError = null;
+      _analyzeErrorIsNetwork = false;
+      _isCrisis = false;
+      _supportCheckIn = null;
     });
 
     try {
       final result = await ApiService.analyzeEmotion(
         text,
-        outcomeMode: studio.selectedOutcomeMode,
         sessionLengthMinutes: studio.sessionLengthMinutes,
-        checkInFrequencyTracks: studio.checkInFrequencyTracks,
-        tasteProfile: _currentTasteProfile(),
       );
       if (!mounted || requestId != _requestSequence) {
+        return;
+      }
+      final isCrisis = result['crisis'] == true;
+      final clarify = isCrisis ? null : clarifyMessageFor(result);
+      if (clarify != null) {
+        // No emotion was read, so no songs: ask again and leave the text in
+        // the composer for the user to rewrite.
+        setState(() {
+          _lastResult = null;
+          _aiMessage = null;
+          _tracks = [];
+          _clarifyMessage = clarify;
+        });
         return;
       }
       final normalizedTracks = PlayerProvider.normalizeTrackList(
         List<dynamic>.from(result['tracks'] ?? []),
       );
-      final continuationToken =
-          result['continuation_token']?.toString().trim() ?? '';
-      final loadingMoreTracks =
-          result['loading_more_tracks'] == true && continuationToken.isNotEmpty;
+      final checkIn = result['support_check_in'];
       setState(() {
         _lastResult = result;
         _aiMessage = result['ai_response'];
+        _isCrisis = isCrisis;
+        _supportCheckIn =
+            checkIn is Map ? Map<String, dynamic>.from(checkIn) : null;
         _tracks = normalizedTracks;
-        _loadingMoreTracks = loadingMoreTracks;
       });
       _promptCtrl.clear();
-      if (normalizedTracks.isNotEmpty) {
-        unawaited(_autoplayInitialTrack(normalizedTracks, result));
+      if (isCrisis) {
+        // A song from the previous request must not keep playing under the
+        // support screen. Paused rather than cleared, so nothing is lost.
+        final player = context.read<PlayerProvider>();
+        if (player.isPlaying) {
+          unawaited(player.togglePlayPause());
+        }
+        // Full-screen so it cannot be scrolled past; the card stays behind it
+        // with a button to reopen it.
+        unawaited(_openCrisisSupport());
       }
-      if (loadingMoreTracks) {
-        unawaited(
-          _loadMoreRecommendationTracks(
-            requestId: requestId,
-            continuationToken: continuationToken,
-          ),
-        );
+      if (!isCrisis && normalizedTracks.isNotEmpty) {
+        unawaited(_autoplayInitialTrack(normalizedTracks, result));
       }
     } on ApiException catch (e) {
       if (!mounted || requestId != _requestSequence) {
@@ -385,9 +409,10 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _lastResult = null;
         _tracks = [];
-        _aiMessage = e.message;
-        _loadingMoreTracks = false;
-      });
+        _analyzeError = e.message;
+        // No status means the server was never reached.
+        _analyzeErrorIsNetwork = e.statusCode == null;
+        });
     } catch (e) {
       if (!mounted || requestId != _requestSequence) {
         return;
@@ -395,15 +420,195 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _lastResult = null;
         _tracks = [];
-        _aiMessage =
+        _analyzeError =
             'Could not analyze your prompt right now. Please try again.';
-        _loadingMoreTracks = false;
-      });
+        });
     } finally {
       if (mounted && requestId == _requestSequence) {
         setState(() => _isAnalyzing = false);
       }
     }
+  }
+
+  Widget _buildClarifyPrompt(EmoTuneColors colors) {
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colors.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: colors.divider),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.edit_note, color: colors.textSecondary, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                _clarifyMessage!,
+                style: TextStyle(
+                  color: colors.textPrimary,
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openCrisisSupport() {
+    return SupportScreen.open(
+      context,
+      level: 'crisis',
+      message: _aiMessage ?? '',
+      resources: List<dynamic>.from(_lastResult?['support_resources'] ?? []),
+      about: _lastResult?['support_about']?.toString() ?? 'self',
+    );
+  }
+
+  /// A failed analyze, styled as a notice rather than EmoTune's reply. Crisis
+  /// detection runs on the server, so whatever the user wrote got no safety
+  /// check; the card always offers the support contacts bundled in the app.
+  Widget _buildAnalyzeError(EmoTuneColors colors) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.cloud_off_rounded, color: colors.textSecondary, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    _analyzeError!,
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontSize: 14,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              foregroundColor: colors.safety,
+              padding: EdgeInsets.zero,
+            ),
+            icon: const Icon(Icons.support_agent, size: 18),
+            label: const Text(
+              'Need to talk to someone now?',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            onPressed: () => SupportScreen.open(
+              context,
+              level: 'concern',
+              message: _analyzeErrorIsNetwork
+                  ? "EmoTune can't connect right now, but these people can "
+                      'be reached by phone.'
+                  : 'EmoTune hit a problem, but these people can be reached '
+                      'by phone.',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCheckInBanner(EmoTuneColors colors) {
+    const amberTint = Color(0xFFFFB020);
+    final checkIn = _supportCheckIn!;
+    final message = checkIn['message']?.toString() ?? '';
+    final about = checkIn['about']?.toString() ?? 'self';
+    final resources = supportContactsOrBundled(
+      List<dynamic>.from(checkIn['resources'] ?? const []),
+    );
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: amberTint.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.safety.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.favorite, color: colors.safety, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  about == 'someone_else'
+                      ? 'Help for someone you care about'
+                      : 'Checking in on you',
+                  style: TextStyle(
+                    color: colors.safety,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: TextStyle(color: colors.textPrimary, fontSize: 14, height: 1.5),
+          ),
+          const SizedBox(height: 10),
+          SupportContactQuickList(resources: resources),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              TextButton(
+                onPressed: () => SupportScreen.open(
+                  context,
+                  level: 'concern',
+                  message: message,
+                  resources: resources,
+                  about: about,
+                ),
+                child: Text(
+                  'More ways to get support',
+                  style: TextStyle(
+                    color: colors.safety,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => setState(() => _supportCheckIn = null),
+                child: Text(
+                  "I'm okay",
+                  style: TextStyle(color: colors.textSecondary),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _autoplayInitialTrack(
@@ -415,7 +620,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final player = context.read<PlayerProvider>();
-    _loadPlaylistIntoPlayer(
+    _session.loadPlaylistIntoPlayer(
       player,
       tracks,
       result,
@@ -428,270 +633,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _loadMoreRecommendationTracks({
-    required int requestId,
-    required String continuationToken,
-  }) async {
-    final hadTracksBefore = _tracks.isNotEmpty;
-    try {
-      final result = await ApiService.continueRecommendation(continuationToken);
-      if (!mounted || requestId != _requestSequence) {
-        return;
-      }
-
-      final incomingTracks = PlayerProvider.normalizeTrackList(
-        List<dynamic>.from(result['tracks'] ?? []),
-      );
-      final mergedTracks =
-          PlayerProvider.mergeTrackLists(_tracks, incomingTracks);
-      final newTracks = mergedTracks.skip(_tracks.length).toList();
-      final historyId = _historyIdFromResult(result);
-      final emotion = _playbackEmotionFromResult(result);
-      final player = context.read<PlayerProvider>();
-      var startedAutoplayFromContinuation = false;
-
-      if (newTracks.isEmpty) {
-        setState(() {
-          _lastResult = result;
-          _tracks = mergedTracks;
-          _loadingMoreTracks = false;
-          if ((result['ai_response']?.toString().trim().isNotEmpty ?? false)) {
-            _aiMessage = result['ai_response']?.toString();
-          }
-        });
-        return;
-      }
-
-      for (final track in newTracks) {
-        if (!mounted || requestId != _requestSequence) {
-          return;
-        }
-
-        final nextVisibleTracks = [..._tracks, track];
-        setState(() {
-          _lastResult = result;
-          _tracks = nextVisibleTracks;
-          if ((result['ai_response']?.toString().trim().isNotEmpty ?? false)) {
-            _aiMessage = result['ai_response']?.toString();
-          }
-        });
-
-        final shouldMergeActivePlaylist =
-            (historyId != null && player.historyId == historyId) ||
-                (historyId == null &&
-                    player.currentEmotion == emotion &&
-                    player.playlist.isNotEmpty);
-
-        if (!hadTracksBefore && !startedAutoplayFromContinuation) {
-          _loadPlaylistIntoPlayer(
-            player,
-            nextVisibleTracks,
-            result,
-            autoplay: true,
-          );
-          startedAutoplayFromContinuation = true;
-        } else if (shouldMergeActivePlaylist) {
-          _mergePlaylistIntoPlayer(
-            player,
-            nextVisibleTracks,
-            result,
-          );
-        }
-
-        await Future.delayed(_progressiveAppendDelay);
-      }
-
-      if (!mounted || requestId != _requestSequence) {
-        return;
-      }
-      setState(() => _loadingMoreTracks = false);
-    } on ApiException {
-      if (!mounted || requestId != _requestSequence) {
-        return;
-      }
-      setState(() => _loadingMoreTracks = false);
-    } catch (_) {
-      if (!mounted || requestId != _requestSequence) {
-        return;
-      }
-      setState(() => _loadingMoreTracks = false);
-    }
-  }
-
-  int? _historyIdFromResult(Map<String, dynamic> result) {
-    final historyId = result['history_id'];
-    if (historyId is int) {
-      return historyId;
-    }
-    if (historyId is num) {
-      return historyId.toInt();
-    }
-    return int.tryParse(historyId?.toString() ?? '');
-  }
-
-  Map<String, dynamic> _currentTasteProfile() {
-    return context.read<RecommendationStudioProvider>().tasteProfile;
-  }
-
-  Map<String, dynamic>? _sessionPlanFromResult(Map<String, dynamic>? result) {
-    final raw = result?['session_plan'];
-    if (raw is! Map) {
-      return null;
-    }
-    return Map<String, dynamic>.from(raw);
-  }
-
-  Map<String, dynamic> _tasteProfileFromResult(Map<String, dynamic>? result) {
-    final raw = result?['taste_profile'];
-    if (raw is! Map) {
-      return _currentTasteProfile();
-    }
-    return Map<String, dynamic>.from(raw);
-  }
-
-  bool _trainOnThisSessionFromResult(Map<String, dynamic>? result) {
-    return _tasteProfileFromResult(result)['train_session'] != false;
-  }
-
-  String _playbackEmotionFromResult(Map<String, dynamic>? result) {
-    final recommendationTarget =
-        result?['recommendation_target_emotion']?.toString().trim() ?? '';
-    if (recommendationTarget.isNotEmpty) {
-      return recommendationTarget;
-    }
-
-    final detectedEmotion = result?['emotion']?.toString().trim() ?? '';
-    if (detectedEmotion.isNotEmpty) {
-      return detectedEmotion;
-    }
-
-    return 'mixed';
-  }
-
-  void _loadPlaylistIntoPlayer(
-    PlayerProvider player,
-    List<Map<String, dynamic>> tracks,
-    Map<String, dynamic>? result, {
-    String? fallbackEmotion,
-    bool autoplay = false,
-  }) {
-    final playbackEmotion = _playbackEmotionFromResult(result);
-    player.loadPlaylist(
-      tracks,
-      playbackEmotion == 'mixed' && fallbackEmotion != null
-          ? fallbackEmotion
-          : playbackEmotion,
-      historyId: _historyIdFromResult(result ?? const <String, dynamic>{}),
-      autoplay: autoplay,
-      sessionPlan: _sessionPlanFromResult(result),
-      tasteProfile: _tasteProfileFromResult(result),
-      outcomeMode: result?['outcome_mode']?.toString(),
-      outcomeLabel: result?['outcome_label']?.toString(),
-      outcomeDescription: result?['outcome_description']?.toString(),
-      trainOnThisSession: _trainOnThisSessionFromResult(result),
-    );
-  }
-
-  void _mergePlaylistIntoPlayer(
-    PlayerProvider player,
-    List<Map<String, dynamic>> tracks,
-    Map<String, dynamic>? result,
-  ) {
-    player.mergePlaylistTracks(
-      tracks,
-      emotion: _playbackEmotionFromResult(result),
-      historyId: _historyIdFromResult(result ?? const <String, dynamic>{}),
-      sessionPlan: _sessionPlanFromResult(result),
-      tasteProfile: _tasteProfileFromResult(result),
-      outcomeMode: result?['outcome_mode']?.toString(),
-      outcomeLabel: result?['outcome_label']?.toString(),
-      outcomeDescription: result?['outcome_description']?.toString(),
-      trainOnThisSession: _trainOnThisSessionFromResult(result),
-    );
-  }
-
   Future<void> _playTrack(int index) async {
     final track = PlayerProvider.normalizeTrack(_tracks[index]);
     _tracks[index] = track;
-    final previewUrl = track['preview_url']?.toString().trim() ?? '';
-    final spotifyUri = track['uri']?.toString().trim() ?? '';
-    final spotifyUrl = track['spotify_url']?.toString().trim() ?? '';
-    final trackList = _playlistForSelection(track);
-    final hasSpotifyTarget = spotifyUri.isNotEmpty || spotifyUrl.isNotEmpty;
-    final playbackEmotion = _playbackEmotionFromResult(_lastResult);
-
-    if (SpotifyRemoteService.instance.isSupportedPlatform && hasSpotifyTarget) {
-      _loadPlaylistIntoPlayer(
-        context.read<PlayerProvider>(),
-        trackList,
-        _lastResult,
-        fallbackEmotion: playbackEmotion,
-        autoplay: false,
-      );
-      await context.read<PlayerProvider>().playTrackAtIndex(
-            trackList.length == 1 ? 0 : index,
-            preferInstantPreview: previewUrl.isNotEmpty,
-          );
-      await _openPlayer();
-      return;
-    }
-
-    if (previewUrl.isEmpty && spotifyUrl.isNotEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              (track['item_type']?.toString() ?? 'track') == 'playlist'
-                  ? 'This playlist needs Android Spotify playback in the current app build.'
-                  : 'This recommendation is not directly playable in the current app build.',
-            ),
-          ),
-        );
-      }
-      return;
-    }
-
-    _loadPlaylistIntoPlayer(
-      context.read<PlayerProvider>(),
-      trackList,
-      _lastResult,
-      fallbackEmotion: playbackEmotion,
-      autoplay: false,
-    );
-    await context.read<PlayerProvider>().playTrackAtIndex(
-          trackList.length == 1 ? 0 : index,
-          preferInstantPreview: previewUrl.isNotEmpty,
-        );
-    await _openPlayer();
-  }
-
-  List<Map<String, dynamic>> _playlistForSelection(
-    Map<String, dynamic> selectedTrack,
-  ) {
-    final playlist = PlayerProvider.normalizeTrackList(_tracks);
-    final selectedTrackId = selectedTrack['id']?.toString().trim() ?? '';
-    final selectedTrackUri = selectedTrack['uri']?.toString().trim() ?? '';
-    final containsSelection = playlist.any((track) {
-      final trackId = track['id']?.toString().trim() ?? '';
-      final trackUri = track['uri']?.toString().trim() ?? '';
-      return (selectedTrackId.isNotEmpty && trackId == selectedTrackId) ||
-          (selectedTrackUri.isNotEmpty && trackUri == selectedTrackUri);
-    });
-    if (containsSelection && playlist.isNotEmpty) {
-      return playlist;
-    }
-    return [selectedTrack];
-  }
-
-  Future<void> _openPlayer() async {
-    if (!mounted) {
-      return;
-    }
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const FullPlayerScreen(),
+    await _session.playTrackFromList(
+      context,
+      tracks: _tracks,
+      selectedTrack: track,
+      lastResult: _lastResult,
     );
   }
 
@@ -720,7 +669,6 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _lastResult = dialogResult;
       _tracks = transitionTracks;
-      _loadingMoreTracks = false;
       if (dialogResult['ai_response']?.toString().trim().isNotEmpty ?? false) {
         _aiMessage = dialogResult['ai_response']?.toString();
       }

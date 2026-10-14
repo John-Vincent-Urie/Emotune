@@ -1,0 +1,74 @@
+{
+  "files": {
+    "emotune_anger_1000.csv": {
+      "source_label": "anger",
+      "emotion": "angry",
+      "rows_read": 1000,
+      "rows_kept": 1000,
+      "dropped": {},
+      "repaired": {
+        "plural_agreement": 110,
+        "tired_of_clause": 58
+      },
+      "template_concentration": {
+        "distinct_openers_first_3_words": 37,
+        "distinct_closers_last_3_words": 101,
+        "most_common_opener": [
+          "it's frustrating that",
+          75
+        ],
+        "most_common_closer": [
+          "causing unnecessary problems",
+          74
+        ]
+      },
+      "output_file": "emotune_anger_1000.cleaned.csv"
+    },
+    "emotune_depression_1000.csv": {
+      "source_label": "depression",
+      "emotion": "depressing",
+      "rows_read": 1000,
+      "rows_kept": 1000,
+      "dropped": {},
+      "repaired": {
+        "lowercase_i": 818
+      },
+      "template_concentration": {
+        "distinct_openers_first_3_words": 51,
+        "distinct_closers_last_3_words": 110,
+        "most_common_opener": [
+          "lately, i feel",
+          99
+        ],
+        "most_common_closer": [
+          "excited about anything",
+          71
+        ]
+      },
+      "output_file": "emotune_depression_1000.cleaned.csv"
+    },
+    "stress.csv": {
+      "source_label": "stress",
+      "emotion": "stressed",
+      "rows_read": 1000,
+      "rows_kept": 1000,
+      "dropped": {},
+      "repaired": {
+        "plural_agreement": 121
+      },
+      "template_concentration": {
+        "distinct_openers_first_3_words": 31,
+        "distinct_closers_last_3_words": 57,
+        "most_common_opener": [
+          "i'm stressed because",
+          80
+        ],
+        "most_common_closer": [
+          "about the result",
+          59
+        ]
+      },
+      "output_file": "stress.cleaned.csv"
+    }
+  }
+}
