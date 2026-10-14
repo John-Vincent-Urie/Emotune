@@ -1,0 +1,255 @@
+text,category,expected_status,expected_emotion,split
+dfhskksdnkjskbkjsb,gibberish,gibberish,,dev
+asdfghjkl,gibberish,gibberish,,test
+qwertyuiop,gibberish,gibberish,,dev
+zxcvbnm,gibberish,gibberish,,test
+jkjkjkjk,gibberish,gibberish,,dev
+lkjhgfdsa,gibberish,gibberish,,test
+hfjdks,gibberish,gibberish,,dev
+aaaaaaaaaaa,gibberish,gibberish,,test
+sdfsdf sdfsdf,gibberish,gibberish,,dev
+xjqzv,gibberish,gibberish,,test
+mnbvcxz lkjh,gibberish,gibberish,,dev
+fghfgh fghfgh,gibberish,gibberish,,test
+qazwsx edcrfv,gibberish,gibberish,,dev
+pppppp,gibberish,gibberish,,test
+ksksksksks,gibberish,gibberish,,dev
+wjdkfnsl qpwoeiru,gibberish,gibberish,,test
+blorptz frangle,gibberish,gibberish,,dev
+vbnvbn,gibberish,gibberish,,test
+hjkl hjkl hjkl,gibberish,gibberish,,dev
+zzzzzz,gibberish,gibberish,,test
+grblx,gibberish,gibberish,,dev
+asd asd asd,gibberish,gibberish,,test
+dsjkfhsdjkfh sdkjfh,gibberish,gibberish,,dev
+!!!!!!,gibberish,gibberish,,test
+????,gibberish,gibberish,,dev
+12345,gibberish,gibberish,,test
+.....,gibberish,gibberish,,dev
+qwe rty uio,gibberish,gibberish,,test
+nmnmnm,gibberish,gibberish,,dev
+xkcd qwfp,gibberish,gibberish,,test
+sad,emotion_word,ok,sad,dev
+happy,emotion_word,ok,happy,test
+stressed,emotion_word,ok,stressed,dev
+angry,emotion_word,ok,angry,test
+lonely,emotion_word,ok,lonely,dev
+scared,emotion_word,ok,fear,test
+calm,emotion_word,ok,calm,dev
+depressed,emotion_word,ok,depressing,test
+nostalgic,emotion_word,ok,nostalgic,dev
+surprised,emotion_word,ok,surprising,test
+motivated,emotion_word,ok,motivational,dev
+in love,emotion_word,ok,romantic,test
+i'm happy,emotion_word,ok,happy,dev
+im so sad,emotion_word,ok,sad,test
+feeling stressed,emotion_word,ok,stressed,dev
+so angry,emotion_word,ok,angry,test
+i feel lonely,emotion_word,ok,lonely,dev
+really anxious,emotion_word,ok,fear,test
+relaxed,emotion_word,ok,calm,dev
+i am depressed,emotion_word,ok,depressing,test
+feeling nostalgic today,emotion_word,ok,nostalgic,dev
+shocked,emotion_word,ok,surprising,test
+very motivated,emotion_word,ok,motivational,dev
+i'm in love,emotion_word,ok,romantic,test
+mixed feelings,emotion_word,ok,mixed,dev
+sooo happy,emotion_word,ok,happy,test
+overwhelmed,emotion_word,ok,stressed,dev
+furious,emotion_word,ok,angry,test
+nervous,emotion_word,ok,fear,dev
+peaceful,emotion_word,ok,calm,test
+heartbroken,emotion_word,ok,sad,dev
+conflicted,emotion_word,ok,mixed,test
+sadd,emotion_word,ok,sad,dev
+😭,emotion_word,ok,sad,test
+😊,emotion_word,ok,happy,dev
+burnt out,emotion_word,ok,stressed,test
+what is 2+2,off_topic,off_topic,,dev
+play something for coding,off_topic,off_topic,,test
+the weather is nice,off_topic,off_topic,,dev
+what time is it,off_topic,off_topic,,test
+who won the game last night,off_topic,off_topic,,dev
+recommend a movie,off_topic,off_topic,,test
+how do magnets work,off_topic,off_topic,,dev
+the capital of france is paris,off_topic,off_topic,,test
+tell me a joke,off_topic,off_topic,,dev
+can you play some jazz,off_topic,off_topic,,test
+open spotify,off_topic,off_topic,,dev
+cats are mammals,off_topic,off_topic,,test
+what is the meaning of photosynthesis,off_topic,off_topic,,dev
+translate hello to spanish,off_topic,off_topic,,test
+give me a playlist for the gym,off_topic,off_topic,,dev
+is it going to rain tomorrow,off_topic,off_topic,,test
+the store closes at nine,off_topic,off_topic,,dev
+search for taylor swift songs,off_topic,off_topic,,test
+how many days are in a year,off_topic,off_topic,,dev
+list three primary colors,off_topic,off_topic,,test
+water boils at 100 degrees,off_topic,off_topic,,dev
+where is the nearest cafe,off_topic,off_topic,,test
+write a poem about the sea,off_topic,off_topic,,dev
+the train arrives at noon,off_topic,off_topic,,test
+calculate 15 times 3,off_topic,off_topic,,dev
+what does api mean,off_topic,off_topic,,test
+show me the news,off_topic,off_topic,,dev
+skip this song,off_topic,off_topic,,test
+the sky is blue,off_topic,off_topic,,dev
+define gravity,off_topic,off_topic,,test
+meh,vague,unclear,,dev
+feeling meh,vague,unclear,,test
+idk,vague,unclear,,dev
+i dont know,vague,unclear,,test
+fine,vague,unclear,,dev
+ok,vague,unclear,,test
+okay i guess,vague,unclear,,dev
+whatever,vague,unclear,,test
+nothing,vague,unclear,,dev
+normal,vague,unclear,,test
+so so,vague,unclear,,dev
+hmm,vague,unclear,,test
+not sure,vague,unclear,,dev
+eh,vague,unclear,,test
+nothing much,vague,unclear,,dev
+same as usual,vague,unclear,,test
+i feel weird,vague,unclear,,dev
+just there,vague,unclear,,test
+blah,vague,unclear,,dev
+i guess fine,vague,unclear,,test
+average,vague,unclear,,dev
+kinda off,vague,unclear,,test
+no idea,vague,unclear,,dev
+neutral,vague,unclear,,test
+ugh,vague,unclear,,dev
+idk really,vague,unclear,,test
+feeling something,vague,unclear,,dev
+it is what it is,vague,unclear,,test
+just okay,vague,unclear,,dev
+bleh,vague,unclear,,test
+I failed my exam and I feel terrible about it,feeling,ok,sad,dev
+I just got promoted at work and I am so excited,feeling,ok,happy,test
+my best friend moved away and I miss her so much,feeling,ok,lonely,dev
+I have three deadlines tomorrow and I cannot keep up,feeling,ok,stressed,test
+someone stole my bike and I am so mad right now,feeling,ok,angry,dev
+I have a job interview tomorrow and my hands are shaking,feeling,ok,fear,test
+nobody texted me back all weekend,feeling,ok,lonely,dev
+looking at old photos from high school made me smile,feeling,ok,nostalgic,test
+I finally finished my thesis and I feel unstoppable,feeling,ok,motivational,dev
+I cannot stop thinking about my crush,feeling,ok,romantic,test
+I sat by the lake this morning and everything felt still,feeling,ok,calm,dev
+I did not expect my friends to throw me a surprise party,feeling,ok,surprising,test
+everything feels pointless lately and I cannot get out of bed,feeling,ok,depressing,dev
+my dog died yesterday,feeling,ok,sad,test
+I am happy but also scared about moving to a new city,feeling,ok,mixed,dev
+I got the scholarship I applied for,feeling,ok,happy,test
+my parents keep fighting and it makes me anxious,feeling,ok,fear,dev
+so much homework and so little time,feeling,ok,stressed,test
+my boyfriend broke up with me today,feeling,ok,sad,dev
+I am grateful for my family tonight,feeling,ok,happy,test
+I keep thinking about my childhood summers,feeling,ok,nostalgic,dev
+my coworker took credit for my work again,feeling,ok,angry,test
+I feel ready to crush my goals this week,feeling,ok,motivational,dev
+I miss my lola so much,feeling,ok,lonely,test
+I passed the board exam,feeling,ok,happy,dev
+my heart feels heavy today,feeling,ok,sad,test
+I am exhausted from studying all night,feeling,ok,stressed,dev
+I am so proud of myself today,feeling,ok,happy,test
+I feel like nobody understands me,feeling,ok,lonely,dev
+ugh my laptop crashed before I could save my essay,feeling,ok,angry,test
+I want to scream because of this group project,feeling,ok,angry,dev
+I am nervous about my first day at the new school,feeling,ok,fear,test
+malungkot ako,non_english,non_english,,dev
+pagod na ako,non_english,non_english,,test
+galit ako sa kanya,non_english,non_english,,dev
+kinikilig ako,non_english,non_english,,test
+ang saya ko ngayon,non_english,non_english,,dev
+sobrang stressed ako,non_english,non_english,,test
+nalulungkot ako kasi wala akong kaibigan,non_english,non_english,,dev
+natatakot ako sa exam bukas,non_english,non_english,,test
+hindi ko alam ang gagawin ko,non_english,non_english,,dev
+masaya ako,non_english,non_english,,test
+nakakainis talaga siya,non_english,non_english,,dev
+I feel so pagod today,non_english,non_english,,test
+stressed na ako sa school,non_english,non_english,,dev
+grabe ang lungkot ko,non_english,non_english,,test
+miss ko na yung family ko,non_english,non_english,,dev
+ang hirap ng buhay,non_english,non_english,,test
+kinakabahan ako sa interview,non_english,non_english,,dev
+nakakapagod mag aral,non_english,non_english,,test
+I am so sad kasi iniwan niya ako,non_english,non_english,,dev
+gusto ko lang matulog,non_english,non_english,,test
+parang wala akong gana,non_english,non_english,,dev
+badtrip ako ngayon,non_english,non_english,,test
+ang saya saya,non_english,non_english,,dev
+umiiyak ako,non_english,non_english,,test
+happy ako today,non_english,non_english,,dev
+nag-iisa ako,non_english,non_english,,test
+sobrang pagod,non_english,non_english,,dev
+excited na ako bukas,non_english,non_english,,test
+ayaw ko sa trabaho ko,non_english,non_english,,dev
+naiinis ako sa kanila,non_english,non_english,,test
+galit,non_english,non_english,,dev
+kinikilig,non_english,non_english,,test
+malungkot,non_english,non_english,,dev
+pagod,non_english,non_english,,test
+I miss Manila so much,tricky_english,ok,lonely,dev
+I feel happy visiting Cebu with my family,tricky_english,ok,happy,test
+I am sad that Maria moved to Davao,tricky_english,ok,sad,dev
+my lola cooked adobo and I felt so loved,tricky_english,ok,happy,test
+I may cry after this movie,tricky_english,ok,sad,dev
+I am stressed about my thesis at UP Diliman,tricky_english,ok,stressed,test
+I feel nostalgic about Jollibee birthday parties,tricky_english,ok,nostalgic,dev
+I am scared of the typhoon tonight,tricky_english,ok,fear,test
+I am angry at my manager Jose,tricky_english,ok,angry,dev
+I feel calm walking along Manila Bay,tricky_english,ok,calm,test
+my pa called and I feel happy,tricky_english,ok,happy,dev
+I am so lonely in Quezon City,tricky_english,ok,lonely,test
+i went to class today,neutral_self,unclear|off_topic,,dev
+i ate breakfast,neutral_self,unclear|off_topic,,test
+i am at home,neutral_self,unclear|off_topic,,dev
+i woke up at 7,neutral_self,unclear|off_topic,,test
+i just got home,neutral_self,unclear|off_topic,,dev
+i am sitting in my room,neutral_self,unclear|off_topic,,test
+my day was a day,neutral_self,unclear|off_topic,,dev
+i watched tv,neutral_self,unclear|off_topic,,test
+i have class later,neutral_self,unclear|off_topic,,dev
+i took a shower,neutral_self,unclear|off_topic,,test
+i am typing this,neutral_self,unclear|off_topic,,dev
+we had rice for dinner,neutral_self,unclear|off_topic,,test
+i am waiting for the bus,neutral_self,unclear|off_topic,,dev
+i walked to the store,neutral_self,unclear|off_topic,,test
+my phone is charging,neutral_self,unclear|off_topic,,dev
+i cleaned my room,neutral_self,unclear|off_topic,,test
+i have a meeting at 3pm,neutral_self,unclear|off_topic,,dev
+i am wearing a blue shirt,neutral_self,unclear|off_topic,,test
+i drank some water,neutral_self,unclear|off_topic,,dev
+my brother is in grade 5,neutral_self,unclear|off_topic,,test
+explain why people feel jealous,off_topic,off_topic,,dev
+define loneliness,off_topic,off_topic,,test
+what is the difference between sadness and depression,off_topic,off_topic,,dev
+write a poem about being angry,off_topic,off_topic,,test
+give me facts about fear,off_topic,off_topic,,dev
+tell me about nostalgia,off_topic,off_topic,,test
+compose a song about love,off_topic,off_topic,,dev
+what does it mean to be motivated,off_topic,off_topic,,test
+summarize the stages of grief,off_topic,off_topic,,dev
+how does stress affect sleep,off_topic,off_topic,,test
+sad na me,non_english,non_english,,dev
+happy na ako,non_english,non_english,,test
+stressed sa work,non_english,non_english,,dev
+lonely na naman,non_english,non_english,,test
+angry sa kanya,non_english,non_english,,dev
+excited na,non_english,non_english,,test
+scared sa dilim,non_english,non_english,,dev
+bored na me,non_english,non_english,,test
+tired sa school,non_english,non_english,,dev
+nervous na me,non_english,non_english,,test
+scraed,emotion_word,ok,fear,dev
+nervuos,emotion_word,ok,fear,test
+stressde,emotion_word,ok,stressed,dev
+lonley,emotion_word,ok,lonely,test
+furoius,emotion_word,ok,angry,dev
+hapyp,emotion_word,ok,happy,test
+depresesd,emotion_word,ok,depressing,dev
+anixous,emotion_word,ok,fear,test
+motivatde,emotion_word,ok,motivational,dev
+nostalgci,emotion_word,ok,nostalgic,test

@@ -26,6 +26,13 @@ from .spotify_oauth_state import (
     issue_state as issue_spotify_oauth_state,
     read_state as read_spotify_oauth_state,
 )
+from .input_validation import (
+    CLARIFY_MESSAGES,
+    ROUTE_EMOTION_WORD,
+    ROUTE_MODEL,
+    STATUS_OK,
+    decide_after_crisis,
+)
 from .session_plan import (
     build_session_plan,
     normalize_requested_outcome_mode,
@@ -540,6 +547,63 @@ def _build_emotion_response_payload(
     return payload
 
 
+def _classify_text(text):
+    """Run BERT emotion classification, falling back to 'mixed' on failure."""
+    try:
+        return get_classifier().predict(text)
+    except Exception:
+        logger.exception("Emotion analysis failed for text input")
+        return _fallback_analysis()
+
+
+def _build_clarify_payload(input_status):
+    """The answer to text that does not say how the user feels: no emotion, no
+    songs, no history row -- just the prompt to try again. Same keys and types
+    as a normal response so the app parses both the same way."""
+    return {
+        'input_status': input_status,
+        'clarify_message': CLARIFY_MESSAGES[input_status],
+        'input_route': None,
+        'emotion': None,
+        'emotion_info': None,
+        'confidence': 0.0,
+        'all_scores': {},
+        'top_emotions': [],
+        'secondary_emotion': None,
+        'secondary_emotion_display': None,
+        'plutchik_scores': {},
+        'plutchik_top_emotions': [],
+        'plutchik_dominant_emotion': None,
+        'plutchik_profile_version': 'v1',
+        'outcome_mode': None,
+        'outcome_label': None,
+        'outcome_description': None,
+        'session_plan': None,
+        'prediction_source': None,
+        'prediction_strategy': None,
+        'confidence_band': None,
+        'confidence_margin': 0.0,
+        'prediction_fallback_used': False,
+        'prediction_fallback_reason': None,
+        'needs_review': False,
+        'ai_response': None,
+        'tracks': [],
+        'total': 0,
+        'tracks_source': None,
+        'history_id': None,
+        'recovery_plan': None,
+    }
+
+
+def _build_emotion_word_result(emotion):
+    """The user named the emotion ("sad", "i'm so stressed"): take it as said."""
+    return {
+        **_build_explicit_emotion_result(emotion),
+        'prediction_source': 'emotion_word',
+        'prediction_strategy': 'emotion_word_shortcut',
+    }
+
+
 def _build_explicit_emotion_result(emotion):
     normalized_emotion = str(emotion or '').strip().lower()
     if normalized_emotion not in EMOTIONS:
@@ -591,17 +655,20 @@ def analyze_emotion(request):
         _record_support_event(RISK_CRISIS, 'phrase', 'analyze_emotion')
         return Response(_build_crisis_response_payload(severity, support_subject(text)))
 
+    # Gibberish, non-English, off-topic and unclear text get a prompt to try
+    # again instead of a guessed emotion (see api/input_validation.py).
+    decision = decide_after_crisis(text, _classify_text)
+    if decision.status != STATUS_OK:
+        return Response(_build_clarify_payload(decision.status))
+
     outcome_mode = _request_outcome_mode(request)
     session_length_minutes = _request_session_length_minutes(request)
     check_in_frequency_tracks = _request_check_in_frequency_tracks(request)
 
-    # Run BERT emotion classification
-    try:
-        classifier = get_classifier()
-        result = classifier.predict(text)
-    except Exception:
-        logger.exception("Emotion analysis failed for text input")
-        result = _fallback_analysis()
+    if decision.route == ROUTE_EMOTION_WORD:
+        result = _build_emotion_word_result(decision.emotion)
+    else:
+        result = decision.result
 
     payload = _build_emotion_response_payload(
         request,
@@ -611,6 +678,13 @@ def analyze_emotion(request):
         outcome_mode=outcome_mode,
         session_length_minutes=session_length_minutes,
         check_in_frequency_tracks=check_in_frequency_tracks,
+    )
+    payload['input_status'] = STATUS_OK
+    payload['clarify_message'] = None
+    payload['input_route'] = (
+        ROUTE_EMOTION_WORD
+        if result.get('prediction_source') == 'emotion_word'
+        else ROUTE_MODEL
     )
     concern_trigger = assess_concern(text, result)
     if concern_trigger:

@@ -56,7 +56,9 @@ class EmotionDisplayNameTests(APITestCase):
     def test_analyze_labels_top_and_secondary_emotions(self, mock_classifier):
         mock_classifier.return_value.predict.return_value = PREDICTION
 
-        body = self.client.post('/api/analyze/', {'text': 'lets go'}, format='json').json()
+        body = self.client.post(
+            '/api/analyze/', {'text': 'I feel so pumped to finish my project today'}, format='json',
+        ).json()
 
         self.assertEqual(body['emotion'], 'motivational')
         self.assertEqual(body['emotion_info']['display_name'], 'Motivated')

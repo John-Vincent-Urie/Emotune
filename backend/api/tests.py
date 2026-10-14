@@ -788,7 +788,9 @@ class AnalyzeEmotionTests(TestCase):
     def test_a_classifier_failure_still_answers_with_the_mixed_list(self):
         with patch('api.views.get_classifier') as get_classifier:
             get_classifier.return_value.predict.side_effect = RuntimeError('classifier crashed')
-            body = self.client.post('/api/analyze/', {'text': 'hmm'}, format='json').json()
+            body = self.client.post(
+                '/api/analyze/', {'text': 'I feel strange about everything today'}, format='json',
+            ).json()
 
         self.assertEqual(body['emotion'], 'mixed')
         self.assertEqual(body['total'], 6)

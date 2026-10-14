@@ -83,7 +83,7 @@ class SessionLengthApiTests(APITestCase):
         mock_classifier.return_value.predict.return_value = PREDICTION
         response = self.client.post(
             '/api/analyze/',
-            {'text': 'winding down', 'session_length_minutes': 15},
+            {'text': 'I sat by the lake and everything felt peaceful', 'session_length_minutes': 15},
             format='json',
         )
         self.assertEqual(response.status_code, 200)
@@ -103,7 +103,7 @@ class SessionLengthApiTests(APITestCase):
     def test_analyze_without_session_length_has_no_plan(self, mock_classifier):
         mock_classifier.return_value.predict.return_value = PREDICTION
         response = self.client.post(
-            '/api/analyze/', {'text': 'winding down'}, format='json',
+            '/api/analyze/', {'text': 'I sat by the lake and everything felt peaceful'}, format='json',
         )
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.json()['session_plan'])
@@ -131,7 +131,7 @@ class SessionLengthApiTests(APITestCase):
         analyze = self.client.post(
             '/api/analyze/',
             {
-                'text': 'winding down',
+                'text': 'I sat by the lake and everything felt peaceful',
                 'session_length_minutes': 15,
                 'check_in_frequency_tracks': 3,
             },
@@ -208,7 +208,7 @@ class SessionLengthApiTests(APITestCase):
         for bad in ('', None, 'abc', -5):
             response = self.client.post(
                 '/api/analyze/',
-                {'text': 'winding down', 'session_length_minutes': bad},
+                {'text': 'I sat by the lake and everything felt peaceful', 'session_length_minutes': bad},
                 format='json',
             )
             self.assertEqual(response.status_code, 200, bad)
