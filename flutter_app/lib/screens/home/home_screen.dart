@@ -19,6 +19,7 @@ import '../support/support_contact_quick_list.dart';
 import '../support/support_screen.dart';
 import '../../services/support_contacts.dart';
 import '../../theme/emotion_names.dart';
+import 'input_status.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,6 +36,9 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isAnalyzing = false;
   Map<String, dynamic>? _lastResult;
   String? _aiMessage;
+  // The server declined to read an emotion from the text (gibberish,
+  // non-English, not about the user's feelings, or unsure) and asks again.
+  String? _clarifyMessage;
   // A failed analyze. Kept apart from [_aiMessage] so an error never renders
   // as if it were EmoTune's reply.
   String? _analyzeError;
@@ -90,7 +94,10 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   bool get _isEmptyState =>
-      _tracks.isEmpty && _aiMessage == null && _analyzeError == null;
+      _tracks.isEmpty &&
+      _aiMessage == null &&
+      _analyzeError == null &&
+      _clarifyMessage == null;
 
   @override
   Widget build(BuildContext context) {
@@ -140,6 +147,10 @@ class _HomeScreenState extends State<HomeScreen>
                   children: [
                     if (_analyzeError != null) ...[
                       _buildAnalyzeError(colors),
+                      const SizedBox(height: 16),
+                    ],
+                    if (_clarifyMessage != null) ...[
+                      _buildClarifyPrompt(colors),
                       const SizedBox(height: 16),
                     ],
                     // First, above the reply and the playlist: on a 360x820
@@ -336,6 +347,7 @@ class _HomeScreenState extends State<HomeScreen>
       _isAnalyzing = true;
       _tracks = [];
       _aiMessage = null;
+      _clarifyMessage = null;
       _analyzeError = null;
       _analyzeErrorIsNetwork = false;
       _isCrisis = false;
@@ -350,10 +362,22 @@ class _HomeScreenState extends State<HomeScreen>
       if (!mounted || requestId != _requestSequence) {
         return;
       }
+      final isCrisis = result['crisis'] == true;
+      final clarify = isCrisis ? null : clarifyMessageFor(result);
+      if (clarify != null) {
+        // No emotion was read, so no songs: ask again and leave the text in
+        // the composer for the user to rewrite.
+        setState(() {
+          _lastResult = null;
+          _aiMessage = null;
+          _tracks = [];
+          _clarifyMessage = clarify;
+        });
+        return;
+      }
       final normalizedTracks = PlayerProvider.normalizeTrackList(
         List<dynamic>.from(result['tracks'] ?? []),
       );
-      final isCrisis = result['crisis'] == true;
       final checkIn = result['support_check_in'];
       setState(() {
         _lastResult = result;
@@ -404,6 +428,38 @@ class _HomeScreenState extends State<HomeScreen>
         setState(() => _isAnalyzing = false);
       }
     }
+  }
+
+  Widget _buildClarifyPrompt(EmoTuneColors colors) {
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colors.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: colors.divider),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.edit_note, color: colors.textSecondary, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                _clarifyMessage!,
+                style: TextStyle(
+                  color: colors.textPrimary,
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _openCrisisSupport() {
